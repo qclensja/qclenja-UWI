@@ -79,12 +79,11 @@ function authGate(){
     <form data-form="reqform" class="stack">${fld('rq-name','Full name','text','autocomplete="name" value="'+esc(UI.rqName||'')+'"')}${fld('rq-email','Email address','email','autocapitalize="none" autocomplete="email" value="'+esc(UI.rqEmail||'')+'"')}${amsg()}<button class="btn primary" type="submit">Send request</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
   }
   if(!S.users.length&&!svcOn()&&!UI.setupNew)return shell(`<div><h2>Welcome to QCLens</h2><p class="muted" style="margin:6px 0 0">This device has no laboratory data yet. Which of these describes you?</p></div>
-    <div class="panelcard stack"><b>My lab already uses QCLens</b><p class="small muted" style="margin:0">You are a worker or administrator signing in on a new device. Connect first, then sign in with your own username and password. Do not create a new administrator.</p><button class="btn primary" type="button" data-act="svcopen">Connect this device to my lab</button></div>
+    <div class="panelcard stack"><b>My lab already uses QCLens</b><p class="small muted" style="margin:0">Do not create a new administrator. Open the QCLens link your administrator sent you. Opening it connects this device to your lab automatically, and you can then sign in or request access.</p></div>
     <div class="panelcard stack"><b>We are setting up QCLens for the first time</b><p class="small muted" style="margin:0">Only for the very first person, who becomes the administrator.</p><button class="btn" type="button" data-act="newlab">Create the administrator account</button></div>`);
   if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
-    <button class="btn primary" type="submit">Create account and sign in</button></form>
-    <div class="small muted" style="margin-top:10px"></div><button class="btn" type="button" data-act="svcopen" style="margin-top:8px">Already use QCLens? Connect this device with the lab service address</button>`);
+    <button class="btn primary" type="submit">Create account and sign in</button></form>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -92,8 +91,7 @@ function authGate(){
     return shell(`<div><h2>Sign in</h2><p class="muted" style="margin:6px 0 0">Levey-Jennings QC for the clinical laboratory</p></div>
       <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
-      <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>
-      <button class="btn" type="button" data-act="svcopen" style="margin-top:4px">${ghOn()?'Change service address':'New device? Enter the lab service address'}</button>`);
+      <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
