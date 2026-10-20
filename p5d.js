@@ -1,8 +1,9 @@
 /* ===== Setup summary, main render, events ===== */
 function renderSetupHome(){
-  const st=S.setup,recs=deptList(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
+  if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
+  const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="adddept">Add department</button></div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
    <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b> · ${esc(st.sub)}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
@@ -13,7 +14,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${renderGithub()}<div class="panel stack"><h3>Data</h3><div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device.</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -28,10 +29,10 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():S.setup.sub+' · '+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits']];if(isAdmin())T.push(['setup','Setup'],['users','Users'],['audit','Audit log']);
+    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']];if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canSetup())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():renderSetupHome();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():renderSetupHome();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h;
@@ -50,8 +51,9 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff']);
-  if(ADMIN.has(act)&&!isAdmin())return;
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet']);
+  const ADMONLY=new Set(['backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
@@ -151,18 +153,21 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(!isAdmin()&&!(t.id==='qcdate'||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
+  if(!canSetup()&&!(t.id==='qcdate'||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
   if(t.id==='af-to'){AF.to=t.value;AF.limit=100;return render()}
+  if(d.rulet){if(!isAdmin())return;S.rules=S.rules||{};const on=t.checked;if(on)delete S.rules[d.rulet];else S.rules[d.rulet]=false;S.rulesAt=nowIso();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name,null,[]);save();return render()}
+  if((d.udept||d.urole)&&!isAdmin())return;
+  if(d.path==='dept'&&!isAdmin())return;
   if(d.udept){const [uid_,did]=d.udept.split(':'),u=S.users.find(x=>x.id===uid_);if(!u)return;
     const cur=Array.isArray(u.depts)?u.depts.slice():deptList().map(x=>x.id);
     u.depts=t.checked?[...new Set([...cur,did])]:cur.filter(x=>x!==did);
     const nm=(deptList().find(x=>x.id===did)||{}).dept;audit('User departments changed',u.name+': '+(t.checked?'added ':'removed ')+nm+' ('+(u.depts.map(i=>(deptList().find(x=>x.id===i)||{}).dept).join(', ')||'none')+')');save();return render()}
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
-    audit('Role changed',u.name+': '+(u.role==='admin'?'administrator':'technologist')+' to '+(t.value==='admin'?'administrator':'technologist'));u.role=t.value;save();return render()}
+    audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;save();return render()}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
@@ -197,7 +202,7 @@ document.addEventListener('change',e=>{
   if(t.id==='as-newname'){UI.asgName=t.value;return}
   if(t.id==='instf'){UI.inst=t.value;return render()}
   if(t.id==='deptf'){UI.dept=t.value;UI.inst='';return render()}
-  if(t.id==='deptsw'){syncCtx();loadCtx(t.value);save();return render()}
+  if(t.id==='deptsw'){if(!canSeeD(t.value))return;syncCtx();loadCtx(t.value);save();return render()}
   if(d.llot){const [id,lv]=d.llot.split(':');anOf(id).targets[0].levels[+lv].lot=t.value.trim();save();return}
   if(d.lmat){const [id,lv]=d.lmat.split(':');anOf(id).targets[0].levels[+lv].material=t.value.trim();save();return refreshNext()}
   if(d.nlev){const a=anOf(d.nlev);a.nlevCustom=true;setLevels(a,+t.value);save();return render()}

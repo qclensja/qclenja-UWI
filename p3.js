@@ -52,6 +52,8 @@ const RULES={
    fix:['Ask what changed when the shift began: new reagent lot or pack, calibration, control vial or lot, maintenance, lamp or electrode change.','Check that calibration used the correct calibrator lot and passed its acceptance checks.','Recalibrate and re-run QC; compare with another analyser or peer group.','If a new control lot started the shift, record it with Lot change and a comment so the target is updated.','Check the patient moving average before the shift becomes a rejection (4₁ₛ or 10ₓ).']}
 };
 /* trends and shifts per control level: runs of points that drift or sit on one side of the mean */
+const RORDER=['1-2s','1-3s','2-2s','R-4s','4-1s','10x','T7','S6'];
+const ruleOn=k=>{try{return !S.rules||S.rules[k]!==false}catch(e){return true}};
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -66,11 +68,11 @@ function patternsFor(a,lv,results){
       let j=i+1;while(j+1<seg.length&&Math.sign(seg[j+1].z-seg[j].z)===d)j++;
       if(j-i+1>=7)push('trend',d,seg.slice(i,j+1),seg);i=d?j:j+1}
   });
-  return out;
+  return out.filter(p=>ruleOn(p.kind==='shift'?'S6':'T7'));
 }
 function evaluate(a,results){
   const out={}; // resultId -> [{rule,sev}]
-  const add=(r,rule)=>{const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
+  const add=(r,rule)=>{if(!ruleOn(rule))return;const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
   const rs=results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:x.lv-y.lv);
   const segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});

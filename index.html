@@ -196,6 +196,8 @@ const RULES={
    fix:['Ask what changed when the shift began: new reagent lot or pack, calibration, control vial or lot, maintenance, lamp or electrode change.','Check that calibration used the correct calibrator lot and passed its acceptance checks.','Recalibrate and re-run QC; compare with another analyser or peer group.','If a new control lot started the shift, record it with Lot change and a comment so the target is updated.','Check the patient moving average before the shift becomes a rejection (4₁ₛ or 10ₓ).']}
 };
 /* trends and shifts per control level: runs of points that drift or sit on one side of the mean */
+const RORDER=['1-2s','1-3s','2-2s','R-4s','4-1s','10x','T7','S6'];
+const ruleOn=k=>{try{return !S.rules||S.rules[k]!==false}catch(e){return true}};
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -210,11 +212,11 @@ function patternsFor(a,lv,results){
       let j=i+1;while(j+1<seg.length&&Math.sign(seg[j+1].z-seg[j].z)===d)j++;
       if(j-i+1>=7)push('trend',d,seg.slice(i,j+1),seg);i=d?j:j+1}
   });
-  return out;
+  return out.filter(p=>ruleOn(p.kind==='shift'?'S6':'T7'));
 }
 function evaluate(a,results){
   const out={}; // resultId -> [{rule,sev}]
-  const add=(r,rule)=>{const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
+  const add=(r,rule)=>{if(!ruleOn(rule))return;const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
   const rs=results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:x.lv-y.lv);
   const segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -354,7 +356,7 @@ const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -681,9 +683,10 @@ function saveQC(){
     ids.push(r.id);
     const ex=(targetFor(an,UI.date).levels[L]||{}).exp;if(ex&&expInfo(ex,UI.date).st==='expired')expd.push(an.name+' '+levelName(L));
   });
-  if(added.length)audit('QC entered',fmtDate(UI.date)+': '+added.join('; '));
-  if(expd.length)audit('QC run on expired material',fmtDate(UI.date)+': '+expd.join('; '));
-  if(edited.length)audit('QC edited',fmtDate(UI.date)+': '+edited.join('; '));
+  const dOf=[...new Set(inputs.map(i=>(anOf(i.dataset.in.split(':')[0])||{}).dept).filter(Boolean))];
+  if(added.length)audit('QC entered',fmtDate(UI.date)+': '+added.join('; '),null,dOf);
+  if(expd.length)audit('QC run on expired material',fmtDate(UI.date)+': '+expd.join('; '),null,dOf);
+  if(edited.length)audit('QC edited',fmtDate(UI.date)+': '+edited.join('; '),null,dOf);
   UI.lateReason=null;UI.report=ids;UI.draft={};save();if(expd.length)setTimeout(()=>toast('Saved, but the QC material for '+expd.join(', ')+' is past its expiry date.'),50);
   if(!ids.length){toast(bad?'Some values are not numbers.':'Enter at least one QC value.');return}
   const f=allFlags(),n=ids.filter(id=>(f[id]||[]).some(x=>x.sev==='reject')).length;
@@ -805,7 +808,7 @@ function saveLot(){
   if(msg){err.textContent=msg;err.hidden=false;return true}
   const t={from:date,type:document.getElementById('m-type').value,comment:note,...stampNow(),levels};
   a.targets=a.targets.filter(x=>x.from!==date);a.targets.push(t);a.targets.sort((x,y)=>x.from<y.from?-1:1);
-  audit('Targets changed',a.name+' from '+fmtDate(date)+': '+t.type+'. '+note);
+  audit('Targets changed',a.name+' from '+fmtDate(date)+': '+t.type+'. '+note,null,a.dept);
   UI.modal=null;save();toast('New targets saved from '+fmtDate(date)+'.');
 }
 /* ===== Excel export ===== */
@@ -1073,14 +1076,19 @@ function asgMove(copy){
 const IDLE_MS=30*60*1000;
 let memSess=null,SESS=null,CU=null;
 const isAdmin=()=>!!CU&&CU.role==='admin';
+const isSup=()=>!!CU&&CU.role==='sup';
+const canSetup=()=>isAdmin()||isSup();
+const roleName=r=>r==='admin'?'Administrator':r==='sup'?'Supervisory technologist':'Technologist';
+const scoped=r=>r!=='admin';
 const nowIso=()=>new Date().toISOString();
 const fmtTs=iso=>{if(!iso)return '';const d=new Date(iso);return isNaN(d)?'':pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
 const byLine=r=>(r.byName?'Entered by '+esc(r.byName)+' · '+fmtTs(r.at):'Entered before sign-in was added')+(r.upd?' · edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at):'');
 const byShort=r=>r.byName?esc(r.byName)+' · '+fmtTs(r.upd?r.upd.at:r.at):'';
 function stampNow(){return {by:CU?CU.id:null,byName:CU?CU.name:'',at:nowIso()}}
-function audit(action,detail,actor){
+function audit(action,detail,actor,depts){
   const u=actor||CU||{};
-  S.audit.push({id:uid(),at:nowIso(),by:u.id||null,byName:u.name||'',action,detail:String(detail||'').slice(0,600)});
+  let dp=depts==null?(S.setup&&S.setup.cur?[S.setup.cur]:[]):[].concat(depts);
+  S.audit.push({id:uid(),at:nowIso(),by:u.id||null,byName:u.name||'',action,detail:String(detail||'').slice(0,600),depts:dp});
   if(S.audit.length>8000)S.audit.splice(0,S.audit.length-8000);
 }
 /* session */
@@ -1149,7 +1157,7 @@ function authGate(){
   return '';
 }
 function userBar(){
-  return `<div class="userbar"><span class="who"><b>${esc(CU.name)}</b> <span class="chip${CU.role==='admin'?' acc':''}">${CU.role==='admin'?'Administrator':'Technologist'}</span></span>
+  return `<div class="userbar"><span class="who"><b>${esc(CU.name)}</b> <span class="chip${CU.role==='admin'?' acc':''}">${roleName(CU.role)}</span></span>
    <button class="btn sm" data-act="acct">Account</button><button class="btn sm" data-act="signout">Sign out</button></div>`;
 }
 function renderAcctModal(){
@@ -1201,8 +1209,8 @@ async function doUserAdd(){
   if(S.users.some(x=>x.username===un))return toast('That username is already taken.');
   if(p.length<8)return toast('The temporary password needs at least 8 characters.');
   const u={id:uid(),username:un,name,role,active:true,mustChange:true,created:nowIso(),pw:await hashPw(p)};
-  if(role==='tech'&&deptList().length){const ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this technologist.');u.depts=ds}
-  S.users.push(u);audit('User created',name+' ('+un+', '+(role==='admin'?'administrator':'technologist')+')');save();toast('User created. They choose their own password at first sign-in.');
+  if(role!=='admin'&&deptList().length){const ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this user.');u.depts=ds}
+  S.users.push(u);audit('User created',name+' ('+un+', '+roleName(role).toLowerCase()+')');save();toast('User created. They choose their own password at first sign-in.');
 }
 async function doUserReset(){
   const id=UI.resetFor,u=S.users.find(x=>x.id===id),p=gv('rs-pass');
@@ -1233,29 +1241,30 @@ function deptCell(u){
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
     return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}</div></td>
-     <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${u.role==='admin'?'Administrator':'Technologist'}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
+     <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="sup"${u.role==='sup'?' selected':''}>Supervisory technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
      <td>${deptCell(u)}</td>
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}`}</td></tr>`}).join('');
-  return `<div class="stack"><div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack"><div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
-    <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="admin">Administrator</option></select></label>
-    ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this technologist can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
+    <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
+    ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this user can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
     <label class="f">Temporary password<span class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="nu-pass" autocomplete="off"><button class="btn sm" type="button" data-act="genpw" data-t="nu-pass">Generate</button></span></label></div>
     <div><button class="btn primary" type="submit">Create user</button></div></form>
    <p class="small muted" style="margin:10px 0 0">Give the person their username and temporary password. They choose their own password the first time they sign in.</p></div></div>`;
 }
 const AF={user:'',act:'',from:'',to:'',limit:100};
+const auditOk=x=>!scoped(CU&&CU.role)||!Array.isArray(CU.depts)&&(x.depts||[]).length>0||Array.isArray(CU.depts)&&(x.depts||[]).some(d=>CU.depts.includes(d));
 function auditRows(){
-  return S.audit.filter(x=>(!AF.user||x.by===AF.user||x.byName===AF.user)&&(!AF.act||x.action===AF.act)&&(!AF.from||x.at.slice(0,10)>=AF.from)&&(!AF.to||dstr(new Date(x.at))<=AF.to)).slice().reverse();
+  return S.audit.filter(x=>auditOk(x)&&(!AF.user||x.by===AF.user||x.byName===AF.user)&&(!AF.act||x.action===AF.act)&&(!AF.from||x.at.slice(0,10)>=AF.from)&&(!AF.to||dstr(new Date(x.at))<=AF.to)).slice().reverse();
 }
 function renderAudit(){
-  const rows=auditRows(),acts=[...new Set(S.audit.map(x=>x.action))].sort();
-  const names=[...new Map(S.audit.filter(x=>x.byName).map(x=>[x.by||x.byName,x.byName])).entries()];
+  const rows=auditRows(),vis=S.audit.filter(auditOk),acts=[...new Set(vis.map(x=>x.action))].sort();
+  const names=[...new Map(vis.filter(x=>x.byName).map(x=>[x.by||x.byName,x.byName])).entries()];
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Audit log</h2><p class="muted small" style="margin:4px 0 0">Every sign-in, QC entry, edit, override, setup change and user change, with who did it and when. Times are in this computer's time zone.</p></div><button class="btn primary" data-act="xaudit">Export to Excel</button></div>
    <div class="row" style="margin-top:12px"><label class="f">User<select id="af-user" style="width:auto"><option value="">Everyone</option>${names.map(([k,n])=>`<option value="${esc(k)}"${AF.user===k?' selected':''}>${esc(n)}</option>`).join('')}</select></label>
     <label class="f">Action<select id="af-act" style="width:auto"><option value="">All actions</option>${acts.map(a=>`<option${AF.act===a?' selected':''}>${esc(a)}</option>`).join('')}</select></label>
@@ -1522,7 +1531,9 @@ function mergeStates(L,R){
   out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));
   const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
+  if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   out.tomb=[...tomb];
+  if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
 }
 const tomb=(...ids)=>{S.tomb=S.tomb||[];ids.forEach(i=>{if(i&&!S.tomb.includes(i))S.tomb.push(i)})};
@@ -1603,11 +1614,32 @@ function renderGithub(){
    <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>${ghOn()?'Change connection settings':'Connect to GitHub'}</b></summary><div style="margin-top:10px">${ghForm()}
    <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Each device (and each person who signs in on it) needs the same token once, on the sign-in screen. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
 }
+/* ===== Westgard rules tab: shows every rule applied to QC points; admin switches them on or off ===== */
+function ruleCounts(){
+  const c={};RORDER.forEach(k=>c[k]=0);const res=VR();
+  VA().forEach(a=>{const f=evaluate(a,res);Object.values(f).forEach(l=>l.forEach(x=>{if(c[x.rule]!=null)c[x.rule]++}))});
+  const p=VA().length;return c;
+}
+function renderRules(){
+  const cnt=ruleCounts(),adm=isAdmin(),off=RORDER.filter(k=>!ruleOn(k)).length;
+  const card=k=>{const R=RULES[k],on=ruleOn(k),rej=R.sev==='reject';
+    return `<div class="panelcard" style="${on?'':'opacity:.65'}"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px">
+     <div><div class="row" style="gap:8px"><b style="font-size:1.05em">${R.name}</b><span class="chip ${rej?'bad':'warn'}">${rej?'Rejection rule':'Warning rule'}</span><span class="chip ${on?'good':''}">${on?'On':'Off'}</span></div>
+     <p class="small" style="margin:6px 0 0;max-width:80ch">${R.desc}</p>
+     <p class="small muted" style="margin:6px 0 0">Flagged ${cnt[k]} time${cnt[k]===1?'':'s'} in the QC points you can see.</p>
+     <details style="margin-top:6px"><summary class="small" style="cursor:pointer">What to do when it triggers</summary><ol class="small" style="margin:6px 0 0 18px;padding:0">${R.fix.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></details></div>
+     ${adm?`<label class="row" style="gap:8px;flex-wrap:nowrap;white-space:nowrap;font-weight:600"><input type="checkbox" data-rulet="${k}"${on?' checked':''} aria-label="Apply ${esc(R.name)}"> Apply</label>`:''}</div></div>`};
+  return `<div class="stack"><div class="panel stack"><div><h2>Westgard rules</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Every rule QCLens checks on each QC point, across all control levels and analytes.${adm?' As administrator you can switch a rule off for the whole laboratory. A rule that is off is not checked, shown on charts or counted in alerts, and the change is recorded in the audit log.':' Only an administrator can switch rules on or off.'}</p></div>
+   ${off?`<div class="panelcard" style="border-color:var(--warn)"><b>${off} rule${off===1?' is':'s are'} switched off.</b> <span class="small">QC points are not being checked against ${RORDER.filter(k=>!ruleOn(k)).map(k=>RULES[k].name).join(', ')}.</span></div>`:''}
+   <h3 style="margin:6px 0 0">Rejection rules</h3>${RORDER.filter(k=>RULES[k].sev==='reject').map(card).join('')}
+   <h3 style="margin:6px 0 0">Warning rules</h3>${RORDER.filter(k=>RULES[k].sev!=='reject').map(card).join('')}</div></div>`;
+}
 /* ===== Setup summary, main render, events ===== */
 function renderSetupHome(){
-  const st=S.setup,recs=deptList(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
+  if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
+  const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="adddept">Add department</button></div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
    <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b> · ${esc(st.sub)}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
@@ -1618,7 +1650,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${renderGithub()}<div class="panel stack"><h3>Data</h3><div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device.</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -1633,10 +1665,10 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():S.setup.sub+' · '+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits']];if(isAdmin())T.push(['setup','Setup'],['users','Users'],['audit','Audit log']);
+    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']];if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canSetup())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():renderSetupHome();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():renderSetupHome();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h;
@@ -1655,8 +1687,9 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff']);
-  if(ADMIN.has(act)&&!isAdmin())return;
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet']);
+  const ADMONLY=new Set(['backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
@@ -1756,18 +1789,21 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(!isAdmin()&&!(t.id==='qcdate'||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
+  if(!canSetup()&&!(t.id==='qcdate'||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
   if(t.id==='af-to'){AF.to=t.value;AF.limit=100;return render()}
+  if(d.rulet){if(!isAdmin())return;S.rules=S.rules||{};const on=t.checked;if(on)delete S.rules[d.rulet];else S.rules[d.rulet]=false;S.rulesAt=nowIso();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name,null,[]);save();return render()}
+  if((d.udept||d.urole)&&!isAdmin())return;
+  if(d.path==='dept'&&!isAdmin())return;
   if(d.udept){const [uid_,did]=d.udept.split(':'),u=S.users.find(x=>x.id===uid_);if(!u)return;
     const cur=Array.isArray(u.depts)?u.depts.slice():deptList().map(x=>x.id);
     u.depts=t.checked?[...new Set([...cur,did])]:cur.filter(x=>x!==did);
     const nm=(deptList().find(x=>x.id===did)||{}).dept;audit('User departments changed',u.name+': '+(t.checked?'added ':'removed ')+nm+' ('+(u.depts.map(i=>(deptList().find(x=>x.id===i)||{}).dept).join(', ')||'none')+')');save();return render()}
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
-    audit('Role changed',u.name+': '+(u.role==='admin'?'administrator':'technologist')+' to '+(t.value==='admin'?'administrator':'technologist'));u.role=t.value;save();return render()}
+    audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;save();return render()}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
@@ -1802,7 +1838,7 @@ document.addEventListener('change',e=>{
   if(t.id==='as-newname'){UI.asgName=t.value;return}
   if(t.id==='instf'){UI.inst=t.value;return render()}
   if(t.id==='deptf'){UI.dept=t.value;UI.inst='';return render()}
-  if(t.id==='deptsw'){syncCtx();loadCtx(t.value);save();return render()}
+  if(t.id==='deptsw'){if(!canSeeD(t.value))return;syncCtx();loadCtx(t.value);save();return render()}
   if(d.llot){const [id,lv]=d.llot.split(':');anOf(id).targets[0].levels[+lv].lot=t.value.trim();save();return}
   if(d.lmat){const [id,lv]=d.lmat.split(':');anOf(id).targets[0].levels[+lv].material=t.value.trim();save();return refreshNext()}
   if(d.nlev){const a=anOf(d.nlev);a.nlevCustom=true;setLevels(a,+t.value);save();return render()}

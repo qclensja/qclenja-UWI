@@ -114,6 +114,6 @@ function saveLot(){
   if(msg){err.textContent=msg;err.hidden=false;return true}
   const t={from:date,type:document.getElementById('m-type').value,comment:note,...stampNow(),levels};
   a.targets=a.targets.filter(x=>x.from!==date);a.targets.push(t);a.targets.sort((x,y)=>x.from<y.from?-1:1);
-  audit('Targets changed',a.name+' from '+fmtDate(date)+': '+t.type+'. '+note);
+  audit('Targets changed',a.name+' from '+fmtDate(date)+': '+t.type+'. '+note,null,a.dept);
   UI.modal=null;save();toast('New targets saved from '+fmtDate(date)+'.');
 }

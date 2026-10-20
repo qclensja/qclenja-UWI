@@ -99,9 +99,10 @@ function saveQC(){
     ids.push(r.id);
     const ex=(targetFor(an,UI.date).levels[L]||{}).exp;if(ex&&expInfo(ex,UI.date).st==='expired')expd.push(an.name+' '+levelName(L));
   });
-  if(added.length)audit('QC entered',fmtDate(UI.date)+': '+added.join('; '));
-  if(expd.length)audit('QC run on expired material',fmtDate(UI.date)+': '+expd.join('; '));
-  if(edited.length)audit('QC edited',fmtDate(UI.date)+': '+edited.join('; '));
+  const dOf=[...new Set(inputs.map(i=>(anOf(i.dataset.in.split(':')[0])||{}).dept).filter(Boolean))];
+  if(added.length)audit('QC entered',fmtDate(UI.date)+': '+added.join('; '),null,dOf);
+  if(expd.length)audit('QC run on expired material',fmtDate(UI.date)+': '+expd.join('; '),null,dOf);
+  if(edited.length)audit('QC edited',fmtDate(UI.date)+': '+edited.join('; '),null,dOf);
   UI.lateReason=null;UI.report=ids;UI.draft={};save();if(expd.length)setTimeout(()=>toast('Saved, but the QC material for '+expd.join(', ')+' is past its expiry date.'),50);
   if(!ids.length){toast(bad?'Some values are not numbers.':'Enter at least one QC value.');return}
   const f=allFlags(),n=ids.filter(id=>(f[id]||[]).some(x=>x.sev==='reject')).length;

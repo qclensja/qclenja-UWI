@@ -59,7 +59,9 @@ function mergeStates(L,R){
   out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));
   const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
+  if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   out.tomb=[...tomb];
+  if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
 }
 const tomb=(...ids)=>{S.tomb=S.tomb||[];ids.forEach(i=>{if(i&&!S.tomb.includes(i))S.tomb.push(i)})};

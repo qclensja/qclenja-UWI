@@ -2,14 +2,19 @@
 const IDLE_MS=30*60*1000;
 let memSess=null,SESS=null,CU=null;
 const isAdmin=()=>!!CU&&CU.role==='admin';
+const isSup=()=>!!CU&&CU.role==='sup';
+const canSetup=()=>isAdmin()||isSup();
+const roleName=r=>r==='admin'?'Administrator':r==='sup'?'Supervisory technologist':'Technologist';
+const scoped=r=>r!=='admin';
 const nowIso=()=>new Date().toISOString();
 const fmtTs=iso=>{if(!iso)return '';const d=new Date(iso);return isNaN(d)?'':pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
 const byLine=r=>(r.byName?'Entered by '+esc(r.byName)+' · '+fmtTs(r.at):'Entered before sign-in was added')+(r.upd?' · edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at):'');
 const byShort=r=>r.byName?esc(r.byName)+' · '+fmtTs(r.upd?r.upd.at:r.at):'';
 function stampNow(){return {by:CU?CU.id:null,byName:CU?CU.name:'',at:nowIso()}}
-function audit(action,detail,actor){
+function audit(action,detail,actor,depts){
   const u=actor||CU||{};
-  S.audit.push({id:uid(),at:nowIso(),by:u.id||null,byName:u.name||'',action,detail:String(detail||'').slice(0,600)});
+  let dp=depts==null?(S.setup&&S.setup.cur?[S.setup.cur]:[]):[].concat(depts);
+  S.audit.push({id:uid(),at:nowIso(),by:u.id||null,byName:u.name||'',action,detail:String(detail||'').slice(0,600),depts:dp});
   if(S.audit.length>8000)S.audit.splice(0,S.audit.length-8000);
 }
 /* session */
@@ -78,7 +83,7 @@ function authGate(){
   return '';
 }
 function userBar(){
-  return `<div class="userbar"><span class="who"><b>${esc(CU.name)}</b> <span class="chip${CU.role==='admin'?' acc':''}">${CU.role==='admin'?'Administrator':'Technologist'}</span></span>
+  return `<div class="userbar"><span class="who"><b>${esc(CU.name)}</b> <span class="chip${CU.role==='admin'?' acc':''}">${roleName(CU.role)}</span></span>
    <button class="btn sm" data-act="acct">Account</button><button class="btn sm" data-act="signout">Sign out</button></div>`;
 }
 function renderAcctModal(){
@@ -130,8 +135,8 @@ async function doUserAdd(){
   if(S.users.some(x=>x.username===un))return toast('That username is already taken.');
   if(p.length<8)return toast('The temporary password needs at least 8 characters.');
   const u={id:uid(),username:un,name,role,active:true,mustChange:true,created:nowIso(),pw:await hashPw(p)};
-  if(role==='tech'&&deptList().length){const ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this technologist.');u.depts=ds}
-  S.users.push(u);audit('User created',name+' ('+un+', '+(role==='admin'?'administrator':'technologist')+')');save();toast('User created. They choose their own password at first sign-in.');
+  if(role!=='admin'&&deptList().length){const ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this user.');u.depts=ds}
+  S.users.push(u);audit('User created',name+' ('+un+', '+roleName(role).toLowerCase()+')');save();toast('User created. They choose their own password at first sign-in.');
 }
 async function doUserReset(){
   const id=UI.resetFor,u=S.users.find(x=>x.id===id),p=gv('rs-pass');
@@ -162,29 +167,30 @@ function deptCell(u){
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
     return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}</div></td>
-     <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${u.role==='admin'?'Administrator':'Technologist'}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
+     <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="sup"${u.role==='sup'?' selected':''}>Supervisory technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
      <td>${deptCell(u)}</td>
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}`}</td></tr>`}).join('');
-  return `<div class="stack"><div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack"><div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
-    <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="admin">Administrator</option></select></label>
-    ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this technologist can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
+    <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
+    ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this user can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
     <label class="f">Temporary password<span class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="nu-pass" autocomplete="off"><button class="btn sm" type="button" data-act="genpw" data-t="nu-pass">Generate</button></span></label></div>
     <div><button class="btn primary" type="submit">Create user</button></div></form>
    <p class="small muted" style="margin:10px 0 0">Give the person their username and temporary password. They choose their own password the first time they sign in.</p></div></div>`;
 }
 const AF={user:'',act:'',from:'',to:'',limit:100};
+const auditOk=x=>!scoped(CU&&CU.role)||!Array.isArray(CU.depts)&&(x.depts||[]).length>0||Array.isArray(CU.depts)&&(x.depts||[]).some(d=>CU.depts.includes(d));
 function auditRows(){
-  return S.audit.filter(x=>(!AF.user||x.by===AF.user||x.byName===AF.user)&&(!AF.act||x.action===AF.act)&&(!AF.from||x.at.slice(0,10)>=AF.from)&&(!AF.to||dstr(new Date(x.at))<=AF.to)).slice().reverse();
+  return S.audit.filter(x=>auditOk(x)&&(!AF.user||x.by===AF.user||x.byName===AF.user)&&(!AF.act||x.action===AF.act)&&(!AF.from||x.at.slice(0,10)>=AF.from)&&(!AF.to||dstr(new Date(x.at))<=AF.to)).slice().reverse();
 }
 function renderAudit(){
-  const rows=auditRows(),acts=[...new Set(S.audit.map(x=>x.action))].sort();
-  const names=[...new Map(S.audit.filter(x=>x.byName).map(x=>[x.by||x.byName,x.byName])).entries()];
+  const rows=auditRows(),vis=S.audit.filter(auditOk),acts=[...new Set(vis.map(x=>x.action))].sort();
+  const names=[...new Map(vis.filter(x=>x.byName).map(x=>[x.by||x.byName,x.byName])).entries()];
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Audit log</h2><p class="muted small" style="margin:4px 0 0">Every sign-in, QC entry, edit, override, setup change and user change, with who did it and when. Times are in this computer's time zone.</p></div><button class="btn primary" data-act="xaudit">Export to Excel</button></div>
    <div class="row" style="margin-top:12px"><label class="f">User<select id="af-user" style="width:auto"><option value="">Everyone</option>${names.map(([k,n])=>`<option value="${esc(k)}"${AF.user===k?' selected':''}>${esc(n)}</option>`).join('')}</select></label>
     <label class="f">Action<select id="af-act" style="width:auto"><option value="">All actions</option>${acts.map(a=>`<option${AF.act===a?' selected':''}>${esc(a)}</option>`).join('')}</select></label>
