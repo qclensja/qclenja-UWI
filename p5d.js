@@ -49,7 +49,7 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,id=el.dataset.id,st=S.setup;
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
-  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
+  const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy']);
   const ADMONLY=new Set(['rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
@@ -60,7 +60,7 @@ document.addEventListener('click',e=>{
    case 'signout':return signOut(false);
    case 'acct':UI.acctMsg='';UI.modal={acct:true};break;
    case 'forgot':UI.auth='forgot';UI.authMsg='';break;
-   case 'backlogin':UI.auth='';UI.authMsg='';UI.ghMsg='';break;
+   case 'backlogin':UI.setupNew=false;UI.auth='';UI.authMsg='';UI.ghMsg='';break;
    case 'recdone':UI.recCode=null;break;
    case 'copyrec':{const sel=()=>{const n=document.getElementById('reccode'),r=document.createRange();r.selectNodeContents(n);const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Select and copy the code.')};
      try{navigator.clipboard.writeText(UI.recCode).then(()=>toast('Code copied.'),sel)}catch(x){sel()}return}
@@ -106,6 +106,7 @@ document.addEventListener('click',e=>{
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
    case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'newlab':UI.setupNew=true;break;
    case 'svcopen':e.preventDefault();UI.auth='conn';UI.ghMsg='';UI.ghDraft=null;break;
    case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
    case 'rqapprove':UI.appr=id;break;

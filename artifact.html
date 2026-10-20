@@ -1188,6 +1188,9 @@ function authGate(){
     return shell(`<div><h2>Request access</h2><p class="muted" style="margin:6px 0 0">Enter your full name and work email address. When an administrator approves your request, a temporary password is sent to that email address.</p></div>
     <form data-form="reqform" class="stack">${fld('rq-name','Full name','text','autocomplete="name" value="'+esc(UI.rqName||'')+'"')}${fld('rq-email','Email address','email','autocapitalize="none" autocomplete="email" value="'+esc(UI.rqEmail||'')+'"')}${amsg()}<button class="btn primary" type="submit">Send request</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
   }
+  if(!S.users.length&&!svcOn()&&!UI.setupNew)return shell(`<div><h2>Welcome to QCLens</h2><p class="muted" style="margin:6px 0 0">This device has no laboratory data yet. Which of these describes you?</p></div>
+    <div class="panelcard stack"><b>My lab already uses QCLens</b><p class="small muted" style="margin:0">You are a worker or administrator signing in on a new device. Connect first, then sign in with your own username and password. Do not create a new administrator.</p><button class="btn primary" type="button" data-act="svcopen">Connect this device to my lab</button></div>
+    <div class="panelcard stack"><b>We are setting up QCLens for the first time</b><p class="small muted" style="margin:0">Only for the very first person, who becomes the administrator.</p><button class="btn" type="button" data-act="newlab">Create the administrator account</button></div>`);
   if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
     <button class="btn primary" type="submit">Create account and sign in</button></form>
@@ -1871,7 +1874,7 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,id=el.dataset.id,st=S.setup;
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
-  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
+  const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy']);
   const ADMONLY=new Set(['rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
@@ -1882,7 +1885,7 @@ document.addEventListener('click',e=>{
    case 'signout':return signOut(false);
    case 'acct':UI.acctMsg='';UI.modal={acct:true};break;
    case 'forgot':UI.auth='forgot';UI.authMsg='';break;
-   case 'backlogin':UI.auth='';UI.authMsg='';UI.ghMsg='';break;
+   case 'backlogin':UI.setupNew=false;UI.auth='';UI.authMsg='';UI.ghMsg='';break;
    case 'recdone':UI.recCode=null;break;
    case 'copyrec':{const sel=()=>{const n=document.getElementById('reccode'),r=document.createRange();r.selectNodeContents(n);const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Select and copy the code.')};
      try{navigator.clipboard.writeText(UI.recCode).then(()=>toast('Code copied.'),sel)}catch(x){sel()}return}
@@ -1928,6 +1931,7 @@ document.addEventListener('click',e=>{
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
    case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'newlab':UI.setupNew=true;break;
    case 'svcopen':e.preventDefault();UI.auth='conn';UI.ghMsg='';UI.ghDraft=null;break;
    case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
    case 'rqapprove':UI.appr=id;break;
