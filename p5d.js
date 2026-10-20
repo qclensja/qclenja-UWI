@@ -49,10 +49,10 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,id=el.dataset.id,st=S.setup;
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
-  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen']);
+  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet']);
-  const ADMONLY=new Set(['backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy']);
+  const ADMONLY=new Set(['rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
@@ -68,7 +68,7 @@ document.addEventListener('click',e=>{
    case 'genpw':{const i=document.getElementById(el.dataset.t);if(i)i.value=genPw();return}
    case 'utoggle':{const u=S.users.find(x=>x.id===id);if(!u||u.id===CU.id)return;
      if(u.role==='admin'&&u.active!==false&&nAdmins()<=1)return toast('There must be at least one active administrator.');
-     u.active=u.active===false;audit(u.active?'User enabled':'User disabled',u.name+' ('+u.username+')');break}
+     u.active=u.active===false;u.mod=nowIso();audit(u.active?'User enabled':'User disabled',u.name+' ('+u.username+')');break}
    case 'ureset':UI.resetFor=id;break;
    case 'ucancel':UI.resetFor=null;break;
    case 'auditmore':AF.limit+=100;break;
@@ -106,6 +106,16 @@ document.addEventListener('click',e=>{
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
    case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'svcopen':e.preventDefault();UI.auth='svc';UI.ghMsg='';break;
+   case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
+   case 'rqapprove':UI.appr=id;break;
+   case 'rqcancel':UI.appr=null;break;
+   case 'rqreject':{const r=S.requests.find(x=>x.id===id);if(r){r.status='declined';r.by=CU.name;r.decidedAt=nowIso();audit('Access request declined',r.name+' <'+r.email+'>');}break}
+   case 'rqconfirm':approveReq(id).then(()=>render());return;
+   case 'credok':UI.lastCred=null;break;
+   case 'copycred':{const c=UI.lastCred;if(c){try{navigator.clipboard.writeText(mailBody(c)).then(()=>toast('Message copied.'),()=>toast('Copy failed.'))}catch(x){toast('Copy failed.')}}return}
+   case 'svcdisc':{GH={};ghSaveCfg();setCred(null);GHS.lastHash=null;GHS.sha=null;GHS.st='idle';GHS.msg='';audit('Sync service disconnected on this device','');break}
+   case 'svccopy':{const l=location.href.split('#')[0]+'#svc='+encodeURIComponent(GH.svc||'');try{navigator.clipboard.writeText(l).then(()=>toast('Link copied.'),()=>toast('Copy failed.'))}catch(x){toast('Copy failed.')}return}
    case 'ghopen':e.preventDefault();UI.auth='gh';UI.ghMsg='';break;
    case 'ghsync':ghSync();return;
    case 'ghoff':{GH={};ghSaveCfg();GHS.lastHash=null;GHS.sha=null;GHS.st='idle';GHS.msg='';audit('GitHub storage disconnected on this device','');break}
@@ -163,11 +173,11 @@ document.addEventListener('change',e=>{
   if(d.path==='dept'&&!isAdmin())return;
   if(d.udept){const [uid_,did]=d.udept.split(':'),u=S.users.find(x=>x.id===uid_);if(!u)return;
     const cur=Array.isArray(u.depts)?u.depts.slice():deptList().map(x=>x.id);
-    u.depts=t.checked?[...new Set([...cur,did])]:cur.filter(x=>x!==did);
+    u.depts=t.checked?[...new Set([...cur,did])]:cur.filter(x=>x!==did);u.mod=nowIso();
     const nm=(deptList().find(x=>x.id===did)||{}).dept;audit('User departments changed',u.name+': '+(t.checked?'added ':'removed ')+nm+' ('+(u.depts.map(i=>(deptList().find(x=>x.id===i)||{}).dept).join(', ')||'none')+')');save();return render()}
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
-    audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;save();return render()}
+    audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
@@ -224,7 +234,7 @@ document.addEventListener('pointerover',e=>{
   tip.style.top=(c.top-b.top-tip.offsetHeight-8)+'px';
 });
 document.addEventListener('pointerout',e=>{const h=e.target.closest&&e.target.closest('.hit');if(h){const t=h.closest('.chartbox').querySelector('.tip');if(t)t.hidden=true}});
-render();
+restoreSess();render();
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-amodnew]')){e.preventDefault();e.target.dispatchEvent(new Event('change',{bubbles:true}))}});
 ghBoot();

@@ -23,12 +23,13 @@ function writeSess(){memSess=SESS;try{if(SESS)sessionStorage.setItem('ljqc.sess'
 function restoreSess(){
   SESS=readSess();CU=null;
   if(SESS&&Date.now()-SESS.last<IDLE_MS)CU=S.users.find(u=>u.id===SESS.uid&&u.active!==false)||null;
+  if(CU&&svcOn()&&!CRED)CU=null;
   if(!CU){SESS=null;writeSess()}
 }
 function signIn(u){SESS={uid:u.id,last:Date.now()};writeSess();CU=u;u.lastLogin=nowIso();UI.authMsg='';UI.auth='';S.tab='today'}
 function signOut(auto){
   if(CU){audit(auto?'Auto sign-out':'Sign out',auto?'Signed out after 30 minutes of inactivity':'');save()}
-  SESS=null;CU=null;writeSess();UI.modal=null;UI.editing=false;UI.authMsg=auto?'You were signed out after 30 minutes of inactivity.':'';render();
+  SESS=null;CU=null;if(svcOn())setCred(null);writeSess();UI.modal=null;UI.editing=false;UI.authMsg=auto?'You were signed out after 30 minutes of inactivity.':'';render();
 }
 let lastTouch=0;
 function touch(){if(!SESS)return;const n=Date.now();if(n-lastTouch>5000){lastTouch=n;SESS.last=n;writeSess()}}
@@ -63,18 +64,26 @@ function authGate(){
     <div class="reccode" id="reccode">${esc(UI.recCode)}</div>
     <div class="row"><button class="btn" type="button" data-act="copyrec">Copy code</button><button class="btn primary" type="button" data-act="recdone">I have saved it</button></div>`);
   if(UI.auth==='gh'&&!CU)return shell(`<div><h2>Connect to GitHub storage</h2><p class="muted" style="margin:6px 0 0">Load this laboratory's data from its private GitHub repository.</p></div>${ghForm()}<button class="btn" type="button" data-act="backlogin">Back</button>`);
-  if(!S.users.length)return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
+  if(UI.auth==='svc'&&!CU)return shell(`<div><h2>Connect to the lab's sync service</h2><p class="muted" style="margin:6px 0 0">Enter the service address the administrator gave you. You do not need a GitHub token. After connecting, sign in with your own username or email and password.</p></div>
+    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Sync service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}${UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}<button class="btn primary" type="submit">Connect</button><button class="btn" type="button" data-act="backlogin">Back</button></form>`);
+  if(UI.auth==='request'&&!CU){
+    if(UI.reqDone)return shell(`<div><h2>Request sent</h2><p class="muted" style="margin:6px 0 0">Thank you. An administrator will review your request. Once approved, they will email a temporary password to ${esc(UI.rqEmail||'your email address')}. You can then sign in and choose your own password.</p></div><button class="btn primary" type="button" data-act="backlogin">Back to sign in</button>`);
+    return shell(`<div><h2>Request access</h2><p class="muted" style="margin:6px 0 0">Enter your full name and work email address. When an administrator approves your request, a temporary password is sent to that email address.</p></div>
+    <form data-form="reqform" class="stack">${fld('rq-name','Full name','text','autocomplete="name" value="'+esc(UI.rqName||'')+'"')}${fld('rq-email','Email address','email','autocapitalize="none" autocomplete="email" value="'+esc(UI.rqEmail||'')+'"')}${amsg()}<button class="btn primary" type="submit">Send request</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
+  }
+  if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
     <button class="btn primary" type="submit">Create account and sign in</button></form>
-    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="ghopen">Connect to your GitHub data</a> first.</div>`);
+    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="svcopen">Connect to the lab's sync service</a> or <a href="#" data-act="ghopen">use a GitHub token</a> first.</div>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
       <button class="btn primary" type="submit">Reset password</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
     return shell(`<div><h2>Sign in</h2><p class="muted" style="margin:6px 0 0">Levey-Jennings QC for the clinical laboratory</p></div>
-      <form data-form="login" class="stack">${fld('li-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
+      <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
-      ${ghOn()?'':'<div class="small muted" style="margin-top:10px"><a href="#" data-act="ghopen">Connect to GitHub storage</a></div>'}`);
+      <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>
+      ${ghOn()?'':'<div class="small muted" style="margin-top:8px">Using another device? <a href="#" data-act="svcopen">Connect to the lab\'s sync service</a> · <a href="#" data-act="ghopen">GitHub token</a></div>'}`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -103,15 +112,28 @@ async function doAdmin(){
   const code=genCode(),u={id:uid(),username:un,name,role:'admin',active:true,mustChange:false,created:nowIso(),pw:await hashPw(p),rec:await hashPw(code.replace(/-/g,''))};
   S.users.push(u);signIn(u);audit('Account created','Administrator account created',u);audit('Sign in','',u);save();UI.recCode=code;
 }
+async function doSvcLogin(un,pw){
+  const bad='Username or password is incorrect.';
+  let salt;try{salt=(await svcCall('/salt',{u:un},false)).salt}catch(e){return UI.authMsg=e.message}
+  const hash=(await hashPw(pw,salt)).hash;setCred({u:un,hash,salt});
+  let j;try{j=await svcCall('/pull')}catch(e){setCred(null);return UI.authMsg=e.code===401?bad:e.message}
+  if(j.empty||!j.data){setCred(null);return UI.authMsg='This laboratory has no data on the sync service yet. The administrator needs to connect it first.'}
+  S=norm(mergeStates(S,norm(j.data)));S.tab='today';
+  const u=S.users.find(x=>x.id===j.me);if(!u){setCred(null);return UI.authMsg=bad}
+  GHS.sha=j.sha;GHS.lastHash=null;GHS.boot=false;
+  signIn(u);audit('Sign in','',u);save();
+}
 async function doLogin(){
   const un=gv('li-user').trim().toLowerCase(),pw=gv('li-pass');UI.authUser=un;
-  const u=S.users.find(x=>x.username===un),bad='Username or password is incorrect.';
+  if(svcOn())return doSvcLogin(un,pw);
+  const u=S.users.find(x=>x.username===un||String(x.email||'').toLowerCase()===un),bad='Username or password is incorrect.';
   if(!u||u.active===false){audit('Failed sign-in','Unknown or disabled username "'+un+'"',{id:null,name:un});save();return UI.authMsg=bad}
   if(u.lockUntil&&Date.now()<u.lockUntil)return UI.authMsg='Too many attempts. Wait a minute and try again.';
   if(!await checkPw(pw,u.pw)){u.fails=(u.fails||0)+1;if(u.fails>=5){u.lockUntil=Date.now()+60000;u.fails=0}audit('Failed sign-in','Wrong password',u);save();return UI.authMsg=bad}
   u.fails=0;u.lockUntil=0;signIn(u);audit('Sign in','',u);save();
 }
 async function doForgot(){
+  if(svcOn())return UI.authMsg='Password resets are done by an administrator. Ask them to set a temporary password for you.';
   const un=gv('fg-user').trim().toLowerCase(),code=gv('fg-code').toUpperCase().replace(/[^A-Z0-9]/g,''),p=gv('fg-pass'),p2=gv('fg-pass2');UI.authUser=un;UI.authCode=gv('fg-code');
   const pr=pwProblem(p,p2);if(pr)return UI.authMsg=pr;
   const u=S.users.find(x=>x.username===un&&x.role==='admin'&&x.rec&&x.active!==false);
@@ -121,27 +143,95 @@ async function doForgot(){
 }
 async function doForce(){
   const p=gv('cp-pass'),pr=pwProblem(p,gv('cp-pass2'));if(pr)return UI.authMsg=pr;
-  CU.pw=await hashPw(p);CU.mustChange=false;audit('Password changed','Chose a new password after reset');save();UI.authMsg='';
+  const old=CU.pw,oldM=CU.mustChange;CU.pw=await hashPw(p);CU.mustChange=false;CU.mod=nowIso();
+  if(svcOn()){pwQueue(CU.id,CU.pw);GHS.newCred={u:CRED.u,hash:CU.pw.hash,salt:CU.pw.salt};audit('Password changed','Chose a new password after reset');save();await ghSync();
+    if(GHS.st==='err'){CU.pw=old;CU.mustChange=oldM;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==CU.id);GHS.newCred=null;ghSaveCfg();return UI.authMsg='Could not save your new password to the sync service. '+GHS.msg}
+    UI.authMsg='';return}
+  audit('Password changed','Chose a new password after reset');save();UI.authMsg='';
 }
 async function doAcct(){
   const p=gv('ac-new'),pr=pwProblem(p,gv('ac-new2'));
-  if(!await checkPw(gv('ac-cur'),CU.pw)){UI.acctMsg='Your current password is not correct.';return}
+  const curOk=svcOn()&&CRED?(await hashPw(gv('ac-cur'),CRED.salt)).hash===CRED.hash:await checkPw(gv('ac-cur'),CU.pw);
+  if(!curOk){UI.acctMsg='Your current password is not correct.';return}
   if(pr){UI.acctMsg=pr;return}
-  CU.pw=await hashPw(p);audit('Password changed','');save();UI.acctMsg='';UI.modal=null;toast('Password changed.');
+  const old=CU.pw;CU.pw=await hashPw(p);CU.mod=nowIso();
+  if(svcOn()){pwQueue(CU.id,CU.pw);GHS.newCred={u:CRED.u,hash:CU.pw.hash,salt:CU.pw.salt};audit('Password changed','');save();await ghSync();
+    if(GHS.st==='err'){CU.pw=old;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==CU.id);GHS.newCred=null;ghSaveCfg();UI.acctMsg='Could not save your new password to the sync service. '+GHS.msg;return}
+    UI.acctMsg='';UI.modal=null;toast('Password changed.');return}
+  audit('Password changed','');save();UI.acctMsg='';UI.modal=null;toast('Password changed.');
 }
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+async function mkUser({name,un,email,role,depts,pw}){
+  const u={id:uid(),username:un,name,role,active:true,mustChange:true,created:nowIso(),mod:nowIso(),pw:await hashPw(pw)};
+  if(email)u.email=email;if(role!=='admin'&&depts)u.depts=depts;
+  S.users.push(u);pwQueue(u.id,u.pw);audit('User created',name+' ('+un+', '+roleName(role).toLowerCase()+')');return u;
+}
+const uniqueUn=base=>{let b=(base||'user').toLowerCase().replace(/[^a-z0-9._-]/g,'');if(b.length<3)b=(b+'user').slice(0,8);let n=b,i=2;while(S.users.some(x=>x.username===n))n=b+(i++);return n};
 async function doUserAdd(){
-  const name=gv('nu-name').trim(),un=gv('nu-user').trim().toLowerCase(),role=gv('nu-role')||'tech',p=gv('nu-pass');
+  const name=gv('nu-name').trim(),un=gv('nu-user').trim().toLowerCase(),role=gv('nu-role')||'tech',p=gv('nu-pass'),email=gv('nu-email').trim().toLowerCase();
   if(!name||!/^[a-z0-9._-]{3,}$/.test(un))return toast('Enter a full name and a username of at least 3 letters or numbers.');
   if(S.users.some(x=>x.username===un))return toast('That username is already taken.');
+  if(email&&!EMAIL_RE.test(email))return toast('That email address does not look right.');
+  if(email&&S.users.some(x=>String(x.email||'').toLowerCase()===email))return toast('That email address already has an account.');
   if(p.length<8)return toast('The temporary password needs at least 8 characters.');
-  const u={id:uid(),username:un,name,role,active:true,mustChange:true,created:nowIso(),pw:await hashPw(p)};
-  if(role!=='admin'&&deptList().length){const ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this user.');u.depts=ds}
-  S.users.push(u);audit('User created',name+' ('+un+', '+roleName(role).toLowerCase()+')');save();toast('User created. They choose their own password at first sign-in.');
+  let ds;if(role!=='admin'&&deptList().length){ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this user.')}
+  const u=await mkUser({name,un,email,role,depts:ds,pw:p});
+  UI.lastCred=email?{name,email,username:un,pw:p}:null;save();toast('User created. They choose their own password at first sign-in.');
+}
+/* ----- access requests ----- */
+async function doRequest(){
+  const name=gv('rq-name').trim(),email=gv('rq-email').trim().toLowerCase();UI.rqName=name;UI.rqEmail=email;
+  if(!name)return UI.authMsg='Enter your full name.';
+  if(!EMAIL_RE.test(email))return UI.authMsg='Enter a valid email address. The administrator will send your temporary password there.';
+  if(svcOn()){try{await svcCall('/request',{name,email},false)}catch(e){return UI.authMsg=e.message}}
+  else{
+    if(S.users.some(x=>String(x.email||'').toLowerCase()===email))return UI.authMsg='That email address already has an account. Try signing in, or ask an administrator to reset your password.';
+    if(!S.requests.some(r=>r.email===email&&(!r.status||r.status==='pending'))){S.requests.push({id:uid(),name,email,at:nowIso(),status:'pending'});S.audit.push({id:uid(),at:nowIso(),by:null,byName:name,action:'Access requested',detail:name+' <'+email+'>',depts:[]});save()}
+  }
+  UI.reqDone=true;
+}
+async function doSvcConn(){
+  const url=gv('sv-url').trim().replace(/\/+$/,'');
+  if(!/^(https:\/\/|http:\/\/localhost)[^\s/]+/.test(url)){UI.ghMsg='Enter the service address, starting with https://';return}
+  const old=GH;GH={...GH,svc:url,on:true};
+  try{await svcCall('/ping',{},false)}catch(e){GH=old;UI.ghMsg=e.message;return}
+  ghSaveCfg();UI.ghMsg='';UI.auth='';toast('Connected. Sign in with your QCLens username or email and password.');
+}
+const mailBody=c=>'Hello '+c.name+',\n\nYour QCLens access has been approved.\n\nSign in at: '+location.href.split('#')[0]+'\nUsername: '+c.username+' (or your email address)\nTemporary password: '+c.pw+'\n\nYou will be asked to choose your own password the first time you sign in.\n';
+function credBox(){
+  const c=UI.lastCred;if(!c)return '';
+  const href='mailto:'+encodeURIComponent(c.email||'')+'?subject='+encodeURIComponent('Your QCLens access')+'&body='+encodeURIComponent(mailBody(c));
+  return `<div class="panel stack" style="border-color:var(--accent)"><h3>Send these sign-in details to ${esc(c.name)}</h3>
+   <div class="panelcard small"><div>Username: <b class="mono">${esc(c.username)}</b>${c.email?` (or ${esc(c.email)})`:''}</div><div>Temporary password: <b class="mono">${esc(c.pw)}</b></div></div>
+   <p class="small muted" style="margin:0">QCLens cannot send email by itself. Press <b>Email these details</b> to open a ready-written message in your email app, addressed to ${esc(c.email||'the worker')}. This password is shown only now.</p>
+   <div class="row">${c.email?`<a class="btn primary" href="${href}">Email these details</a>`:''}<button class="btn" data-act="copycred">Copy message</button><button class="btn" data-act="credok">Done</button></div></div>`;
+}
+function renderRequests(){
+  const pend=S.requests.filter(r=>!r.status||r.status==='pending').sort((a,b)=>a.at<b.at?-1:1),done=S.requests.filter(r=>r.status&&r.status!=='pending').sort((a,b)=>(a.decidedAt||'')<(b.decidedAt||'')?1:-1).slice(0,8);
+  const row=r=>{const open=UI.appr===r.id;
+    return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.email)} · requested ${fmtTs(r.at)}</div></div>
+     ${open?'':`<div class="row"><button class="btn sm primary" data-act="rqapprove" data-id="${r.id}">Approve…</button><button class="btn sm danger" data-act="rqreject" data-id="${r.id}">Decline</button></div>`}</div>
+     ${open?`<div class="stack" style="margin-top:10px"><label class="f">Access level<select id="rq-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
+      ${deptList().length?`<div class="f">Departments<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="rq-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span></div>`:''}
+      <div class="row"><button class="btn primary" data-act="rqconfirm" data-id="${r.id}">Approve and create account</button><button class="btn" data-act="rqcancel">Cancel</button></div></div>`:''}</div>`};
+  return `${credBox()}<div class="panel stack"><div><h2>Access requests</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Workers ask for access from the sign-in screen with their name and email address. Approving creates their account with a temporary password for you to email to them.</p></div>
+   ${pend.length?pend.map(row).join(''):'<p class="small muted" style="margin:0">No requests waiting.</p>'}
+   ${done.length?`<details><summary class="small" style="cursor:pointer">Recent decisions</summary><div class="small" style="margin-top:6px">${done.map(r=>`<div>${esc(r.name)} · ${esc(r.email)} · <b>${r.status==='approved'?'approved':'declined'}</b>${r.by?' by '+esc(r.by):''}</div>`).join('')}</div></details>`:''}</div>`;
+}
+async function approveReq(id){
+  const r=S.requests.find(x=>x.id===id);if(!r)return;
+  const role=gv('rq-role')||'tech';let ds;
+  if(role!=='admin'&&deptList().length){ds=deptList().filter(d=>{const e=document.getElementById('rq-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department.')}
+  if(S.users.some(x=>String(x.email||'').toLowerCase()===r.email))return toast('That email address already has an account.');
+  const un=uniqueUn(r.email.split('@')[0]),pw=genPw();
+  await mkUser({name:r.name,un,email:r.email,role,depts:ds,pw});
+  r.status='approved';r.by=CU.name;r.decidedAt=nowIso();audit('Access request approved',r.name+' <'+r.email+'> as '+roleName(role).toLowerCase());
+  UI.lastCred={name:r.name,email:r.email,username:un,pw};UI.appr=null;save();
 }
 async function doUserReset(){
   const id=UI.resetFor,u=S.users.find(x=>x.id===id),p=gv('rs-pass');
   if(!u)return;if(p.length<8)return toast('The temporary password needs at least 8 characters.');
-  u.pw=await hashPw(p);u.mustChange=true;u.fails=0;u.lockUntil=0;UI.resetFor=null;audit('Password reset by administrator',u.name+' ('+u.username+')');save();toast('Temporary password set for '+u.name+'.');
+  u.pw=await hashPw(p);u.mustChange=true;u.mod=nowIso();pwQueue(u.id,u.pw);u.fails=0;u.lockUntil=0;UI.resetFor=null;audit('Password reset by administrator',u.name+' ('+u.username+')');save();toast('Temporary password set for '+u.name+'.');
 }
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target.dataset.form;if(!f)return;
@@ -152,6 +242,9 @@ document.addEventListener('submit',async e=>{
     else if(f==='acct'){await doAcct();if(UI.acctMsg){const m=document.getElementById('ac-err');m.textContent=UI.acctMsg;m.hidden=false;return}}
     else if(f==='uadd'){if(!isAdmin())return;await doUserAdd()}
     else if(f==='ureset'){if(!isAdmin())return;await doUserReset()}
+    else if(f==='svcadmin'){if(!isAdmin())return;await doSvcAdmin()}
+    else if(f==='reqform')await doRequest();
+    else if(f==='svcconn')await doSvcConn();
     else if(f==='ghconn'){if(CU&&!isAdmin())return;await doGhConnect()}
   }catch(err){UI.authMsg='Secure accounts are not available in this browser view.'}
   render();
@@ -166,17 +259,18 @@ function deptCell(u){
 }
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
-    return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}</div></td>
+    return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}${u.email?' · '+esc(u.email):''}</div></td>
      <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="sup"${u.role==='sup'?' selected':''}>Supervisory technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
      <td>${deptCell(u)}</td>
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}`}</td></tr>`}).join('');
-  return `<div class="stack"><div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack">${renderRequests()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
+    <label class="f">Email address (optional)<input type="email" id="nu-email" autocapitalize="none"></label>
     <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
     ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this user can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
     <label class="f">Temporary password<span class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="nu-pass" autocomplete="off"><button class="btn sm" type="button" data-act="genpw" data-t="nu-pass">Generate</button></span></label></div>
@@ -210,4 +304,3 @@ async function exportAudit(){
     await dl.save({filename:'QCLens-audit-log-'+todayStr()+'.xlsx',data:await wb.xlsx.writeBuffer()});toast('Audit log ready.');
   }catch(e){toast(e&&e.code==='declined'?'Save cancelled.':'Export failed.')}
 }
-restoreSess();

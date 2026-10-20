@@ -4,10 +4,26 @@ const GHK='ljqc.gh';
 function ghLoad(){try{const s=localStorage.getItem(GHK);if(s)return JSON.parse(s)}catch(e){}return ghMem||{}}
 let GH=ghLoad();
 function ghSaveCfg(){ghMem=GH;try{localStorage.setItem(GHK,JSON.stringify(GH))}catch(e){}}
-const ghOn=()=>!!(GH.on&&GH.token&&GH.owner&&GH.repo);
+let credMem=null,CRED=null;
+try{const s=sessionStorage.getItem('ljqc.cred');CRED=s?JSON.parse(s):null}catch(e){}
+function setCred(c){CRED=c;credMem=c;try{c?sessionStorage.setItem('ljqc.cred',JSON.stringify(c)):sessionStorage.removeItem('ljqc.cred')}catch(e){}}
+const svcOn=()=>!!(GH.on&&GH.svc);
+const ghOn=()=>!!(GH.on&&(GH.svc||(GH.token&&GH.owner&&GH.repo)));
+const ghReady=()=>ghOn()&&(!GH.svc||!!CRED);
+try{const m=/[#&]svc=([^&]+)/.exec(location.hash||'');if(m&&!GH.svc){GH={svc:decodeURIComponent(m[1]),on:true};ghSaveCfg();history.replaceState(null,'',location.pathname+location.search)}}catch(e){}
+function pwQueue(id,rec){if(!svcOn())return;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==id);GH.pwq.push({id,pw:rec});ghSaveCfg()}
+async function svcCall(path,body,auth){
+  const b={...(body||{})};if(auth!==false&&CRED){b.u=CRED.u;b.hash=CRED.hash}
+  let r;try{r=await fetch(GH.svc.replace(/\/+$/,'')+path,{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:JSON.stringify(b)})}catch(e){throw new Error('Could not reach the QCLens sync service. Check your connection and the service address.')}
+  let j={};try{j=await r.json()}catch(e){}
+  if(r.status===409)return {conflict:true};
+  if(r.status===401){const e=new Error(j.error||'Sign-in required.');e.code=401;throw e}
+  if(!r.ok)throw new Error(j.error||('The sync service returned '+r.status+'.'));
+  return j;
+}
 const GHS={st:'idle',msg:'',sha:null,last:'',busy:false,pending:false,timer:null,lastHash:null,defer:false};
 const canon=v=>Array.isArray(v)?v.map(canon):v&&typeof v==='object'?Object.keys(v).sort().reduce((o,k)=>(o[k]=canon(v[k]),o),{}):v;
-const ghStrip=o=>{const c={...o};delete c.tab;return c};
+const ghStrip=o=>{const c={...o};delete c.tab;if(svcOn())c.users=(c.users||[]).map(u=>{const x={...u};delete x.pw;delete x.rec;delete x.fails;delete x.lockUntil;return x});return c};
 const ghHash=o=>JSON.stringify(canon(ghStrip(o)));
 function b64enc(t){const b=new TextEncoder().encode(t);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
 function b64dec(t){const s=atob(t.replace(/\s/g,'')),b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return new TextDecoder().decode(b)}
@@ -30,6 +46,7 @@ async function ghCheck(){
   return j;
 }
 async function ghPull(){
+  if(GH.svc){const j=await svcCall('/pull');return j.empty?{exists:!!j.data,empty:true,sha:j.sha,data:j.data}:{exists:true,sha:j.sha,data:j.data,me:j.me}}
   const q='?ref='+encodeURIComponent(GH.branch||'main');
   const r=await ghApi(ghFile()+q);
   if(r.status===404)return {exists:false};
@@ -40,6 +57,11 @@ async function ghPull(){
   return {exists:true,sha:j.sha,data:JSON.parse(text)};
 }
 async function ghPush(){
+  if(GH.svc){
+    const j=await svcCall('/push',{data:GHS.boot?(()=>{const c={...S};delete c.tab;return c})():ghStrip(S),sha:GHS.sha,pwset:GH.pwq||[],boot:!!GHS.boot});
+    if(j.conflict)return 'conflict';
+    GHS.sha=j.sha||GHS.sha;GHS.boot=false;GH.pwq=[];ghSaveCfg();if(GHS.newCred){setCred(GHS.newCred);GHS.newCred=null}return 'ok';
+  }
   const body={message:'QCLens data '+new Date().toISOString(),content:b64enc(JSON.stringify(ghStrip(S))),branch:GH.branch||'main'};
   if(GHS.sha)body.sha=GHS.sha;
   const r=await ghApi(ghFile(),{method:'PUT',body});
@@ -52,7 +74,8 @@ function mergeStates(L,R){
   const tomb=new Set([...(L.tomb||[]),...(R.tomb||[])]),out=JSON.parse(JSON.stringify(L));
   const by=(a,b,pick)=>{const m=new Map();(b||[]).forEach(x=>m.set(x.id,x));(a||[]).forEach(x=>m.set(x.id,m.has(x.id)&&pick?pick(x,m.get(x.id)):x));return [...m.values()].filter(x=>!tomb.has(x.id))};
   const newer=(a,b)=>((a.upd||a).at||'')>=((b.upd||b).at||'')?a:b;
-  out.users=by(L.users,R.users);out.depts=by(L.depts,R.depts);out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
+  const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;return x};
+  out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts);out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
   out.est=by(L.est,R.est,(a,b)=>b.runs&&a.runs&&b.runs.length>a.runs.length?b:a);
   out.analytes=by(L.analytes,R.analytes,(a,b)=>b.targets.length>a.targets.length?b:a);
   const ok=new Set(out.analytes.map(a=>a.id));
@@ -72,17 +95,17 @@ function ghAdopt(M){
   if(typing||UI.modal){GHS.defer=true}else render();
 }
 async function ghSync(){
-  if(!ghOn())return;
+  if(!ghReady())return;
   if(GHS.busy){GHS.pending=true;return}
   GHS.busy=true;GHS.st='syncing';ghPaint();
   try{
     for(let i=0;i<3;i++){
       const rem=await ghPull();let remoteH=null;
       if(rem.exists){
-        GHS.sha=rem.sha;const R=norm(rem.data);remoteH=ghHash(R);
+        GHS.sha=rem.sha;GHS.boot=!!rem.empty;if(rem.data){const R=norm(rem.data);remoteH=rem.empty?null:ghHash(R);
         const M=norm(mergeStates(S,R));
-        if(ghHash(M)!==ghHash(S))ghAdopt(M);
-      }else GHS.sha=null;
+        if(ghHash(M)!==ghHash(S))ghAdopt(M)}
+      }else{GHS.sha=null;GHS.boot=true}
       if(remoteH!==null&&ghHash(S)===remoteH){break}
       const res=await ghPush();if(res==='ok')break;
     }
@@ -91,7 +114,7 @@ async function ghSync(){
   finally{GHS.busy=false;ghPaint();if(GHS.pending){GHS.pending=false;ghQueue()}}
 }
 function ghQueue(){
-  if(!ghOn())return;
+  if(!ghReady())return;
   if(GHS.lastHash!==null&&ghHash(S)===GHS.lastHash)return;
   clearTimeout(GHS.timer);GHS.timer=setTimeout(ghSync,2500);GHS.st=GHS.st==='err'?'err':'pending';ghPaint();
 }
@@ -100,12 +123,12 @@ function ghStatusHtml(){
   if(!ghOn())return '<span class="chip">Not connected</span>';
   const t=GHS.last?' · last saved '+fmtTs(GHS.last):'';
   const c=GHS.st==='err'?'<span class="chip bad">Not saved</span>':GHS.st==='syncing'?'<span class="chip warn">Saving…</span>':GHS.st==='pending'?'<span class="chip warn">Changes waiting</span>':'<span class="chip good">Saved to GitHub</span>';
-  return c+' <span class="small muted">'+esc(GH.owner+'/'+GH.repo)+t+'</span>'+(GHS.msg?'<div class="small" style="color:var(--bad);margin-top:4px">'+esc(GHS.msg)+'</div>':'');
+  return c+' <span class="small muted">'+esc(GH.svc?GH.svc.replace(/^https:\/\//,''):GH.owner+'/'+GH.repo)+t+'</span>'+(GHS.msg?'<div class="small" style="color:var(--bad);margin-top:4px">'+esc(GHS.msg)+'</div>':'');
 }
 function ghBoot(){
   if(!ghOn())return;
   ghSync();
-  setInterval(()=>{if(ghOn()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000);
+  setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000);
   document.addEventListener('focusout',()=>{if(GHS.defer){setTimeout(()=>{const a=document.activeElement;if(GHS.defer&&!UI.modal&&!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))){GHS.defer=false;render()}},50)}});
 }
 /* ----- connect form (sign-in screen and Setup) ----- */
@@ -134,11 +157,29 @@ async function doGhConnect(){
   if(UI.auth==='gh')UI.auth='';
 }
 let ghPoll=null;
-function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghOn()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}
+function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}
+async function doSvcAdmin(){
+  const url=(document.getElementById('sv-url')||{value:''}).value.trim().replace(/\/+$/,'');
+  if(!/^(https:\/\/|http:\/\/localhost)[^\s/]+/.test(url)){UI.ghMsg='Enter the service address, starting with https://';return}
+  if(!CU||!CU.pw){UI.ghMsg='Sign in again with your password on this device, then connect.';return}
+  const old=GH;GH={svc:url,on:true,pwq:[]};
+  try{await svcCall('/ping',{},false)}catch(e){GH=old;UI.ghMsg=e.message;return}
+  setCred({u:CU.username,hash:CU.pw.hash,salt:CU.pw.salt});ghSaveCfg();GHS.sha=null;GHS.lastHash=null;GHS.st='idle';
+  await ghSync();
+  if(GHS.st==='err'){const m=GHS.msg;GH=old;ghSaveCfg();setCred(null);UI.ghMsg=m;return}
+  ghBoot2();UI.ghMsg='';audit('Sync service connected',url,null,[]);save();toast('Connected. Your data is saved to the sync service.');
+}
 function renderGithub(){
-  return `<div class="panel stack"><div><h3>GitHub storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Changes are saved a few seconds after you make them, and other devices pick them up within a minute.</p></div>
+  if(svcOn())return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">All QCLens data is saved through the lab's sync service. Workers sign in with their own username and password from any device. They never need a GitHub token.</p></div>
    <div id="ghstatus">${ghStatusHtml()}</div>
-   ${ghOn()?`<div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn danger" data-act="ghoff">Disconnect this device</button></div>`:''}
-   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>${ghOn()?'Change connection settings':'Connect to GitHub'}</b></summary><div style="margin-top:10px">${ghForm()}
-   <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Each device (and each person who signs in on it) needs the same token once, on the sign-in screen. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
+   <div class="panelcard small"><div class="muted">Service</div><div class="mono" style="word-break:break-all">${esc(GH.svc)}</div></div>
+   <div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn" data-act="svccopy">Copy link for new devices</button><button class="btn danger" data-act="svcdisc">Disconnect this device</button></div>
+   <p class="small muted" style="margin:0;max-width:80ch">Send workers the link above. Opening it connects their device to the service; they then use Request access or sign in.</p></div>`;
+  return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Choose one of the two ways below.</p></div>
+   <div id="ghstatus">${ghStatusHtml()}</div>
+   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>Option A (recommended): sync service, no GitHub token on devices</b></summary><div style="margin-top:10px" class="stack">
+    <p class="small muted" style="margin:0;max-width:80ch">A small free service (a Cloudflare Worker, in the <code>worker</code> folder of the code repository, with setup steps in its README) holds the GitHub token for you. Workers sign in with their own username and password on any device. Deploy it once, then paste its address here.</p>
+    <form data-form="svcadmin" class="stack" autocomplete="off">${fld('sv-url','Sync service address','url','autocapitalize="none" placeholder="https://qclens-sync.your-name.workers.dev"')}${UI.ghMsg&&!UI.ghDraft?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}<button class="btn primary" type="submit">Connect and upload data</button></form></div></details>
+   <details${ghOn()?'':''}><summary style="cursor:pointer"><b>Option B: connect straight to GitHub with a token</b></summary><div style="margin-top:10px">${ghOn()?`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="ghsync">Sync now</button><button class="btn danger" data-act="ghoff">Disconnect this device</button></div>`:''}${ghForm()}
+   <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Every device needs the same token once. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
 }

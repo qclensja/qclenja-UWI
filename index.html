@@ -1,3 +1,5 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0B7A6F"><meta name="color-scheme" content="light dark">
 <title>QCLens</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -22,6 +24,7 @@
   --accent:#4FC1CC; --accent-ink:#04262A; --accent-soft:#17383D; --logo-bg:#EEF3F5;
   --good:#5CC48A; --warn:#E5A445; --bad:#F27766; --bad-soft:#3A1F1C; --warn-soft:#37290F; --good-soft:#15301F;
   --grid:#25333D; --zone1:#182630; --zone2:#2A2713; --zone3:#33201E; color-scheme:dark}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;
   padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -135,6 +138,40 @@ svg.lj text.l3{fill:var(--bad)} svg.lj text.l2{fill:var(--warn)} svg.lj text.lm{
 .days label:has(input:checked){background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .days label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 .empty{padding:28px;text-align:center;color:var(--muted)}
+
+@media (max-width:640px){
+  body{font-size:15px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+  .wrap{padding-block:8px 32px}
+  header.top{gap:8px 12px;padding-block:8px 6px}
+  .logo{height:52px}
+  .brand{gap:10px;width:100%}
+  .brand span{font-size:12.5px}
+  .userbar{width:100%;justify-content:space-between}
+  .userbar .who{flex:1 1 100%;margin:0}
+  nav.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-inline:-12px;padding-inline:12px;margin-bottom:12px}
+  nav.tabs::-webkit-scrollbar{display:none}
+  nav.tabs button{white-space:nowrap;padding:12px 12px;flex:none}
+  .btn{min-height:42px;padding:9px 14px}
+  .btn.sm{min-height:36px;padding:6px 11px}
+  input[type=text],input[type=password],input[type=number],input[type=date],input[type=email],select,textarea{font-size:16px;min-height:42px}
+  input[type=checkbox]{width:20px;height:20px}
+  .panel{padding:12px;border-radius:8px}
+  h2{font-size:20px}
+  .grid2{grid-template-columns:1fr}
+  .row{gap:10px}
+  .due{padding:10px 8px;gap:8px 10px}
+  .due .nm{flex:1 1 100%}
+  .due label.f{flex:1 1 calc(50% - 10px);max-width:none}
+  .due .btn{flex:1 1 100%}
+  .auth{min-height:auto;padding-block:12px;align-items:flex-start}
+  .authcard{padding:18px;gap:14px}
+  .modalbg{padding:0;align-items:flex-end}
+  .modal{max-width:none;max-height:92vh;overflow-y:auto;border-radius:14px 14px 0 0;padding:16px}
+  .modal .row{justify-content:stretch}
+  .modal .row .btn{flex:1 1 auto}
+  table.t td,table.t th{padding:8px 6px}
+  .toast{left:12px;right:12px;max-width:none}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <div class="wrap" id="app"></div>
@@ -352,11 +389,11 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[]});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[]});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -1097,12 +1134,13 @@ function writeSess(){memSess=SESS;try{if(SESS)sessionStorage.setItem('ljqc.sess'
 function restoreSess(){
   SESS=readSess();CU=null;
   if(SESS&&Date.now()-SESS.last<IDLE_MS)CU=S.users.find(u=>u.id===SESS.uid&&u.active!==false)||null;
+  if(CU&&svcOn()&&!CRED)CU=null;
   if(!CU){SESS=null;writeSess()}
 }
 function signIn(u){SESS={uid:u.id,last:Date.now()};writeSess();CU=u;u.lastLogin=nowIso();UI.authMsg='';UI.auth='';S.tab='today'}
 function signOut(auto){
   if(CU){audit(auto?'Auto sign-out':'Sign out',auto?'Signed out after 30 minutes of inactivity':'');save()}
-  SESS=null;CU=null;writeSess();UI.modal=null;UI.editing=false;UI.authMsg=auto?'You were signed out after 30 minutes of inactivity.':'';render();
+  SESS=null;CU=null;if(svcOn())setCred(null);writeSess();UI.modal=null;UI.editing=false;UI.authMsg=auto?'You were signed out after 30 minutes of inactivity.':'';render();
 }
 let lastTouch=0;
 function touch(){if(!SESS)return;const n=Date.now();if(n-lastTouch>5000){lastTouch=n;SESS.last=n;writeSess()}}
@@ -1137,18 +1175,26 @@ function authGate(){
     <div class="reccode" id="reccode">${esc(UI.recCode)}</div>
     <div class="row"><button class="btn" type="button" data-act="copyrec">Copy code</button><button class="btn primary" type="button" data-act="recdone">I have saved it</button></div>`);
   if(UI.auth==='gh'&&!CU)return shell(`<div><h2>Connect to GitHub storage</h2><p class="muted" style="margin:6px 0 0">Load this laboratory's data from its private GitHub repository.</p></div>${ghForm()}<button class="btn" type="button" data-act="backlogin">Back</button>`);
-  if(!S.users.length)return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
+  if(UI.auth==='svc'&&!CU)return shell(`<div><h2>Connect to the lab's sync service</h2><p class="muted" style="margin:6px 0 0">Enter the service address the administrator gave you. You do not need a GitHub token. After connecting, sign in with your own username or email and password.</p></div>
+    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Sync service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}${UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}<button class="btn primary" type="submit">Connect</button><button class="btn" type="button" data-act="backlogin">Back</button></form>`);
+  if(UI.auth==='request'&&!CU){
+    if(UI.reqDone)return shell(`<div><h2>Request sent</h2><p class="muted" style="margin:6px 0 0">Thank you. An administrator will review your request. Once approved, they will email a temporary password to ${esc(UI.rqEmail||'your email address')}. You can then sign in and choose your own password.</p></div><button class="btn primary" type="button" data-act="backlogin">Back to sign in</button>`);
+    return shell(`<div><h2>Request access</h2><p class="muted" style="margin:6px 0 0">Enter your full name and work email address. When an administrator approves your request, a temporary password is sent to that email address.</p></div>
+    <form data-form="reqform" class="stack">${fld('rq-name','Full name','text','autocomplete="name" value="'+esc(UI.rqName||'')+'"')}${fld('rq-email','Email address','email','autocapitalize="none" autocomplete="email" value="'+esc(UI.rqEmail||'')+'"')}${amsg()}<button class="btn primary" type="submit">Send request</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
+  }
+  if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
     <button class="btn primary" type="submit">Create account and sign in</button></form>
-    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="ghopen">Connect to your GitHub data</a> first.</div>`);
+    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="svcopen">Connect to the lab's sync service</a> or <a href="#" data-act="ghopen">use a GitHub token</a> first.</div>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
       <button class="btn primary" type="submit">Reset password</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
     return shell(`<div><h2>Sign in</h2><p class="muted" style="margin:6px 0 0">Levey-Jennings QC for the clinical laboratory</p></div>
-      <form data-form="login" class="stack">${fld('li-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
+      <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
-      ${ghOn()?'':'<div class="small muted" style="margin-top:10px"><a href="#" data-act="ghopen">Connect to GitHub storage</a></div>'}`);
+      <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>
+      ${ghOn()?'':'<div class="small muted" style="margin-top:8px">Using another device? <a href="#" data-act="svcopen">Connect to the lab\'s sync service</a> · <a href="#" data-act="ghopen">GitHub token</a></div>'}`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -1177,15 +1223,28 @@ async function doAdmin(){
   const code=genCode(),u={id:uid(),username:un,name,role:'admin',active:true,mustChange:false,created:nowIso(),pw:await hashPw(p),rec:await hashPw(code.replace(/-/g,''))};
   S.users.push(u);signIn(u);audit('Account created','Administrator account created',u);audit('Sign in','',u);save();UI.recCode=code;
 }
+async function doSvcLogin(un,pw){
+  const bad='Username or password is incorrect.';
+  let salt;try{salt=(await svcCall('/salt',{u:un},false)).salt}catch(e){return UI.authMsg=e.message}
+  const hash=(await hashPw(pw,salt)).hash;setCred({u:un,hash,salt});
+  let j;try{j=await svcCall('/pull')}catch(e){setCred(null);return UI.authMsg=e.code===401?bad:e.message}
+  if(j.empty||!j.data){setCred(null);return UI.authMsg='This laboratory has no data on the sync service yet. The administrator needs to connect it first.'}
+  S=norm(mergeStates(S,norm(j.data)));S.tab='today';
+  const u=S.users.find(x=>x.id===j.me);if(!u){setCred(null);return UI.authMsg=bad}
+  GHS.sha=j.sha;GHS.lastHash=null;GHS.boot=false;
+  signIn(u);audit('Sign in','',u);save();
+}
 async function doLogin(){
   const un=gv('li-user').trim().toLowerCase(),pw=gv('li-pass');UI.authUser=un;
-  const u=S.users.find(x=>x.username===un),bad='Username or password is incorrect.';
+  if(svcOn())return doSvcLogin(un,pw);
+  const u=S.users.find(x=>x.username===un||String(x.email||'').toLowerCase()===un),bad='Username or password is incorrect.';
   if(!u||u.active===false){audit('Failed sign-in','Unknown or disabled username "'+un+'"',{id:null,name:un});save();return UI.authMsg=bad}
   if(u.lockUntil&&Date.now()<u.lockUntil)return UI.authMsg='Too many attempts. Wait a minute and try again.';
   if(!await checkPw(pw,u.pw)){u.fails=(u.fails||0)+1;if(u.fails>=5){u.lockUntil=Date.now()+60000;u.fails=0}audit('Failed sign-in','Wrong password',u);save();return UI.authMsg=bad}
   u.fails=0;u.lockUntil=0;signIn(u);audit('Sign in','',u);save();
 }
 async function doForgot(){
+  if(svcOn())return UI.authMsg='Password resets are done by an administrator. Ask them to set a temporary password for you.';
   const un=gv('fg-user').trim().toLowerCase(),code=gv('fg-code').toUpperCase().replace(/[^A-Z0-9]/g,''),p=gv('fg-pass'),p2=gv('fg-pass2');UI.authUser=un;UI.authCode=gv('fg-code');
   const pr=pwProblem(p,p2);if(pr)return UI.authMsg=pr;
   const u=S.users.find(x=>x.username===un&&x.role==='admin'&&x.rec&&x.active!==false);
@@ -1195,27 +1254,95 @@ async function doForgot(){
 }
 async function doForce(){
   const p=gv('cp-pass'),pr=pwProblem(p,gv('cp-pass2'));if(pr)return UI.authMsg=pr;
-  CU.pw=await hashPw(p);CU.mustChange=false;audit('Password changed','Chose a new password after reset');save();UI.authMsg='';
+  const old=CU.pw,oldM=CU.mustChange;CU.pw=await hashPw(p);CU.mustChange=false;CU.mod=nowIso();
+  if(svcOn()){pwQueue(CU.id,CU.pw);GHS.newCred={u:CRED.u,hash:CU.pw.hash,salt:CU.pw.salt};audit('Password changed','Chose a new password after reset');save();await ghSync();
+    if(GHS.st==='err'){CU.pw=old;CU.mustChange=oldM;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==CU.id);GHS.newCred=null;ghSaveCfg();return UI.authMsg='Could not save your new password to the sync service. '+GHS.msg}
+    UI.authMsg='';return}
+  audit('Password changed','Chose a new password after reset');save();UI.authMsg='';
 }
 async function doAcct(){
   const p=gv('ac-new'),pr=pwProblem(p,gv('ac-new2'));
-  if(!await checkPw(gv('ac-cur'),CU.pw)){UI.acctMsg='Your current password is not correct.';return}
+  const curOk=svcOn()&&CRED?(await hashPw(gv('ac-cur'),CRED.salt)).hash===CRED.hash:await checkPw(gv('ac-cur'),CU.pw);
+  if(!curOk){UI.acctMsg='Your current password is not correct.';return}
   if(pr){UI.acctMsg=pr;return}
-  CU.pw=await hashPw(p);audit('Password changed','');save();UI.acctMsg='';UI.modal=null;toast('Password changed.');
+  const old=CU.pw;CU.pw=await hashPw(p);CU.mod=nowIso();
+  if(svcOn()){pwQueue(CU.id,CU.pw);GHS.newCred={u:CRED.u,hash:CU.pw.hash,salt:CU.pw.salt};audit('Password changed','');save();await ghSync();
+    if(GHS.st==='err'){CU.pw=old;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==CU.id);GHS.newCred=null;ghSaveCfg();UI.acctMsg='Could not save your new password to the sync service. '+GHS.msg;return}
+    UI.acctMsg='';UI.modal=null;toast('Password changed.');return}
+  audit('Password changed','');save();UI.acctMsg='';UI.modal=null;toast('Password changed.');
 }
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+async function mkUser({name,un,email,role,depts,pw}){
+  const u={id:uid(),username:un,name,role,active:true,mustChange:true,created:nowIso(),mod:nowIso(),pw:await hashPw(pw)};
+  if(email)u.email=email;if(role!=='admin'&&depts)u.depts=depts;
+  S.users.push(u);pwQueue(u.id,u.pw);audit('User created',name+' ('+un+', '+roleName(role).toLowerCase()+')');return u;
+}
+const uniqueUn=base=>{let b=(base||'user').toLowerCase().replace(/[^a-z0-9._-]/g,'');if(b.length<3)b=(b+'user').slice(0,8);let n=b,i=2;while(S.users.some(x=>x.username===n))n=b+(i++);return n};
 async function doUserAdd(){
-  const name=gv('nu-name').trim(),un=gv('nu-user').trim().toLowerCase(),role=gv('nu-role')||'tech',p=gv('nu-pass');
+  const name=gv('nu-name').trim(),un=gv('nu-user').trim().toLowerCase(),role=gv('nu-role')||'tech',p=gv('nu-pass'),email=gv('nu-email').trim().toLowerCase();
   if(!name||!/^[a-z0-9._-]{3,}$/.test(un))return toast('Enter a full name and a username of at least 3 letters or numbers.');
   if(S.users.some(x=>x.username===un))return toast('That username is already taken.');
+  if(email&&!EMAIL_RE.test(email))return toast('That email address does not look right.');
+  if(email&&S.users.some(x=>String(x.email||'').toLowerCase()===email))return toast('That email address already has an account.');
   if(p.length<8)return toast('The temporary password needs at least 8 characters.');
-  const u={id:uid(),username:un,name,role,active:true,mustChange:true,created:nowIso(),pw:await hashPw(p)};
-  if(role!=='admin'&&deptList().length){const ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this user.');u.depts=ds}
-  S.users.push(u);audit('User created',name+' ('+un+', '+roleName(role).toLowerCase()+')');save();toast('User created. They choose their own password at first sign-in.');
+  let ds;if(role!=='admin'&&deptList().length){ds=deptList().filter(d=>{const e=document.getElementById('nu-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department for this user.')}
+  const u=await mkUser({name,un,email,role,depts:ds,pw:p});
+  UI.lastCred=email?{name,email,username:un,pw:p}:null;save();toast('User created. They choose their own password at first sign-in.');
+}
+/* ----- access requests ----- */
+async function doRequest(){
+  const name=gv('rq-name').trim(),email=gv('rq-email').trim().toLowerCase();UI.rqName=name;UI.rqEmail=email;
+  if(!name)return UI.authMsg='Enter your full name.';
+  if(!EMAIL_RE.test(email))return UI.authMsg='Enter a valid email address. The administrator will send your temporary password there.';
+  if(svcOn()){try{await svcCall('/request',{name,email},false)}catch(e){return UI.authMsg=e.message}}
+  else{
+    if(S.users.some(x=>String(x.email||'').toLowerCase()===email))return UI.authMsg='That email address already has an account. Try signing in, or ask an administrator to reset your password.';
+    if(!S.requests.some(r=>r.email===email&&(!r.status||r.status==='pending'))){S.requests.push({id:uid(),name,email,at:nowIso(),status:'pending'});S.audit.push({id:uid(),at:nowIso(),by:null,byName:name,action:'Access requested',detail:name+' <'+email+'>',depts:[]});save()}
+  }
+  UI.reqDone=true;
+}
+async function doSvcConn(){
+  const url=gv('sv-url').trim().replace(/\/+$/,'');
+  if(!/^(https:\/\/|http:\/\/localhost)[^\s/]+/.test(url)){UI.ghMsg='Enter the service address, starting with https://';return}
+  const old=GH;GH={...GH,svc:url,on:true};
+  try{await svcCall('/ping',{},false)}catch(e){GH=old;UI.ghMsg=e.message;return}
+  ghSaveCfg();UI.ghMsg='';UI.auth='';toast('Connected. Sign in with your QCLens username or email and password.');
+}
+const mailBody=c=>'Hello '+c.name+',\n\nYour QCLens access has been approved.\n\nSign in at: '+location.href.split('#')[0]+'\nUsername: '+c.username+' (or your email address)\nTemporary password: '+c.pw+'\n\nYou will be asked to choose your own password the first time you sign in.\n';
+function credBox(){
+  const c=UI.lastCred;if(!c)return '';
+  const href='mailto:'+encodeURIComponent(c.email||'')+'?subject='+encodeURIComponent('Your QCLens access')+'&body='+encodeURIComponent(mailBody(c));
+  return `<div class="panel stack" style="border-color:var(--accent)"><h3>Send these sign-in details to ${esc(c.name)}</h3>
+   <div class="panelcard small"><div>Username: <b class="mono">${esc(c.username)}</b>${c.email?` (or ${esc(c.email)})`:''}</div><div>Temporary password: <b class="mono">${esc(c.pw)}</b></div></div>
+   <p class="small muted" style="margin:0">QCLens cannot send email by itself. Press <b>Email these details</b> to open a ready-written message in your email app, addressed to ${esc(c.email||'the worker')}. This password is shown only now.</p>
+   <div class="row">${c.email?`<a class="btn primary" href="${href}">Email these details</a>`:''}<button class="btn" data-act="copycred">Copy message</button><button class="btn" data-act="credok">Done</button></div></div>`;
+}
+function renderRequests(){
+  const pend=S.requests.filter(r=>!r.status||r.status==='pending').sort((a,b)=>a.at<b.at?-1:1),done=S.requests.filter(r=>r.status&&r.status!=='pending').sort((a,b)=>(a.decidedAt||'')<(b.decidedAt||'')?1:-1).slice(0,8);
+  const row=r=>{const open=UI.appr===r.id;
+    return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.email)} · requested ${fmtTs(r.at)}</div></div>
+     ${open?'':`<div class="row"><button class="btn sm primary" data-act="rqapprove" data-id="${r.id}">Approve…</button><button class="btn sm danger" data-act="rqreject" data-id="${r.id}">Decline</button></div>`}</div>
+     ${open?`<div class="stack" style="margin-top:10px"><label class="f">Access level<select id="rq-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
+      ${deptList().length?`<div class="f">Departments<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="rq-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span></div>`:''}
+      <div class="row"><button class="btn primary" data-act="rqconfirm" data-id="${r.id}">Approve and create account</button><button class="btn" data-act="rqcancel">Cancel</button></div></div>`:''}</div>`};
+  return `${credBox()}<div class="panel stack"><div><h2>Access requests</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Workers ask for access from the sign-in screen with their name and email address. Approving creates their account with a temporary password for you to email to them.</p></div>
+   ${pend.length?pend.map(row).join(''):'<p class="small muted" style="margin:0">No requests waiting.</p>'}
+   ${done.length?`<details><summary class="small" style="cursor:pointer">Recent decisions</summary><div class="small" style="margin-top:6px">${done.map(r=>`<div>${esc(r.name)} · ${esc(r.email)} · <b>${r.status==='approved'?'approved':'declined'}</b>${r.by?' by '+esc(r.by):''}</div>`).join('')}</div></details>`:''}</div>`;
+}
+async function approveReq(id){
+  const r=S.requests.find(x=>x.id===id);if(!r)return;
+  const role=gv('rq-role')||'tech';let ds;
+  if(role!=='admin'&&deptList().length){ds=deptList().filter(d=>{const e=document.getElementById('rq-d-'+d.id);return e&&e.checked}).map(d=>d.id);if(!ds.length)return toast('Choose at least one department.')}
+  if(S.users.some(x=>String(x.email||'').toLowerCase()===r.email))return toast('That email address already has an account.');
+  const un=uniqueUn(r.email.split('@')[0]),pw=genPw();
+  await mkUser({name:r.name,un,email:r.email,role,depts:ds,pw});
+  r.status='approved';r.by=CU.name;r.decidedAt=nowIso();audit('Access request approved',r.name+' <'+r.email+'> as '+roleName(role).toLowerCase());
+  UI.lastCred={name:r.name,email:r.email,username:un,pw};UI.appr=null;save();
 }
 async function doUserReset(){
   const id=UI.resetFor,u=S.users.find(x=>x.id===id),p=gv('rs-pass');
   if(!u)return;if(p.length<8)return toast('The temporary password needs at least 8 characters.');
-  u.pw=await hashPw(p);u.mustChange=true;u.fails=0;u.lockUntil=0;UI.resetFor=null;audit('Password reset by administrator',u.name+' ('+u.username+')');save();toast('Temporary password set for '+u.name+'.');
+  u.pw=await hashPw(p);u.mustChange=true;u.mod=nowIso();pwQueue(u.id,u.pw);u.fails=0;u.lockUntil=0;UI.resetFor=null;audit('Password reset by administrator',u.name+' ('+u.username+')');save();toast('Temporary password set for '+u.name+'.');
 }
 document.addEventListener('submit',async e=>{
   e.preventDefault();const f=e.target.dataset.form;if(!f)return;
@@ -1226,6 +1353,9 @@ document.addEventListener('submit',async e=>{
     else if(f==='acct'){await doAcct();if(UI.acctMsg){const m=document.getElementById('ac-err');m.textContent=UI.acctMsg;m.hidden=false;return}}
     else if(f==='uadd'){if(!isAdmin())return;await doUserAdd()}
     else if(f==='ureset'){if(!isAdmin())return;await doUserReset()}
+    else if(f==='svcadmin'){if(!isAdmin())return;await doSvcAdmin()}
+    else if(f==='reqform')await doRequest();
+    else if(f==='svcconn')await doSvcConn();
     else if(f==='ghconn'){if(CU&&!isAdmin())return;await doGhConnect()}
   }catch(err){UI.authMsg='Secure accounts are not available in this browser view.'}
   render();
@@ -1240,17 +1370,18 @@ function deptCell(u){
 }
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
-    return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}</div></td>
+    return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}${u.email?' · '+esc(u.email):''}</div></td>
      <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="sup"${u.role==='sup'?' selected':''}>Supervisory technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
      <td>${deptCell(u)}</td>
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}`}</td></tr>`}).join('');
-  return `<div class="stack"><div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack">${renderRequests()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
+    <label class="f">Email address (optional)<input type="email" id="nu-email" autocapitalize="none"></label>
     <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
     ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this user can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
     <label class="f">Temporary password<span class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="nu-pass" autocomplete="off"><button class="btn sm" type="button" data-act="genpw" data-t="nu-pass">Generate</button></span></label></div>
@@ -1284,7 +1415,6 @@ async function exportAudit(){
     await dl.save({filename:'QCLens-audit-log-'+todayStr()+'.xlsx',data:await wb.xlsx.writeBuffer()});toast('Audit log ready.');
   }catch(e){toast(e&&e.code==='declined'?'Save cancelled.':'Export failed.')}
 }
-restoreSess();
 /* ===== Establish limits: mean and SD from 20 to 40 runs ===== */
 const EST_MIN=20,EST_MAX=40;
 const estOf=id=>(S.est||(S.est=[])).find(s=>s.id===id);
@@ -1476,10 +1606,26 @@ const GHK='ljqc.gh';
 function ghLoad(){try{const s=localStorage.getItem(GHK);if(s)return JSON.parse(s)}catch(e){}return ghMem||{}}
 let GH=ghLoad();
 function ghSaveCfg(){ghMem=GH;try{localStorage.setItem(GHK,JSON.stringify(GH))}catch(e){}}
-const ghOn=()=>!!(GH.on&&GH.token&&GH.owner&&GH.repo);
+let credMem=null,CRED=null;
+try{const s=sessionStorage.getItem('ljqc.cred');CRED=s?JSON.parse(s):null}catch(e){}
+function setCred(c){CRED=c;credMem=c;try{c?sessionStorage.setItem('ljqc.cred',JSON.stringify(c)):sessionStorage.removeItem('ljqc.cred')}catch(e){}}
+const svcOn=()=>!!(GH.on&&GH.svc);
+const ghOn=()=>!!(GH.on&&(GH.svc||(GH.token&&GH.owner&&GH.repo)));
+const ghReady=()=>ghOn()&&(!GH.svc||!!CRED);
+try{const m=/[#&]svc=([^&]+)/.exec(location.hash||'');if(m&&!GH.svc){GH={svc:decodeURIComponent(m[1]),on:true};ghSaveCfg();history.replaceState(null,'',location.pathname+location.search)}}catch(e){}
+function pwQueue(id,rec){if(!svcOn())return;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==id);GH.pwq.push({id,pw:rec});ghSaveCfg()}
+async function svcCall(path,body,auth){
+  const b={...(body||{})};if(auth!==false&&CRED){b.u=CRED.u;b.hash=CRED.hash}
+  let r;try{r=await fetch(GH.svc.replace(/\/+$/,'')+path,{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:JSON.stringify(b)})}catch(e){throw new Error('Could not reach the QCLens sync service. Check your connection and the service address.')}
+  let j={};try{j=await r.json()}catch(e){}
+  if(r.status===409)return {conflict:true};
+  if(r.status===401){const e=new Error(j.error||'Sign-in required.');e.code=401;throw e}
+  if(!r.ok)throw new Error(j.error||('The sync service returned '+r.status+'.'));
+  return j;
+}
 const GHS={st:'idle',msg:'',sha:null,last:'',busy:false,pending:false,timer:null,lastHash:null,defer:false};
 const canon=v=>Array.isArray(v)?v.map(canon):v&&typeof v==='object'?Object.keys(v).sort().reduce((o,k)=>(o[k]=canon(v[k]),o),{}):v;
-const ghStrip=o=>{const c={...o};delete c.tab;return c};
+const ghStrip=o=>{const c={...o};delete c.tab;if(svcOn())c.users=(c.users||[]).map(u=>{const x={...u};delete x.pw;delete x.rec;delete x.fails;delete x.lockUntil;return x});return c};
 const ghHash=o=>JSON.stringify(canon(ghStrip(o)));
 function b64enc(t){const b=new TextEncoder().encode(t);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
 function b64dec(t){const s=atob(t.replace(/\s/g,'')),b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return new TextDecoder().decode(b)}
@@ -1502,6 +1648,7 @@ async function ghCheck(){
   return j;
 }
 async function ghPull(){
+  if(GH.svc){const j=await svcCall('/pull');return j.empty?{exists:!!j.data,empty:true,sha:j.sha,data:j.data}:{exists:true,sha:j.sha,data:j.data,me:j.me}}
   const q='?ref='+encodeURIComponent(GH.branch||'main');
   const r=await ghApi(ghFile()+q);
   if(r.status===404)return {exists:false};
@@ -1512,6 +1659,11 @@ async function ghPull(){
   return {exists:true,sha:j.sha,data:JSON.parse(text)};
 }
 async function ghPush(){
+  if(GH.svc){
+    const j=await svcCall('/push',{data:GHS.boot?(()=>{const c={...S};delete c.tab;return c})():ghStrip(S),sha:GHS.sha,pwset:GH.pwq||[],boot:!!GHS.boot});
+    if(j.conflict)return 'conflict';
+    GHS.sha=j.sha||GHS.sha;GHS.boot=false;GH.pwq=[];ghSaveCfg();if(GHS.newCred){setCred(GHS.newCred);GHS.newCred=null}return 'ok';
+  }
   const body={message:'QCLens data '+new Date().toISOString(),content:b64enc(JSON.stringify(ghStrip(S))),branch:GH.branch||'main'};
   if(GHS.sha)body.sha=GHS.sha;
   const r=await ghApi(ghFile(),{method:'PUT',body});
@@ -1524,7 +1676,8 @@ function mergeStates(L,R){
   const tomb=new Set([...(L.tomb||[]),...(R.tomb||[])]),out=JSON.parse(JSON.stringify(L));
   const by=(a,b,pick)=>{const m=new Map();(b||[]).forEach(x=>m.set(x.id,x));(a||[]).forEach(x=>m.set(x.id,m.has(x.id)&&pick?pick(x,m.get(x.id)):x));return [...m.values()].filter(x=>!tomb.has(x.id))};
   const newer=(a,b)=>((a.upd||a).at||'')>=((b.upd||b).at||'')?a:b;
-  out.users=by(L.users,R.users);out.depts=by(L.depts,R.depts);out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
+  const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;return x};
+  out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts);out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
   out.est=by(L.est,R.est,(a,b)=>b.runs&&a.runs&&b.runs.length>a.runs.length?b:a);
   out.analytes=by(L.analytes,R.analytes,(a,b)=>b.targets.length>a.targets.length?b:a);
   const ok=new Set(out.analytes.map(a=>a.id));
@@ -1544,17 +1697,17 @@ function ghAdopt(M){
   if(typing||UI.modal){GHS.defer=true}else render();
 }
 async function ghSync(){
-  if(!ghOn())return;
+  if(!ghReady())return;
   if(GHS.busy){GHS.pending=true;return}
   GHS.busy=true;GHS.st='syncing';ghPaint();
   try{
     for(let i=0;i<3;i++){
       const rem=await ghPull();let remoteH=null;
       if(rem.exists){
-        GHS.sha=rem.sha;const R=norm(rem.data);remoteH=ghHash(R);
+        GHS.sha=rem.sha;GHS.boot=!!rem.empty;if(rem.data){const R=norm(rem.data);remoteH=rem.empty?null:ghHash(R);
         const M=norm(mergeStates(S,R));
-        if(ghHash(M)!==ghHash(S))ghAdopt(M);
-      }else GHS.sha=null;
+        if(ghHash(M)!==ghHash(S))ghAdopt(M)}
+      }else{GHS.sha=null;GHS.boot=true}
       if(remoteH!==null&&ghHash(S)===remoteH){break}
       const res=await ghPush();if(res==='ok')break;
     }
@@ -1563,7 +1716,7 @@ async function ghSync(){
   finally{GHS.busy=false;ghPaint();if(GHS.pending){GHS.pending=false;ghQueue()}}
 }
 function ghQueue(){
-  if(!ghOn())return;
+  if(!ghReady())return;
   if(GHS.lastHash!==null&&ghHash(S)===GHS.lastHash)return;
   clearTimeout(GHS.timer);GHS.timer=setTimeout(ghSync,2500);GHS.st=GHS.st==='err'?'err':'pending';ghPaint();
 }
@@ -1572,12 +1725,12 @@ function ghStatusHtml(){
   if(!ghOn())return '<span class="chip">Not connected</span>';
   const t=GHS.last?' · last saved '+fmtTs(GHS.last):'';
   const c=GHS.st==='err'?'<span class="chip bad">Not saved</span>':GHS.st==='syncing'?'<span class="chip warn">Saving…</span>':GHS.st==='pending'?'<span class="chip warn">Changes waiting</span>':'<span class="chip good">Saved to GitHub</span>';
-  return c+' <span class="small muted">'+esc(GH.owner+'/'+GH.repo)+t+'</span>'+(GHS.msg?'<div class="small" style="color:var(--bad);margin-top:4px">'+esc(GHS.msg)+'</div>':'');
+  return c+' <span class="small muted">'+esc(GH.svc?GH.svc.replace(/^https:\/\//,''):GH.owner+'/'+GH.repo)+t+'</span>'+(GHS.msg?'<div class="small" style="color:var(--bad);margin-top:4px">'+esc(GHS.msg)+'</div>':'');
 }
 function ghBoot(){
   if(!ghOn())return;
   ghSync();
-  setInterval(()=>{if(ghOn()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000);
+  setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000);
   document.addEventListener('focusout',()=>{if(GHS.defer){setTimeout(()=>{const a=document.activeElement;if(GHS.defer&&!UI.modal&&!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))){GHS.defer=false;render()}},50)}});
 }
 /* ----- connect form (sign-in screen and Setup) ----- */
@@ -1606,13 +1759,31 @@ async function doGhConnect(){
   if(UI.auth==='gh')UI.auth='';
 }
 let ghPoll=null;
-function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghOn()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}
+function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}
+async function doSvcAdmin(){
+  const url=(document.getElementById('sv-url')||{value:''}).value.trim().replace(/\/+$/,'');
+  if(!/^(https:\/\/|http:\/\/localhost)[^\s/]+/.test(url)){UI.ghMsg='Enter the service address, starting with https://';return}
+  if(!CU||!CU.pw){UI.ghMsg='Sign in again with your password on this device, then connect.';return}
+  const old=GH;GH={svc:url,on:true,pwq:[]};
+  try{await svcCall('/ping',{},false)}catch(e){GH=old;UI.ghMsg=e.message;return}
+  setCred({u:CU.username,hash:CU.pw.hash,salt:CU.pw.salt});ghSaveCfg();GHS.sha=null;GHS.lastHash=null;GHS.st='idle';
+  await ghSync();
+  if(GHS.st==='err'){const m=GHS.msg;GH=old;ghSaveCfg();setCred(null);UI.ghMsg=m;return}
+  ghBoot2();UI.ghMsg='';audit('Sync service connected',url,null,[]);save();toast('Connected. Your data is saved to the sync service.');
+}
 function renderGithub(){
-  return `<div class="panel stack"><div><h3>GitHub storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Changes are saved a few seconds after you make them, and other devices pick them up within a minute.</p></div>
+  if(svcOn())return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">All QCLens data is saved through the lab's sync service. Workers sign in with their own username and password from any device. They never need a GitHub token.</p></div>
    <div id="ghstatus">${ghStatusHtml()}</div>
-   ${ghOn()?`<div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn danger" data-act="ghoff">Disconnect this device</button></div>`:''}
-   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>${ghOn()?'Change connection settings':'Connect to GitHub'}</b></summary><div style="margin-top:10px">${ghForm()}
-   <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Each device (and each person who signs in on it) needs the same token once, on the sign-in screen. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
+   <div class="panelcard small"><div class="muted">Service</div><div class="mono" style="word-break:break-all">${esc(GH.svc)}</div></div>
+   <div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn" data-act="svccopy">Copy link for new devices</button><button class="btn danger" data-act="svcdisc">Disconnect this device</button></div>
+   <p class="small muted" style="margin:0;max-width:80ch">Send workers the link above. Opening it connects their device to the service; they then use Request access or sign in.</p></div>`;
+  return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Choose one of the two ways below.</p></div>
+   <div id="ghstatus">${ghStatusHtml()}</div>
+   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>Option A (recommended): sync service, no GitHub token on devices</b></summary><div style="margin-top:10px" class="stack">
+    <p class="small muted" style="margin:0;max-width:80ch">A small free service (a Cloudflare Worker, in the <code>worker</code> folder of the code repository, with setup steps in its README) holds the GitHub token for you. Workers sign in with their own username and password on any device. Deploy it once, then paste its address here.</p>
+    <form data-form="svcadmin" class="stack" autocomplete="off">${fld('sv-url','Sync service address','url','autocapitalize="none" placeholder="https://qclens-sync.your-name.workers.dev"')}${UI.ghMsg&&!UI.ghDraft?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}<button class="btn primary" type="submit">Connect and upload data</button></form></div></details>
+   <details${ghOn()?'':''}><summary style="cursor:pointer"><b>Option B: connect straight to GitHub with a token</b></summary><div style="margin-top:10px">${ghOn()?`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="ghsync">Sync now</button><button class="btn danger" data-act="ghoff">Disconnect this device</button></div>`:''}${ghForm()}
+   <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Every device needs the same token once. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
 }
 /* ===== Westgard rules tab: shows every rule applied to QC points; admin switches them on or off ===== */
 function ruleCounts(){
@@ -1685,10 +1856,10 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,id=el.dataset.id,st=S.setup;
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
-  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen']);
+  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet']);
-  const ADMONLY=new Set(['backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy']);
+  const ADMONLY=new Set(['rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
@@ -1704,7 +1875,7 @@ document.addEventListener('click',e=>{
    case 'genpw':{const i=document.getElementById(el.dataset.t);if(i)i.value=genPw();return}
    case 'utoggle':{const u=S.users.find(x=>x.id===id);if(!u||u.id===CU.id)return;
      if(u.role==='admin'&&u.active!==false&&nAdmins()<=1)return toast('There must be at least one active administrator.');
-     u.active=u.active===false;audit(u.active?'User enabled':'User disabled',u.name+' ('+u.username+')');break}
+     u.active=u.active===false;u.mod=nowIso();audit(u.active?'User enabled':'User disabled',u.name+' ('+u.username+')');break}
    case 'ureset':UI.resetFor=id;break;
    case 'ucancel':UI.resetFor=null;break;
    case 'auditmore':AF.limit+=100;break;
@@ -1742,6 +1913,16 @@ document.addEventListener('click',e=>{
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
    case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'svcopen':e.preventDefault();UI.auth='svc';UI.ghMsg='';break;
+   case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
+   case 'rqapprove':UI.appr=id;break;
+   case 'rqcancel':UI.appr=null;break;
+   case 'rqreject':{const r=S.requests.find(x=>x.id===id);if(r){r.status='declined';r.by=CU.name;r.decidedAt=nowIso();audit('Access request declined',r.name+' <'+r.email+'>');}break}
+   case 'rqconfirm':approveReq(id).then(()=>render());return;
+   case 'credok':UI.lastCred=null;break;
+   case 'copycred':{const c=UI.lastCred;if(c){try{navigator.clipboard.writeText(mailBody(c)).then(()=>toast('Message copied.'),()=>toast('Copy failed.'))}catch(x){toast('Copy failed.')}}return}
+   case 'svcdisc':{GH={};ghSaveCfg();setCred(null);GHS.lastHash=null;GHS.sha=null;GHS.st='idle';GHS.msg='';audit('Sync service disconnected on this device','');break}
+   case 'svccopy':{const l=location.href.split('#')[0]+'#svc='+encodeURIComponent(GH.svc||'');try{navigator.clipboard.writeText(l).then(()=>toast('Link copied.'),()=>toast('Copy failed.'))}catch(x){toast('Copy failed.')}return}
    case 'ghopen':e.preventDefault();UI.auth='gh';UI.ghMsg='';break;
    case 'ghsync':ghSync();return;
    case 'ghoff':{GH={};ghSaveCfg();GHS.lastHash=null;GHS.sha=null;GHS.st='idle';GHS.msg='';audit('GitHub storage disconnected on this device','');break}
@@ -1799,11 +1980,11 @@ document.addEventListener('change',e=>{
   if(d.path==='dept'&&!isAdmin())return;
   if(d.udept){const [uid_,did]=d.udept.split(':'),u=S.users.find(x=>x.id===uid_);if(!u)return;
     const cur=Array.isArray(u.depts)?u.depts.slice():deptList().map(x=>x.id);
-    u.depts=t.checked?[...new Set([...cur,did])]:cur.filter(x=>x!==did);
+    u.depts=t.checked?[...new Set([...cur,did])]:cur.filter(x=>x!==did);u.mod=nowIso();
     const nm=(deptList().find(x=>x.id===did)||{}).dept;audit('User departments changed',u.name+': '+(t.checked?'added ':'removed ')+nm+' ('+(u.depts.map(i=>(deptList().find(x=>x.id===i)||{}).dept).join(', ')||'none')+')');save();return render()}
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
-    audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;save();return render()}
+    audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
@@ -1860,8 +2041,10 @@ document.addEventListener('pointerover',e=>{
   tip.style.top=(c.top-b.top-tip.offsetHeight-8)+'px';
 });
 document.addEventListener('pointerout',e=>{const h=e.target.closest&&e.target.closest('.hit');if(h){const t=h.closest('.chartbox').querySelector('.tip');if(t)t.hidden=true}});
-render();
+restoreSess();render();
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-amodnew]')){e.preventDefault();e.target.dispatchEvent(new Event('change',{bubbles:true}))}});
 ghBoot();
 </script>
+
+</body></html>

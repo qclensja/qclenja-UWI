@@ -95,11 +95,11 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[]});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[]});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
