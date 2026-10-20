@@ -11,6 +11,14 @@ const svcOn=()=>!!(GH.on&&GH.svc);
 const ghOn=()=>!!(GH.on&&(GH.svc||(GH.token&&GH.owner&&GH.repo)));
 const ghReady=()=>ghOn()&&(!GH.svc||!!CRED);
 try{const m=/[#&]svc=([^&]+)/.exec(location.hash||'');if(m&&!GH.svc){GH={svc:decodeURIComponent(m[1]),on:true};ghSaveCfg();history.replaceState(null,'',location.pathname+location.search)}}catch(e){}
+/* shared default: config.json next to the page ({"svc":"https://..."}) connects every new device automatically */
+if(!GH.svc&&!(GH.token&&GH.repo)&&/^https?:/.test(location.protocol)){
+  UI.cfgWait=true;
+  const ac=typeof AbortController!=='undefined'?new AbortController():null,tm=setTimeout(()=>ac&&ac.abort(),4000);
+  fetch('config.json',{cache:'no-store',signal:ac?ac.signal:undefined}).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&typeof j.svc==='string'&&/^(https:\/\/|http:\/\/localhost)[^\s/]+/.test(j.svc)&&!GH.svc){GH={svc:j.svc.replace(/\/+$/,''),on:true};ghSaveCfg()}
+  }).catch(()=>{}).finally(()=>{clearTimeout(tm);UI.cfgWait=false;try{render()}catch(e){}});
+}
 function pwQueue(id,rec){if(!svcOn())return;GH.pwq=(GH.pwq||[]).filter(x=>x.id!==id);GH.pwq.push({id,pw:rec});ghSaveCfg()}
 async function svcCall(path,body,auth){
   const b={...(body||{})};if(auth!==false&&CRED){b.u=CRED.u;b.hash=CRED.hash}
@@ -174,7 +182,8 @@ function renderGithub(){
    <div id="ghstatus">${ghStatusHtml()}</div>
    <div class="panelcard small"><div class="muted">Service</div><div class="mono" style="word-break:break-all">${esc(GH.svc)}</div></div>
    <div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn" data-act="svccopy">Copy link for new devices</button><button class="btn danger" data-act="svcdisc">Disconnect this device</button></div>
-   <p class="small muted" style="margin:0;max-width:80ch">Send workers the link above. Opening it connects their device to the service; they then use Request access or sign in.</p></div>`;
+   <p class="small muted" style="margin:0;max-width:80ch">Send workers the link above. Opening it connects their device to the service; they then use Request access or sign in.</p>
+   <div class="panelcard small"><b>Sign in with no connection step.</b> Add a file named <code>config.json</code> next to the page in the GitHub code repository (the same folder as <code>index.html</code>) containing:<div class="mono" style="margin:6px 0;word-break:break-all">{"svc":"${esc(GH.svc)}"}</div>Every new device that opens the page then connects by itself and shows the normal sign-in screen.</div></div>`;
   return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Choose one of the two ways below.</p></div>
    <div id="ghstatus">${ghStatusHtml()}</div>
    <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>Option A (recommended): sync service, no GitHub token on devices</b></summary><div style="margin-top:10px" class="stack">

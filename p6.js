@@ -69,6 +69,7 @@ function connScreen(){
    <button class="btn" type="button" data-act="backlogin">Back</button>`;
 }
 function authGate(){
+  if(UI.cfgWait&&!CU)return shell('<p class="muted" style="text-align:center">Loading…</p>');
   if(UI.recCode)return shell(`<div><h2>Save your recovery code</h2><p class="muted" style="margin:6px 0 0">If you forget your password, this code lets an administrator reset it. It is shown once. Keep it somewhere safe, away from this computer.</p></div>
     <div class="reccode" id="reccode">${esc(UI.recCode)}</div>
     <div class="row"><button class="btn" type="button" data-act="copyrec">Copy code</button><button class="btn primary" type="button" data-act="recdone">I have saved it</button></div>`);
