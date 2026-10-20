@@ -61,11 +61,10 @@ const amsg=()=>UI.authMsg?`<p class="amsg" role="alert">${esc(UI.authMsg)}</p>`:
 const fld=(id,label,type,extra)=>`<label class="f">${label}<input id="${id}" type="${type}" ${extra||''}></label>`;
 function connScreen(){
   const m=UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:'';
-  return `<div><h2>Connect this device</h2><p class="muted" style="margin:6px 0 0">Load your laboratory's data on this device. Use <b>one</b> of the two options, then sign in with your own username and password.</p></div>
+  return `<div><h2>Connect this device</h2><p class="muted" style="margin:6px 0 0">Load your laboratory's data on this device. Enter the service address your administrator gave you, then sign in with your own username and password. No GitHub token is needed.</p></div>
    ${m}
    <div class="panelcard stack"><h3>Sync service address</h3><p class="small muted" style="margin:0">Recommended. The address your administrator gave you. No GitHub token needed.</p>
-    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}<button class="btn primary" type="submit">Connect with service address</button></form></div>
-   <details class="panelcard"${UI.auth==='gh'||UI.ghDraft?' open':''}><summary style="cursor:pointer"><b>GitHub token</b></summary><p class="small muted" style="margin:8px 0">Connects straight to the lab's private GitHub data repository. Ask your administrator for the repository name and token.</p>${ghForm()}</details>
+    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}<button class="btn primary" type="submit">Connect</button></form></div>
    <button class="btn" type="button" data-act="backlogin">Back</button>`;
 }
 function authGate(){
@@ -85,7 +84,7 @@ function authGate(){
   if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
     <button class="btn primary" type="submit">Create account and sign in</button></form>
-    <div class="small muted" style="margin-top:10px"></div><button class="btn" type="button" data-act="svcopen" style="margin-top:8px">Already use QCLens? Connect this device with a service address or GitHub token</button>`);
+    <div class="small muted" style="margin-top:10px"></div><button class="btn" type="button" data-act="svcopen" style="margin-top:8px">Already use QCLens? Connect this device with the lab service address</button>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -94,7 +93,7 @@ function authGate(){
       <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
       <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>
-      <button class="btn" type="button" data-act="svcopen" style="margin-top:4px">${ghOn()?'Change connection (service address or GitHub token)':'New device? Connect with a service address or GitHub token'}</button>`);
+      <button class="btn" type="button" data-act="svcopen" style="margin-top:4px">${ghOn()?'Change service address':'New device? Enter the lab service address'}</button>`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}

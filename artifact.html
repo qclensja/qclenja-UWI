@@ -1170,11 +1170,10 @@ const amsg=()=>UI.authMsg?`<p class="amsg" role="alert">${esc(UI.authMsg)}</p>`:
 const fld=(id,label,type,extra)=>`<label class="f">${label}<input id="${id}" type="${type}" ${extra||''}></label>`;
 function connScreen(){
   const m=UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:'';
-  return `<div><h2>Connect this device</h2><p class="muted" style="margin:6px 0 0">Load your laboratory's data on this device. Use <b>one</b> of the two options, then sign in with your own username and password.</p></div>
+  return `<div><h2>Connect this device</h2><p class="muted" style="margin:6px 0 0">Load your laboratory's data on this device. Enter the service address your administrator gave you, then sign in with your own username and password. No GitHub token is needed.</p></div>
    ${m}
    <div class="panelcard stack"><h3>Sync service address</h3><p class="small muted" style="margin:0">Recommended. The address your administrator gave you. No GitHub token needed.</p>
-    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}<button class="btn primary" type="submit">Connect with service address</button></form></div>
-   <details class="panelcard"${UI.auth==='gh'||UI.ghDraft?' open':''}><summary style="cursor:pointer"><b>GitHub token</b></summary><p class="small muted" style="margin:8px 0">Connects straight to the lab's private GitHub data repository. Ask your administrator for the repository name and token.</p>${ghForm()}</details>
+    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}<button class="btn primary" type="submit">Connect</button></form></div>
    <button class="btn" type="button" data-act="backlogin">Back</button>`;
 }
 function authGate(){
@@ -1194,7 +1193,7 @@ function authGate(){
   if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
     <button class="btn primary" type="submit">Create account and sign in</button></form>
-    <div class="small muted" style="margin-top:10px"></div><button class="btn" type="button" data-act="svcopen" style="margin-top:8px">Already use QCLens? Connect this device with a service address or GitHub token</button>`);
+    <div class="small muted" style="margin-top:10px"></div><button class="btn" type="button" data-act="svcopen" style="margin-top:8px">Already use QCLens? Connect this device with the lab service address</button>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -1203,7 +1202,7 @@ function authGate(){
       <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
       <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>
-      <button class="btn" type="button" data-act="svcopen" style="margin-top:4px">${ghOn()?'Change connection (service address or GitHub token)':'New device? Connect with a service address or GitHub token'}</button>`);
+      <button class="btn" type="button" data-act="svcopen" style="margin-top:4px">${ghOn()?'Change service address':'New device? Enter the lab service address'}</button>`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -1796,13 +1795,12 @@ function renderGithub(){
    <div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn" data-act="svccopy">Copy link for new devices</button><button class="btn danger" data-act="svcdisc">Disconnect this device</button></div>
    <p class="small muted" style="margin:0;max-width:80ch">Send workers the link above. Opening it connects their device to the service; they then use Request access or sign in.</p>
    <div class="panelcard small"><b>Sign in with no connection step.</b> Add a file named <code>config.json</code> next to the page in the GitHub code repository (the same folder as <code>index.html</code>) containing:<div class="mono" style="margin:6px 0;word-break:break-all">{"svc":"${esc(GH.svc)}"}</div>Every new device that opens the page then connects by itself and shows the normal sign-in screen.</div></div>`;
-  return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Choose one of the two ways below.</p></div>
+  return `<div class="panel stack"><div><h3>Cloud storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. </p></div>
    <div id="ghstatus">${ghStatusHtml()}</div>
-   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>Option A (recommended): sync service, no GitHub token on devices</b></summary><div style="margin-top:10px" class="stack">
+   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>Connect the sync service</b></summary><div style="margin-top:10px" class="stack">
     <p class="small muted" style="margin:0;max-width:80ch">A small free service (a Cloudflare Worker, in the <code>worker</code> folder of the code repository, with setup steps in its README) holds the GitHub token for you. Workers sign in with their own username and password on any device. Deploy it once, then paste its address here.</p>
     <form data-form="svcadmin" class="stack" autocomplete="off">${fld('sv-url','Sync service address','url','autocapitalize="none" placeholder="https://qclens-sync.your-name.workers.dev"')}${UI.ghMsg&&!UI.ghDraft?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}<button class="btn primary" type="submit">Connect and upload data</button></form></div></details>
-   <details${ghOn()?'':''}><summary style="cursor:pointer"><b>Option B: connect straight to GitHub with a token</b></summary><div style="margin-top:10px">${ghOn()?`<div class="row" style="margin-bottom:10px"><button class="btn" data-act="ghsync">Sync now</button><button class="btn danger" data-act="ghoff">Disconnect this device</button></div>`:''}${ghForm()}
-   <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Every device needs the same token once. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
+</div>`;
 }
 /* ===== Westgard rules tab: shows every rule applied to QC points; admin switches them on or off ===== */
 function ruleCounts(){
