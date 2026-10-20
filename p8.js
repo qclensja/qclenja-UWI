@@ -98,14 +98,14 @@ function mergeStates(L,R){
 const tomb=(...ids)=>{S.tomb=S.tomb||[];ids.forEach(i=>{if(i&&!S.tomb.includes(i))S.tomb.push(i)})};
 function ghAdopt(M){
   M.tab=S.tab;S=M;if(CU)CU=S.users.find(u=>u.id===CU.id&&u.active!==false)||null;
-  try{mem=JSON.stringify(S);localStorage.setItem(KEY,mem)}catch(e){}
+  try{mem=JSON.stringify(S)}catch(e){}
   const a=document.activeElement,typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
   if(typing||UI.modal){GHS.defer=true}else render();
 }
 async function ghSync(){
   if(!ghReady())return;
   if(GHS.busy){GHS.pending=true;return}
-  GHS.busy=true;GHS.st='syncing';ghPaint();
+  GHS.busy=true;GHS.timer=null;GHS.st='syncing';ghPaint();
   try{
     for(let i=0;i<3;i++){
       const rem=await ghPull();let remoteH=null;
@@ -118,6 +118,8 @@ async function ghSync(){
       const res=await ghPush();if(res==='ok')break;
     }
     GHS.lastHash=ghHash(S);GHS.st='ok';GHS.msg='';GHS.last=new Date().toISOString();
+    /* the data now lives on GitHub: drop the browser copy (it only holds changes not yet uploaded) */
+    if(!GHS.pending&&!GHS.timer){try{localStorage.removeItem(KEY)}catch(e){}}
   }catch(e){GHS.st='err';GHS.msg=(e&&e.message)||'Sync failed.'}
   finally{GHS.busy=false;ghPaint();if(GHS.pending){GHS.pending=false;ghQueue()}}
 }
@@ -135,7 +137,6 @@ function ghStatusHtml(){
 }
 function ghBoot(){
   if(!ghOn())return;
-  ghSync();
   setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000);
   document.addEventListener('focusout',()=>{if(GHS.defer){setTimeout(()=>{const a=document.activeElement;if(GHS.defer&&!UI.modal&&!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))){GHS.defer=false;render()}},50)}});
 }

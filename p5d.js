@@ -16,7 +16,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
    ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
-   <p class="small muted" style="margin:0">Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device.</p>
+   <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
 }
 const app=document.getElementById('app');
@@ -236,7 +236,7 @@ document.addEventListener('pointerover',e=>{
   tip.style.top=(c.top-b.top-tip.offsetHeight-8)+'px';
 });
 document.addEventListener('pointerout',e=>{const h=e.target.closest&&e.target.closest('.hit');if(h){const t=h.closest('.chartbox').querySelector('.tip');if(t)t.hidden=true}});
-restoreSess();render();
+if(ghOn()&&(!GH.svc||CRED)){UI.cfgWait=true;render();ghSync().catch(()=>{}).finally(()=>{UI.cfgWait=false;restoreSess();render()})}else{restoreSess();render()}
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-amodnew]')){e.preventDefault();e.target.dispatchEvent(new Event('change',{bubbles:true}))}});
 ghBoot();
