@@ -383,6 +383,13 @@ function save(){
   const j=JSON.stringify(S);mem=j;
   try{localStorage.setItem(KEY,j)}catch(e){}
 }
+/* file saving: claude.ai provides downloads; on a normal web page (for example GitHub Pages) fall back to a browser download */
+async function getDl(){
+  try{if(typeof claude!=='undefined'&&claude&&claude.use){const d=await claude.use('downloads');if(d)return d}}catch(e){}
+  return {save:async({filename,data})=>{
+    const t=/\.xlsx$/i.test(filename)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':/\.json$/i.test(filename)?'application/json':'application/octet-stream';
+    const u=URL.createObjectURL(new Blob([data],{type:t})),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}};
+}
 const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
@@ -851,7 +858,7 @@ async function buildWorkbook(list){
   return wb;
 }
 async function exportXlsx(list,filename){
-  const dl=await claude.use('downloads');
+  const dl=await getDl();
   if(!dl){toast('Saving files is not available in this view. Open the app in claude.ai to export.');return}
   toast('Preparing Excel file…');
   try{
@@ -860,7 +867,7 @@ async function exportXlsx(list,filename){
   }catch(e){toast(e&&e.code==='declined'?'Save cancelled.':(e&&e.message)||'Export failed.')}
 }
 async function backupJson(){
-  const dl=await claude.use('downloads');if(!dl){toast('Saving files is not available in this view.');return}
+  const dl=await getDl();if(!dl){toast('Saving files is not available in this view.');return}
   try{await dl.save({filename:'qclens-backup-'+todayStr()+'.json',data:JSON.stringify(S,null,1)});toast('Backup saved.')}catch(e){toast(e&&e.code==='declined'?'Save cancelled.':'Backup failed.')}
 }
 /* ===== Panels & analytes manager (after setup) ===== */
@@ -1253,7 +1260,7 @@ function renderAudit(){
    ${rows.length>AF.limit?`<div style="margin-top:10px"><button class="btn sm" data-act="auditmore">Show more (${rows.length-AF.limit} left)</button></div>`:''}</div></div>`;
 }
 async function exportAudit(){
-  const dl=await claude.use('downloads');if(!dl){toast('Saving files is not available in this view.');return}
+  const dl=await getDl();if(!dl){toast('Saving files is not available in this view.');return}
   if(!window.ExcelJS){toast('The Excel library did not load. Check your connection and try again.');return}
   try{
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Audit log');
@@ -1433,7 +1440,7 @@ function estChange(e){
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-ein]')){e.preventDefault();const b=document.querySelector('[data-act="estadd"]');if(b&&!b.disabled)b.click()}});
 async function estExport(s){
-  const dl=await claude.use('downloads');if(!dl){toast('Saving files is not available in this view.');return}
+  const dl=await getDl();if(!dl){toast('Saving files is not available in this view.');return}
   if(!window.ExcelJS){toast('The Excel library did not load. Check your connection and try again.');return}
   try{
     const a=anOf(s.aid),wb=new ExcelJS.Workbook(),sum=wb.addWorksheet('Summary'),ws=wb.addWorksheet('Runs');

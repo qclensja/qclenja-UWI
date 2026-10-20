@@ -190,7 +190,7 @@ function renderAudit(){
    ${rows.length>AF.limit?`<div style="margin-top:10px"><button class="btn sm" data-act="auditmore">Show more (${rows.length-AF.limit} left)</button></div>`:''}</div></div>`;
 }
 async function exportAudit(){
-  const dl=await claude.use('downloads');if(!dl){toast('Saving files is not available in this view.');return}
+  const dl=await getDl();if(!dl){toast('Saving files is not available in this view.');return}
   if(!window.ExcelJS){toast('The Excel library did not load. Check your connection and try again.');return}
   try{
     const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet('Audit log');

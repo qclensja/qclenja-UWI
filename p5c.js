@@ -49,7 +49,7 @@ async function buildWorkbook(list){
   return wb;
 }
 async function exportXlsx(list,filename){
-  const dl=await claude.use('downloads');
+  const dl=await getDl();
   if(!dl){toast('Saving files is not available in this view. Open the app in claude.ai to export.');return}
   toast('Preparing Excel file…');
   try{
@@ -58,6 +58,6 @@ async function exportXlsx(list,filename){
   }catch(e){toast(e&&e.code==='declined'?'Save cancelled.':(e&&e.message)||'Export failed.')}
 }
 async function backupJson(){
-  const dl=await claude.use('downloads');if(!dl){toast('Saving files is not available in this view.');return}
+  const dl=await getDl();if(!dl){toast('Saving files is not available in this view.');return}
   try{await dl.save({filename:'qclens-backup-'+todayStr()+'.json',data:JSON.stringify(S,null,1)});toast('Backup saved.')}catch(e){toast(e&&e.code==='declined'?'Save cancelled.':'Backup failed.')}
 }

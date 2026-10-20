@@ -167,7 +167,7 @@ function estChange(e){
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-ein]')){e.preventDefault();const b=document.querySelector('[data-act="estadd"]');if(b&&!b.disabled)b.click()}});
 async function estExport(s){
-  const dl=await claude.use('downloads');if(!dl){toast('Saving files is not available in this view.');return}
+  const dl=await getDl();if(!dl){toast('Saving files is not available in this view.');return}
   if(!window.ExcelJS){toast('The Excel library did not load. Check your connection and try again.');return}
   try{
     const a=anOf(s.aid),wb=new ExcelJS.Workbook(),sum=wb.addWorksheet('Summary'),ws=wb.addWorksheet('Runs');

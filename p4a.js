@@ -128,6 +128,13 @@ function save(){
   const j=JSON.stringify(S);mem=j;
   try{localStorage.setItem(KEY,j)}catch(e){}
 }
+/* file saving: claude.ai provides downloads; on a normal web page (for example GitHub Pages) fall back to a browser download */
+async function getDl(){
+  try{if(typeof claude!=='undefined'&&claude&&claude.use){const d=await claude.use('downloads');if(d)return d}}catch(e){}
+  return {save:async({filename,data})=>{
+    const t=/\.xlsx$/i.test(filename)?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':/\.json$/i.test(filename)?'application/json':'application/octet-stream';
+    const u=URL.createObjectURL(new Blob([data],{type:t})),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}};
+}
 const uid=()=>Math.random().toString(36).slice(2,9);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
