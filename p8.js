@@ -154,7 +154,7 @@ async function doGhConnect(){
   await ghSync();
   if(GHS.st==='err'){UI.ghMsg=GHS.msg;return}
   ghBoot2();toast('Connected. Your data is saved to '+GH.owner+'/'+GH.repo+'.');
-  if(UI.auth==='gh')UI.auth='';
+  if(UI.auth==='gh'||UI.auth==='conn')UI.auth='';
 }
 let ghPoll=null;
 function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}

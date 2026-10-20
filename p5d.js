@@ -106,7 +106,7 @@ document.addEventListener('click',e=>{
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
    case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
-   case 'svcopen':e.preventDefault();UI.auth='svc';UI.ghMsg='';break;
+   case 'svcopen':e.preventDefault();UI.auth='conn';UI.ghMsg='';UI.ghDraft=null;break;
    case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
    case 'rqapprove':UI.appr=id;break;
    case 'rqcancel':UI.appr=null;break;
@@ -145,8 +145,9 @@ document.addEventListener('click',e=>{
      if(panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('A panel with that name already exists.');
      st.cpanels.push({id:uid(),name:n,items:[]});toast('Panel created. Use Add analyte to put tests in it.');break}
    case 'pdel':{const pn=el.dataset.p,ids=DA().filter(a=>a.panel===pn).map(a=>a.id);
-     if(ids.some(nRes)&&UI.confirmDel!=='p:'+pn){UI.confirmDel='p:'+pn;break}
-     ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);UI.confirmDel=null;toast('Panel deleted.');break}
+     if(UI.confirmDel!=='p:'+pn){UI.confirmDel='p:'+pn;break}
+     const nr=ids.reduce((n,i)=>n+nRes(i),0);audit('Panel deleted',pn+' ('+ids.length+' analytes, '+nr+' results)');
+     ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted.');break}
    case 'mclose':UI.modal=null;UI.lateReason=null;break;
    case 'lateok':{const v=(document.getElementById('late-note')||{value:''}).value.trim();if(!v){const e=document.getElementById('late-err');e.textContent='Write a reason before saving.';e.hidden=false;return}UI.lateReason=v;UI.modal=null;saveQC();render();return}
    case 'msave':return saveLot()||render();

@@ -971,7 +971,7 @@ function renderManager(){
     return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:center">
      <div class="row" style="align-items:center;gap:8px">${cp?`<input type="text" data-rnp="${esc(pn)}" value="${esc(pn)}" aria-label="Panel name" style="width:220px;font-weight:600">`:`<h3>${esc(pn)}</h3>`}<span class="chip${cp?'':' acc'}">${cp?'Custom':'Routine'}</span></div>
      <div class="row" style="gap:6px"><button class="btn sm" data-act="addopen" data-p="${esc(pn)}">Add or move analytes</button>
-     ${cp?(pc?`<span class="small">Delete ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} result${nr===1?'':'s'}?</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Confirm delete</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`):''}</div></div>
+     ${pc?`<span class="small">Delete the panel "${esc(pn)}", its ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} QC result${nr===1?'':'s'}? This cannot be undone.</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Yes, delete panel</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`}</div></div>
      ${list.length?`<div class="scroll"><table class="t" style="margin-top:6px"><thead><tr><th>Analyte</th><th>Unit</th>${ctxMulti()?'<th>Analyser · module</th>':''}<th>Schedule</th><th>QC materials · lots</th><th></th></tr></thead><tbody>${list.map(a=>{const t=curTarget(a),c=UI.confirmDel===a.id,n=nRes(a.id);
        return `<tr><td><b>${esc(a.name)}</b></td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
        <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
@@ -1168,13 +1168,20 @@ const gv=id=>{const e=document.getElementById(id);return e?e.value:''};
 const shell=inner=>`<div class="auth"><div class="authcard"><img class="logo big" src="${LOGO}" alt="QCLens logo"><h1 class="sr">QCLens</h1>${inner}</div></div>`;
 const amsg=()=>UI.authMsg?`<p class="amsg" role="alert">${esc(UI.authMsg)}</p>`:'';
 const fld=(id,label,type,extra)=>`<label class="f">${label}<input id="${id}" type="${type}" ${extra||''}></label>`;
+function connScreen(){
+  const m=UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:'';
+  return `<div><h2>Connect this device</h2><p class="muted" style="margin:6px 0 0">Load your laboratory's data on this device. Use <b>one</b> of the two options, then sign in with your own username and password.</p></div>
+   ${m}
+   <div class="panelcard stack"><h3>Sync service address</h3><p class="small muted" style="margin:0">Recommended. The address your administrator gave you. No GitHub token needed.</p>
+    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}<button class="btn primary" type="submit">Connect with service address</button></form></div>
+   <details class="panelcard"${UI.auth==='gh'||UI.ghDraft?' open':''}><summary style="cursor:pointer"><b>GitHub token</b></summary><p class="small muted" style="margin:8px 0">Connects straight to the lab's private GitHub data repository. Ask your administrator for the repository name and token.</p>${ghForm()}</details>
+   <button class="btn" type="button" data-act="backlogin">Back</button>`;
+}
 function authGate(){
   if(UI.recCode)return shell(`<div><h2>Save your recovery code</h2><p class="muted" style="margin:6px 0 0">If you forget your password, this code lets an administrator reset it. It is shown once. Keep it somewhere safe, away from this computer.</p></div>
     <div class="reccode" id="reccode">${esc(UI.recCode)}</div>
     <div class="row"><button class="btn" type="button" data-act="copyrec">Copy code</button><button class="btn primary" type="button" data-act="recdone">I have saved it</button></div>`);
-  if(UI.auth==='gh'&&!CU)return shell(`<div><h2>Connect to GitHub storage</h2><p class="muted" style="margin:6px 0 0">Load this laboratory's data from its private GitHub repository.</p></div>${ghForm()}<button class="btn" type="button" data-act="backlogin">Back</button>`);
-  if(UI.auth==='svc'&&!CU)return shell(`<div><h2>Connect to the lab's sync service</h2><p class="muted" style="margin:6px 0 0">Enter the service address the administrator gave you. You do not need a GitHub token. After connecting, sign in with your own username or email and password.</p></div>
-    <form data-form="svcconn" class="stack" autocomplete="off">${fld('sv-url','Sync service address','url','autocapitalize="none" placeholder="https://qclens-sync.example.workers.dev" value="'+esc(GH.svc||'')+'"')}${UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}<button class="btn primary" type="submit">Connect</button><button class="btn" type="button" data-act="backlogin">Back</button></form>`);
+  if((UI.auth==='gh'||UI.auth==='svc'||UI.auth==='conn')&&!CU)return shell(connScreen());
   if(UI.auth==='request'&&!CU){
     if(UI.reqDone)return shell(`<div><h2>Request sent</h2><p class="muted" style="margin:6px 0 0">Thank you. An administrator will review your request. Once approved, they will email a temporary password to ${esc(UI.rqEmail||'your email address')}. You can then sign in and choose your own password.</p></div><button class="btn primary" type="button" data-act="backlogin">Back to sign in</button>`);
     return shell(`<div><h2>Request access</h2><p class="muted" style="margin:6px 0 0">Enter your full name and work email address. When an administrator approves your request, a temporary password is sent to that email address.</p></div>
@@ -1183,7 +1190,7 @@ function authGate(){
   if(!S.users.length&&!svcOn())return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
     <button class="btn primary" type="submit">Create account and sign in</button></form>
-    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="svcopen">Connect to the lab's sync service</a> or <a href="#" data-act="ghopen">use a GitHub token</a> first.</div>`);
+    <div class="small muted" style="margin-top:10px"></div><button class="btn" type="button" data-act="svcopen" style="margin-top:8px">Already use QCLens? Connect this device with a service address or GitHub token</button>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -1192,7 +1199,7 @@ function authGate(){
       <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
       <div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>
-      ${ghOn()?'':'<div class="small muted" style="margin-top:8px">Using another device? <a href="#" data-act="svcopen">Connect to the lab\'s sync service</a> · <a href="#" data-act="ghopen">GitHub token</a></div>'}`);
+      <button class="btn" type="button" data-act="svcopen" style="margin-top:4px">${ghOn()?'Change connection (service address or GitHub token)':'New device? Connect with a service address or GitHub token'}</button>`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -1754,7 +1761,7 @@ async function doGhConnect(){
   await ghSync();
   if(GHS.st==='err'){UI.ghMsg=GHS.msg;return}
   ghBoot2();toast('Connected. Your data is saved to '+GH.owner+'/'+GH.repo+'.');
-  if(UI.auth==='gh')UI.auth='';
+  if(UI.auth==='gh'||UI.auth==='conn')UI.auth='';
 }
 let ghPoll=null;
 function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghReady()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}
@@ -1911,7 +1918,7 @@ document.addEventListener('click',e=>{
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
    case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
-   case 'svcopen':e.preventDefault();UI.auth='svc';UI.ghMsg='';break;
+   case 'svcopen':e.preventDefault();UI.auth='conn';UI.ghMsg='';UI.ghDraft=null;break;
    case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
    case 'rqapprove':UI.appr=id;break;
    case 'rqcancel':UI.appr=null;break;
@@ -1950,8 +1957,9 @@ document.addEventListener('click',e=>{
      if(panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('A panel with that name already exists.');
      st.cpanels.push({id:uid(),name:n,items:[]});toast('Panel created. Use Add analyte to put tests in it.');break}
    case 'pdel':{const pn=el.dataset.p,ids=DA().filter(a=>a.panel===pn).map(a=>a.id);
-     if(ids.some(nRes)&&UI.confirmDel!=='p:'+pn){UI.confirmDel='p:'+pn;break}
-     ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);UI.confirmDel=null;toast('Panel deleted.');break}
+     if(UI.confirmDel!=='p:'+pn){UI.confirmDel='p:'+pn;break}
+     const nr=ids.reduce((n,i)=>n+nRes(i),0);audit('Panel deleted',pn+' ('+ids.length+' analytes, '+nr+' results)');
+     ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted.');break}
    case 'mclose':UI.modal=null;UI.lateReason=null;break;
    case 'lateok':{const v=(document.getElementById('late-note')||{value:''}).value.trim();if(!v){const e=document.getElementById('late-err');e.textContent='Write a reason before saving.';e.hidden=false;return}UI.lateReason=v;UI.modal=null;saveQC();render();return}
    case 'msave':return saveLot()||render();
