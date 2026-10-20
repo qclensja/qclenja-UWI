@@ -131,7 +131,7 @@ function estAct(act,el){
      audit('Limits values excluded',(anOf(sx.aid)||{}).name+' '+levelName(lv)+': '+info.out.length+' value'+(info.out.length>1?'s':'')+' beyond 3 SD');return done()}
    case 'estdelask':UI.estDel=id;return done();
    case 'estdelno':UI.estDel=null;return done();
-   case 'estdel':{const sx=estOf(id);if(sx)audit('Limits data set deleted',(anOf(sx.aid)||{}).name+' with '+sx.runs.length+' runs'+(sx.status==='applied'?' (had been applied)':''));S.est=S.est.filter(x=>x.id!==id);UI.estDel=null;UI.estSid=null;return done()}
+   case 'estdel':{const sx=estOf(id);if(sx)audit('Limits data set deleted',(anOf(sx.aid)||{}).name+' with '+sx.runs.length+' runs'+(sx.status==='applied'?' (had been applied)':''));tomb(id);S.est=S.est.filter(x=>x.id!==id);UI.estDel=null;UI.estSid=null;return done()}
    case 'estexp':estExport(estOf(id));return true;
    case 'estapply':{const sx=estOf(UI.estSid);if(!sx||sx.status!=='collecting')return true;
      const a=anOf(sx.aid),infos=sx.levels.map((_,i)=>estLevel(sx,i)),err=document.getElementById('est-err'),fail=t=>{err.textContent=t;err.hidden=false;return true};

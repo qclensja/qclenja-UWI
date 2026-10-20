@@ -42,7 +42,7 @@ function moveAnalyte(id,panel){
 function removeAnalyte(id){
   const a=anOf(id);if(!a)return;
   detachSrc(a);
-  S.analytes=S.analytes.filter(x=>x.id!==id);S.results=S.results.filter(r=>r.aid!==id);S.skips=S.skips.filter(r=>r.aid!==id);
+  tomb(id);S.analytes=S.analytes.filter(x=>x.id!==id);S.results=S.results.filter(r=>r.aid!==id);S.skips=S.skips.filter(r=>r.aid!==id);
 }
 const nRes=id=>S.results.filter(r=>r.aid===id).length;
 function panelNames(){

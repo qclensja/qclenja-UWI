@@ -57,16 +57,19 @@ function authGate(){
   if(UI.recCode)return shell(`<div><h2>Save your recovery code</h2><p class="muted" style="margin:6px 0 0">If you forget your password, this code lets an administrator reset it. It is shown once. Keep it somewhere safe, away from this computer.</p></div>
     <div class="reccode" id="reccode">${esc(UI.recCode)}</div>
     <div class="row"><button class="btn" type="button" data-act="copyrec">Copy code</button><button class="btn primary" type="button" data-act="recdone">I have saved it</button></div>`);
+  if(UI.auth==='gh'&&!CU)return shell(`<div><h2>Connect to GitHub storage</h2><p class="muted" style="margin:6px 0 0">Load this laboratory's data from its private GitHub repository.</p></div>${ghForm()}<button class="btn" type="button" data-act="backlogin">Back</button>`);
   if(!S.users.length)return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
-    <button class="btn primary" type="submit">Create account and sign in</button></form>`);
+    <button class="btn primary" type="submit">Create account and sign in</button></form>
+    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="ghopen">Connect to your GitHub data</a> first.</div>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
       <button class="btn primary" type="submit">Reset password</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
     return shell(`<div><h2>Sign in</h2><p class="muted" style="margin:6px 0 0">Levey-Jennings QC for the clinical laboratory</p></div>
       <form data-form="login" class="stack">${fld('li-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
-      <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>`);
+      <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
+      ${ghOn()?'':'<div class="small muted" style="margin-top:10px"><a href="#" data-act="ghopen">Connect to GitHub storage</a></div>'}`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -144,6 +147,7 @@ document.addEventListener('submit',async e=>{
     else if(f==='acct'){await doAcct();if(UI.acctMsg){const m=document.getElementById('ac-err');m.textContent=UI.acctMsg;m.hidden=false;return}}
     else if(f==='uadd'){if(!isAdmin())return;await doUserAdd()}
     else if(f==='ureset'){if(!isAdmin())return;await doUserReset()}
+    else if(f==='ghconn'){if(CU&&!isAdmin())return;await doGhConnect()}
   }catch(err){UI.authMsg='Secure accounts are not available in this browser view.'}
   render();
 });

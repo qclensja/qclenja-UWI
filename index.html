@@ -350,11 +350,11 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[]});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[]});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -382,6 +382,7 @@ function save(){
   try{syncCtx()}catch(e){}
   const j=JSON.stringify(S);mem=j;
   try{localStorage.setItem(KEY,j)}catch(e){}
+  try{ghQueue()}catch(e){}
 }
 /* file saving: claude.ai provides downloads; on a normal web page (for example GitHub Pages) fall back to a browser download */
 async function getDl(){
@@ -914,7 +915,7 @@ function moveAnalyte(id,panel){
 function removeAnalyte(id){
   const a=anOf(id);if(!a)return;
   detachSrc(a);
-  S.analytes=S.analytes.filter(x=>x.id!==id);S.results=S.results.filter(r=>r.aid!==id);S.skips=S.skips.filter(r=>r.aid!==id);
+  tomb(id);S.analytes=S.analytes.filter(x=>x.id!==id);S.results=S.results.filter(r=>r.aid!==id);S.skips=S.skips.filter(r=>r.aid!==id);
 }
 const nRes=id=>S.results.filter(r=>r.aid===id).length;
 function panelNames(){
@@ -1127,16 +1128,19 @@ function authGate(){
   if(UI.recCode)return shell(`<div><h2>Save your recovery code</h2><p class="muted" style="margin:6px 0 0">If you forget your password, this code lets an administrator reset it. It is shown once. Keep it somewhere safe, away from this computer.</p></div>
     <div class="reccode" id="reccode">${esc(UI.recCode)}</div>
     <div class="row"><button class="btn" type="button" data-act="copyrec">Copy code</button><button class="btn primary" type="button" data-act="recdone">I have saved it</button></div>`);
+  if(UI.auth==='gh'&&!CU)return shell(`<div><h2>Connect to GitHub storage</h2><p class="muted" style="margin:6px 0 0">Load this laboratory's data from its private GitHub repository.</p></div>${ghForm()}<button class="btn" type="button" data-act="backlogin">Back</button>`);
   if(!S.users.length)return shell(`<div><h2>Create the administrator account</h2><p class="muted" style="margin:6px 0 0">This is the first sign-in. The administrator sets up the lab, adds colleagues and can review the audit log.</p></div>
     <form data-form="admin" class="stack" autocomplete="off">${fld('ca-name','Full name','text','autocomplete="name" value="'+esc(UI.authName||'')+'"')}${fld('ca-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('ca-pass','Password (8 or more characters)','password','autocomplete="new-password"')}${fld('ca-pass2','Confirm password','password','autocomplete="new-password"')}${amsg()}
-    <button class="btn primary" type="submit">Create account and sign in</button></form>`);
+    <button class="btn primary" type="submit">Create account and sign in</button></form>
+    <div class="small muted" style="margin-top:10px">Already use QCLens on another device? <a href="#" data-act="ghopen">Connect to your GitHub data</a> first.</div>`);
   if(!CU){
     if(UI.auth==='forgot')return shell(`<div><h2>Reset password</h2><p class="muted" style="margin:6px 0 0">Administrators can reset their own password with the recovery code from when the account was created. Other users should ask an administrator.</p></div>
       <form data-form="forgot" class="stack">${fld('fg-user','Username','text','autocapitalize="none" value="'+esc(UI.authUser||'')+'"')}${fld('fg-code','Recovery code','text','autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" value="'+esc(UI.authCode||'')+'"')}${fld('fg-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('fg-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
       <button class="btn primary" type="submit">Reset password</button><button class="btn" type="button" data-act="backlogin">Back to sign in</button></form>`);
     return shell(`<div><h2>Sign in</h2><p class="muted" style="margin:6px 0 0">Levey-Jennings QC for the clinical laboratory</p></div>
       <form data-form="login" class="stack">${fld('li-user','Username','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
-      <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>`);
+      <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
+      ${ghOn()?'':'<div class="small muted" style="margin-top:10px"><a href="#" data-act="ghopen">Connect to GitHub storage</a></div>'}`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
@@ -1214,6 +1218,7 @@ document.addEventListener('submit',async e=>{
     else if(f==='acct'){await doAcct();if(UI.acctMsg){const m=document.getElementById('ac-err');m.textContent=UI.acctMsg;m.hidden=false;return}}
     else if(f==='uadd'){if(!isAdmin())return;await doUserAdd()}
     else if(f==='ureset'){if(!isAdmin())return;await doUserReset()}
+    else if(f==='ghconn'){if(CU&&!isAdmin())return;await doGhConnect()}
   }catch(err){UI.authMsg='Secure accounts are not available in this browser view.'}
   render();
 });
@@ -1404,7 +1409,7 @@ function estAct(act,el){
      audit('Limits values excluded',(anOf(sx.aid)||{}).name+' '+levelName(lv)+': '+info.out.length+' value'+(info.out.length>1?'s':'')+' beyond 3 SD');return done()}
    case 'estdelask':UI.estDel=id;return done();
    case 'estdelno':UI.estDel=null;return done();
-   case 'estdel':{const sx=estOf(id);if(sx)audit('Limits data set deleted',(anOf(sx.aid)||{}).name+' with '+sx.runs.length+' runs'+(sx.status==='applied'?' (had been applied)':''));S.est=S.est.filter(x=>x.id!==id);UI.estDel=null;UI.estSid=null;return done()}
+   case 'estdel':{const sx=estOf(id);if(sx)audit('Limits data set deleted',(anOf(sx.aid)||{}).name+' with '+sx.runs.length+' runs'+(sx.status==='applied'?' (had been applied)':''));tomb(id);S.est=S.est.filter(x=>x.id!==id);UI.estDel=null;UI.estSid=null;return done()}
    case 'estexp':estExport(estOf(id));return true;
    case 'estapply':{const sx=estOf(UI.estSid);if(!sx||sx.status!=='collecting')return true;
      const a=anOf(sx.aid),infos=sx.levels.map((_,i)=>estLevel(sx,i)),err=document.getElementById('est-err'),fail=t=>{err.textContent=t;err.hidden=false;return true};
@@ -1456,6 +1461,148 @@ async function estExport(s){
     await dl.save({filename:'QCLens-limits-'+a.name.replace(/[^\w-]+/g,'_')+'-'+todayStr()+'.xlsx',data:await wb.xlsx.writeBuffer()});toast('Excel file ready.');
   }catch(e){toast(e&&e.code==='declined'?'Save cancelled.':'Export failed.')}
 }
+/* ===== GitHub storage: keeps all QCLens data in a PRIVATE GitHub repository ===== */
+let ghMem=null;
+const GHK='ljqc.gh';
+function ghLoad(){try{const s=localStorage.getItem(GHK);if(s)return JSON.parse(s)}catch(e){}return ghMem||{}}
+let GH=ghLoad();
+function ghSaveCfg(){ghMem=GH;try{localStorage.setItem(GHK,JSON.stringify(GH))}catch(e){}}
+const ghOn=()=>!!(GH.on&&GH.token&&GH.owner&&GH.repo);
+const GHS={st:'idle',msg:'',sha:null,last:'',busy:false,pending:false,timer:null,lastHash:null,defer:false};
+const canon=v=>Array.isArray(v)?v.map(canon):v&&typeof v==='object'?Object.keys(v).sort().reduce((o,k)=>(o[k]=canon(v[k]),o),{}):v;
+const ghStrip=o=>{const c={...o};delete c.tab;return c};
+const ghHash=o=>JSON.stringify(canon(ghStrip(o)));
+function b64enc(t){const b=new TextEncoder().encode(t);let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
+function b64dec(t){const s=atob(t.replace(/\s/g,'')),b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return new TextDecoder().decode(b)}
+async function ghApi(path,opt){
+  opt=opt||{};
+  return fetch('https://api.github.com/repos/'+encodeURIComponent(GH.owner)+'/'+encodeURIComponent(GH.repo)+path,{method:opt.method||'GET',cache:'no-store',
+    headers:{Authorization:'Bearer '+GH.token,Accept:opt.accept||'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(opt.body?{'Content-Type':'application/json'}:{})},body:opt.body?JSON.stringify(opt.body):undefined});
+}
+const ghFile=()=>'/contents/'+GH.path.split('/').map(encodeURIComponent).join('/');
+/* checks the token, that it can write, and that the repository is private */
+async function ghCheck(){
+  let r;try{r=await ghApi('')}catch(e){throw new Error('Could not reach GitHub. Check your connection. (If you opened QCLens inside claude.ai, run it from your GitHub Pages address instead.)')}
+  if(r.status===401)throw new Error('GitHub rejected the token. Check that it was copied in full and has not expired.');
+  if(r.status===404||r.status===403)throw new Error('Repository not found, or the token has no access to it. The token must be limited to this repository with Contents: Read and write.');
+  if(!r.ok)throw new Error('GitHub returned '+r.status+'.');
+  const j=await r.json();
+  if(!j.private)throw new Error('This repository is public. QCLens stores lab results and password hashes, so it will only sync to a PRIVATE repository. Create a private repository (for example qclens-data) and use that one.');
+  if(j.permissions&&!j.permissions.push)throw new Error('The token can read this repository but not write to it. Give it Contents: Read and write.');
+  if(!GH.branch)GH.branch=j.default_branch||'main';
+  return j;
+}
+async function ghPull(){
+  const q='?ref='+encodeURIComponent(GH.branch||'main');
+  const r=await ghApi(ghFile()+q);
+  if(r.status===404)return {exists:false};
+  if(!r.ok)throw new Error('GitHub returned '+r.status+' while reading the data file.');
+  const j=await r.json();let text;
+  if(j.content&&j.encoding==='base64')text=b64dec(j.content);
+  else{const r2=await ghApi(ghFile()+q,{accept:'application/vnd.github.raw+json'});if(!r2.ok)throw new Error('GitHub returned '+r2.status+' while reading the data file.');text=await r2.text()}
+  return {exists:true,sha:j.sha,data:JSON.parse(text)};
+}
+async function ghPush(){
+  const body={message:'QCLens data '+new Date().toISOString(),content:b64enc(JSON.stringify(ghStrip(S))),branch:GH.branch||'main'};
+  if(GHS.sha)body.sha=GHS.sha;
+  const r=await ghApi(ghFile(),{method:'PUT',body});
+  if(r.status===409||r.status===422)return 'conflict';
+  if(!r.ok)throw new Error('GitHub returned '+r.status+' while saving. Check that the token can write to the repository.');
+  const j=await r.json();GHS.sha=j.content&&j.content.sha||GHS.sha;return 'ok';
+}
+/* union of local and remote records; local wins on ties, deleted records stay deleted */
+function mergeStates(L,R){
+  const tomb=new Set([...(L.tomb||[]),...(R.tomb||[])]),out=JSON.parse(JSON.stringify(L));
+  const by=(a,b,pick)=>{const m=new Map();(b||[]).forEach(x=>m.set(x.id,x));(a||[]).forEach(x=>m.set(x.id,m.has(x.id)&&pick?pick(x,m.get(x.id)):x));return [...m.values()].filter(x=>!tomb.has(x.id))};
+  const newer=(a,b)=>((a.upd||a).at||'')>=((b.upd||b).at||'')?a:b;
+  out.users=by(L.users,R.users);out.depts=by(L.depts,R.depts);out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
+  out.est=by(L.est,R.est,(a,b)=>b.runs&&a.runs&&b.runs.length>a.runs.length?b:a);
+  out.analytes=by(L.analytes,R.analytes,(a,b)=>b.targets.length>a.targets.length?b:a);
+  const ok=new Set(out.analytes.map(a=>a.id));
+  out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));
+  const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
+  out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
+  out.tomb=[...tomb];
+  return out;
+}
+const tomb=(...ids)=>{S.tomb=S.tomb||[];ids.forEach(i=>{if(i&&!S.tomb.includes(i))S.tomb.push(i)})};
+function ghAdopt(M){
+  M.tab=S.tab;S=M;if(CU)CU=S.users.find(u=>u.id===CU.id&&u.active!==false)||null;
+  try{mem=JSON.stringify(S);localStorage.setItem(KEY,mem)}catch(e){}
+  const a=document.activeElement,typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+  if(typing||UI.modal){GHS.defer=true}else render();
+}
+async function ghSync(){
+  if(!ghOn())return;
+  if(GHS.busy){GHS.pending=true;return}
+  GHS.busy=true;GHS.st='syncing';ghPaint();
+  try{
+    for(let i=0;i<3;i++){
+      const rem=await ghPull();let remoteH=null;
+      if(rem.exists){
+        GHS.sha=rem.sha;const R=norm(rem.data);remoteH=ghHash(R);
+        const M=norm(mergeStates(S,R));
+        if(ghHash(M)!==ghHash(S))ghAdopt(M);
+      }else GHS.sha=null;
+      if(remoteH!==null&&ghHash(S)===remoteH){break}
+      const res=await ghPush();if(res==='ok')break;
+    }
+    GHS.lastHash=ghHash(S);GHS.st='ok';GHS.msg='';GHS.last=new Date().toISOString();
+  }catch(e){GHS.st='err';GHS.msg=(e&&e.message)||'Sync failed.'}
+  finally{GHS.busy=false;ghPaint();if(GHS.pending){GHS.pending=false;ghQueue()}}
+}
+function ghQueue(){
+  if(!ghOn())return;
+  if(GHS.lastHash!==null&&ghHash(S)===GHS.lastHash)return;
+  clearTimeout(GHS.timer);GHS.timer=setTimeout(ghSync,2500);GHS.st=GHS.st==='err'?'err':'pending';ghPaint();
+}
+function ghPaint(){const e=document.getElementById('ghstatus');if(e)e.innerHTML=ghStatusHtml()}
+function ghStatusHtml(){
+  if(!ghOn())return '<span class="chip">Not connected</span>';
+  const t=GHS.last?' · last saved '+fmtTs(GHS.last):'';
+  const c=GHS.st==='err'?'<span class="chip bad">Not saved</span>':GHS.st==='syncing'?'<span class="chip warn">Saving…</span>':GHS.st==='pending'?'<span class="chip warn">Changes waiting</span>':'<span class="chip good">Saved to GitHub</span>';
+  return c+' <span class="small muted">'+esc(GH.owner+'/'+GH.repo)+t+'</span>'+(GHS.msg?'<div class="small" style="color:var(--bad);margin-top:4px">'+esc(GHS.msg)+'</div>':'');
+}
+function ghBoot(){
+  if(!ghOn())return;
+  ghSync();
+  setInterval(()=>{if(ghOn()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000);
+  document.addEventListener('focusout',()=>{if(GHS.defer){setTimeout(()=>{const a=document.activeElement;if(GHS.defer&&!UI.modal&&!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))){GHS.defer=false;render()}},50)}});
+}
+/* ----- connect form (sign-in screen and Setup) ----- */
+function ghForm(){
+  const D=UI.ghDraft||GH;
+  return `<form data-form="ghconn" class="stack" autocomplete="off">
+   <div class="grid2"><label class="f">GitHub user or organisation<input type="text" id="gh-owner" value="${esc(D.owner||'')}" autocapitalize="none" placeholder="qclensja"></label>
+   <label class="f">Private data repository<input type="text" id="gh-repo" value="${esc(D.repo||'')}" autocapitalize="none" placeholder="qclens-data"></label>
+   <label class="f">Branch<input type="text" id="gh-branch" value="${esc(D.branch||'')}" placeholder="main (default)"></label>
+   <label class="f">Data file<input type="text" id="gh-path" value="${esc(D.path||'qclens-data.json')}"></label></div>
+   <label class="f">Access token<input type="password" id="gh-token" autocomplete="off" placeholder="${GH.token?'Saved on this device. Paste a new one to replace it.':'github_pat_…'}"></label>
+   ${UI.ghMsg?`<p class="amsg" role="alert">${esc(UI.ghMsg)}</p>`:''}
+   <button class="btn primary" type="submit">${ghOn()?'Save and sync':'Connect and test'}</button></form>`;
+}
+async function doGhConnect(){
+  const g=id=>(document.getElementById(id)||{value:''}).value.trim();
+  const n={owner:g('gh-owner'),repo:g('gh-repo').replace(/\.git$/,''),branch:g('gh-branch'),path:g('gh-path')||'qclens-data.json',token:g('gh-token')||GH.token||''};
+  if(!n.owner||!n.repo||!n.token){UI.ghMsg='Enter the owner, repository and access token.';UI.ghDraft={...n,token:''};return}
+  const old=GH;GH={...n,on:false};
+  try{await ghCheck()}catch(e){GH=old;UI.ghMsg=e.message;UI.ghDraft={...n,token:''};return}
+  GH.on=true;ghSaveCfg();UI.ghMsg='';UI.ghDraft=null;GHS.sha=null;GHS.lastHash=null;GHS.st='idle';
+  if(S.users.length||S.analytes.length)audit('GitHub storage connected',GH.owner+'/'+GH.repo+' ('+GH.path+')');
+  await ghSync();
+  if(GHS.st==='err'){UI.ghMsg=GHS.msg;return}
+  ghBoot2();toast('Connected. Your data is saved to '+GH.owner+'/'+GH.repo+'.');
+  if(UI.auth==='gh')UI.auth='';
+}
+let ghPoll=null;
+function ghBoot2(){if(ghPoll)return;ghPoll=setInterval(()=>{if(ghOn()&&!GHS.busy&&document.visibilityState==='visible')ghSync()},60000)}
+function renderGithub(){
+  return `<div class="panel stack"><div><h3>GitHub storage</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Saves all QCLens data (setup, QC results, users, audit log) to a <b>private</b> GitHub repository, so it is shared by every device and survives clearing the browser. Changes are saved a few seconds after you make them, and other devices pick them up within a minute.</p></div>
+   <div id="ghstatus">${ghStatusHtml()}</div>
+   ${ghOn()?`<div class="row"><button class="btn" data-act="ghsync">Sync now</button><button class="btn danger" data-act="ghoff">Disconnect this device</button></div>`:''}
+   <details${ghOn()?'':' open'}><summary style="cursor:pointer"><b>${ghOn()?'Change connection settings':'Connect to GitHub'}</b></summary><div style="margin-top:10px">${ghForm()}
+   <div class="small muted" style="margin-top:10px;max-width:80ch"><b>Set up once:</b> 1) On GitHub create a new <b>private</b> repository (for example <code>qclens-data</code>, add a README so it is not empty). 2) Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Repository access: <i>Only select repositories</i> and pick that one. Permissions: <i>Contents → Read and write</i>. 3) Paste the token above. Each device (and each person who signs in on it) needs the same token once, on the sign-in screen. Anyone holding the token can read and change the stored data directly, so share it only with people you trust with the lab's records.</div></div></details></div>`;
+}
 /* ===== Setup summary, main render, events ===== */
 function renderSetupHome(){
   const st=S.setup,recs=deptList(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
@@ -1471,10 +1618,10 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}<div class="panel stack"><h3>Data</h3><div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${renderGithub()}<div class="panel stack"><h3>Data</h3><div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device.</p>
-   <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1">Start over</button>'}</div></div></div>`;
+   <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
 }
 const app=document.getElementById('app');
 function stashDrafts(){UI.draft=UI.draft||{};document.querySelectorAll('[data-in]').forEach(i=>{const k=UI.date+':'+i.dataset.in;if(i.value!=='')UI.draft[k]=i.value;else delete UI.draft[k]})}
@@ -1506,9 +1653,9 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,id=el.dataset.id,st=S.setup;
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
-  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone']);
+  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff']);
   if(ADMIN.has(act)&&!isAdmin())return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
@@ -1516,7 +1663,7 @@ document.addEventListener('click',e=>{
    case 'signout':return signOut(false);
    case 'acct':UI.acctMsg='';UI.modal={acct:true};break;
    case 'forgot':UI.auth='forgot';UI.authMsg='';break;
-   case 'backlogin':UI.auth='';UI.authMsg='';break;
+   case 'backlogin':UI.auth='';UI.authMsg='';UI.ghMsg='';break;
    case 'recdone':UI.recCode=null;break;
    case 'copyrec':{const sel=()=>{const n=document.getElementById('reccode'),r=document.createRange();r.selectNodeContents(n);const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Select and copy the code.')};
      try{navigator.clipboard.writeText(UI.recCode).then(()=>toast('Code copied.'),sel)}catch(x){sel()}return}
@@ -1561,7 +1708,10 @@ document.addEventListener('click',e=>{
    case 'papply':{const card=el.closest('.panelcard');let any=false;
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
-   case 'closesetup':{if(st.adding){const id=st.cur;S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'ghopen':e.preventDefault();UI.auth='gh';UI.ghMsg='';break;
+   case 'ghsync':ghSync();return;
+   case 'ghoff':{GH={};ghSaveCfg();GHS.lastHash=null;GHS.sha=null;GHS.st='idle';GHS.msg='';audit('GitHub storage disconnected on this device','');break}
    case 'asgall':{const l=DA().filter(a=>(instOf(a)||'No analyser')===el.dataset.g&&(!el.dataset.hasm||(a.mod||'')===el.dataset.m)),on=l.every(a=>UI.asg[a.id]);l.forEach(a=>{if(on)delete UI.asg[a.id];else UI.asg[a.id]=1});break}
    case 'asgmove':if(asgMove())return;break;
    case 'asgcopy':if(asgMove(true))return;break;
@@ -1576,7 +1726,7 @@ document.addEventListener('click',e=>{
    case 'override':{const c=document.getElementById('ov-'+id).value.trim();if(!c){toast('Write a comment before overriding.');return}
      const r=S.results.find(x=>x.id===id);r.ov={comment:c,...stampNow()};audit('Override',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+': '+c);save();toast('Override recorded with your comment.');break}
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
-   case 'delres':{const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
+   case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
    case 'addopen':{const f=DA().find(x=>x.panel===el.dataset.p);UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev};break}
    case 'sugg':{const rp=panelsNow().find(p=>p.name===el.dataset.p),it=rp.items.find(i=>i.name===el.dataset.n),f=DA().find(x=>x.panel===el.dataset.p);
@@ -1677,4 +1827,5 @@ document.addEventListener('pointerout',e=>{const h=e.target.closest&&e.target.cl
 render();
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-amodnew]')){e.preventDefault();e.target.dispatchEvent(new Event('change',{bubbles:true}))}});
+ghBoot();
 </script>

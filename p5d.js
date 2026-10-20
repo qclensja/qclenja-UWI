@@ -13,10 +13,10 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}<div class="panel stack"><h3>Data</h3><div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${renderGithub()}<div class="panel stack"><h3>Data</h3><div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device.</p>
-   <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1">Start over</button>'}</div></div></div>`;
+   <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
 }
 const app=document.getElementById('app');
 function stashDrafts(){UI.draft=UI.draft||{};document.querySelectorAll('[data-in]').forEach(i=>{const k=UI.date+':'+i.dataset.in;if(i.value!=='')UI.draft[k]=i.value;else delete UI.draft[k]})}
@@ -48,9 +48,9 @@ document.addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;
   const act=el.dataset.act,id=el.dataset.id,st=S.setup;
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
-  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone']);
+  const PUBLIC=new Set(['forgot','backlogin','copyrec','recdone','ghopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff']);
   if(ADMIN.has(act)&&!isAdmin())return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
@@ -58,7 +58,7 @@ document.addEventListener('click',e=>{
    case 'signout':return signOut(false);
    case 'acct':UI.acctMsg='';UI.modal={acct:true};break;
    case 'forgot':UI.auth='forgot';UI.authMsg='';break;
-   case 'backlogin':UI.auth='';UI.authMsg='';break;
+   case 'backlogin':UI.auth='';UI.authMsg='';UI.ghMsg='';break;
    case 'recdone':UI.recCode=null;break;
    case 'copyrec':{const sel=()=>{const n=document.getElementById('reccode'),r=document.createRange();r.selectNodeContents(n);const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Select and copy the code.')};
      try{navigator.clipboard.writeText(UI.recCode).then(()=>toast('Code copied.'),sel)}catch(x){sel()}return}
@@ -103,7 +103,10 @@ document.addEventListener('click',e=>{
    case 'papply':{const card=el.closest('.panelcard');let any=false;
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
-   case 'closesetup':{if(st.adding){const id=st.cur;S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'ghopen':e.preventDefault();UI.auth='gh';UI.ghMsg='';break;
+   case 'ghsync':ghSync();return;
+   case 'ghoff':{GH={};ghSaveCfg();GHS.lastHash=null;GHS.sha=null;GHS.st='idle';GHS.msg='';audit('GitHub storage disconnected on this device','');break}
    case 'asgall':{const l=DA().filter(a=>(instOf(a)||'No analyser')===el.dataset.g&&(!el.dataset.hasm||(a.mod||'')===el.dataset.m)),on=l.every(a=>UI.asg[a.id]);l.forEach(a=>{if(on)delete UI.asg[a.id];else UI.asg[a.id]=1});break}
    case 'asgmove':if(asgMove())return;break;
    case 'asgcopy':if(asgMove(true))return;break;
@@ -118,7 +121,7 @@ document.addEventListener('click',e=>{
    case 'override':{const c=document.getElementById('ov-'+id).value.trim();if(!c){toast('Write a comment before overriding.');return}
      const r=S.results.find(x=>x.id===id);r.ov={comment:c,...stampNow()};audit('Override',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+': '+c);save();toast('Override recorded with your comment.');break}
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
-   case 'delres':{const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
+   case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
    case 'addopen':{const f=DA().find(x=>x.panel===el.dataset.p);UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev};break}
    case 'sugg':{const rp=panelsNow().find(p=>p.name===el.dataset.p),it=rp.items.find(i=>i.name===el.dataset.n),f=DA().find(x=>x.panel===el.dataset.p);
@@ -219,3 +222,4 @@ document.addEventListener('pointerout',e=>{const h=e.target.closest&&e.target.cl
 render();
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-amodnew]')){e.preventDefault();e.target.dispatchEvent(new Event('change',{bubbles:true}))}});
+ghBoot();
