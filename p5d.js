@@ -136,6 +136,7 @@ document.addEventListener('click',e=>{
      st.prevCur=st.cur;st.cur=uid();S.depts.push({id:st.cur});st.dept=d0;st.sub=Object.keys(CAT[d0].subs)[0];st.analyser='';st.analyserOther='';st.analysers=[];st.amods={};st.sel={};st.selFor='';st.cpanels=[];st.adding=true;st.step=1;UI.editing=true;syncCtx();break}
    case 'today':UI.date=todayStr();UI.report=[];break;
    case 'saveqc':saveQC();break;
+   case 'saveone':saveQC(id);break;
    case 'skip':stashDrafts();UI.skipOpen=id;break;
    case 'skipcancel':UI.skipOpen=null;break;
    case 'skipok':{const a=anOf(id);S.skips=S.skips.filter(s=>!(s.aid===id&&s.date===UI.date));const rsn=document.getElementById('skr-'+id).value.trim();S.skips.push({aid:id,date:UI.date,reason:rsn,...stampNow()});audit('Marked not performed',a.name+' on '+fmtDate(UI.date)+(rsn?': '+rsn:''));UI.skipOpen=null;save();toast(a.name+' marked as not performed on '+fmtDate(UI.date)+'.');break}
@@ -159,7 +160,7 @@ document.addEventListener('click',e=>{
      const nr=ids.reduce((n,i)=>n+nRes(i),0);audit('Panel deleted',pn+' ('+ids.length+' analytes, '+nr+' results)');
      ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted.');break}
    case 'mclose':UI.modal=null;UI.lateReason=null;break;
-   case 'lateok':{const v=(document.getElementById('late-note')||{value:''}).value.trim();if(!v){const e=document.getElementById('late-err');e.textContent='Write a reason before saving.';e.hidden=false;return}UI.lateReason=v;UI.modal=null;saveQC();render();return}
+   case 'lateok':{const v=(document.getElementById('late-note')||{value:''}).value.trim();if(!v){const e=document.getElementById('late-err');e.textContent='Write a reason before saving.';e.hidden=false;return}UI.lateReason=v;UI.modal=null;saveQC(UI.saveScope);render();return}
    case 'msave':return saveLot()||render();
    case 'xl':{const a=anOf(id);return exportXlsx([a],'QCLens-'+a.name.replace(/[^\w-]+/g,'_')+'-'+todayStr()+'.xlsx')}
    case 'xlall':return exportXlsx(VA(),'QCLens-all-analytes-'+todayStr()+'.xlsx');

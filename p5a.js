@@ -23,7 +23,7 @@ function dueRow(a,flags,extra){
   const act=UI.skipOpen===a.id
     ?`<div class="row" style="flex:1 1 100%"><label class="f" style="flex:1 1 220px">Reason (e.g. analyser down, no reagent, not requested)<input type="text" id="skr-${a.id}" placeholder="Reason"></label><button class="btn primary sm" data-act="skipok" data-id="${a.id}">Confirm not performed</button><button class="btn sm" data-act="skipcancel">Cancel</button></div>`
     :isOD(a)?'':`<button class="btn sm" data-act="skip" data-id="${a.id}">Not performed</button>`;
-  return `<div class="due">${head}${ins}${act}</div>`;
+  return `<div class="due">${head}${ins}<button class="btn sm primary" data-act="saveone" data-id="${a.id}">Save QC results</button>${act}</div>`;
 }
 function alertCard(r,flags,full){
   const a=anOf(r.aid);if(!a)return '';
@@ -70,7 +70,7 @@ function renderToday(){
    <div class="panel" style="padding:0">${due.length?byPanel(due):'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
    ${od.length?`<div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">On-demand tests <span class="small muted" style="font-weight:400">No fixed schedule. Enter QC on the date it is run.</span></div>${byPanel(od)}</div>`:''}
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}
-   <div class="row"><button class="btn primary" data-act="saveqc">Save QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div></div>`;
+   <div class="row"><button class="btn primary" data-act="saveqc">Save All QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div></div>`;
 }
 function renderAlerts(){
   const flags=allFlags(),un=unresolved(flags);
@@ -83,8 +83,9 @@ function renderAlerts(){
    ${ov.length?`<h3>Overridden results</h3>${ov.map(r=>alertCard(r,flags,false)).join('')}`:''}</div>`;
 }
 const LATE_MS=3600000;
-function saveQC(){
-  const inputs=[...document.querySelectorAll('[data-in]')].filter(i=>i.value.trim()!=='');
+function saveQC(scope){
+  scope=scope||null;UI.saveScope=scope;
+  const inputs=[...document.querySelectorAll('[data-in]')].filter(i=>i.value.trim()!==''&&(!scope||i.dataset.in.split(':')[0]===scope));
   const late=[];
   inputs.forEach(i=>{const [aid,lv]=i.dataset.in.split(':'),v=num(i.value),an=anOf(aid),r=an&&canSee(an)?resultAt(aid,+lv,UI.date):null;
     if(r&&v!=null&&r.value!==v&&r.at&&Date.now()-new Date(r.at).getTime()>LATE_MS)late.push({name:an.name,lv:+lv,old:r.value,nw:v,at:r.at,byName:r.byName})});
@@ -103,8 +104,10 @@ function saveQC(){
   if(added.length)audit('QC entered',fmtDate(UI.date)+': '+added.join('; '),null,dOf);
   if(expd.length)audit('QC run on expired material',fmtDate(UI.date)+': '+expd.join('; '),null,dOf);
   if(edited.length)audit('QC edited',fmtDate(UI.date)+': '+edited.join('; '),null,dOf);
-  UI.lateReason=null;UI.report=ids;UI.draft={};save();if(expd.length)setTimeout(()=>toast('Saved, but the QC material for '+expd.join(', ')+' is past its expiry date.'),50);
-  if(!ids.length){toast(bad?'Some values are not numbers.':'Enter at least one QC value.');return}
+  UI.lateReason=null;
+  if(scope){UI.report=[...new Set([...(UI.report||[]),...ids])];inputs.forEach(i=>{if(UI.draft)delete UI.draft[UI.date+':'+i.dataset.in]})}else{UI.report=ids;UI.draft={}}
+  save();if(expd.length)setTimeout(()=>toast('Saved, but the QC material for '+expd.join(', ')+' is past its expiry date.'),50);
+  if(!ids.length){toast(bad?'Some values are not numbers.':scope?'Enter a QC value for this analyte first.':'Enter at least one QC value.');return}
   const f=allFlags(),n=ids.filter(id=>(f[id]||[]).some(x=>x.sev==='reject')).length;
   const w=ids.filter(id=>(f[id]||[]).length).length;toast(n?`${n} QC violation${n>1?'s':''} found. See actions below.`:w?'QC saved. Warnings to review below.':'QC saved. All entered values are in control.');
 }
