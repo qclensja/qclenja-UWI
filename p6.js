@@ -3,7 +3,16 @@ const IDLE_MS=30*60*1000;
 let memSess=null,SESS=null,CU=null;
 const isAdmin=()=>!!CU&&CU.role==='admin';
 const isSup=()=>!!CU&&CU.role==='sup';
-const canSetup=()=>isAdmin()||isSup();
+const PERMDEF=[
+ {k:'v_charts',g:'View',l:'Charts',tech:1,sup:1},{k:'v_alerts',g:'View',l:'QC alerts',tech:1,sup:1},{k:'v_limits',g:'View',l:'Establish limits',tech:1,sup:1},{k:'v_rules',g:'View',l:'Westgard rules',tech:1,sup:1},
+ {k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1},
+ {k:'e_qc',g:'Edit',l:'Enter and edit QC values, mark QC not performed',tech:1,sup:1},{k:'e_override',g:'Edit',l:'Resolve violations with a comment, add notes, reopen violations',tech:1,sup:1},
+ {k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1},
+ {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1}];
+const perm=k=>{if(!CU)return false;if(CU.role==='admin')return true;const d=PERMDEF.find(x=>x.k===k);if(!d)return false;const r=CU.role==='sup'?'sup':'tech',o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
+const permFor=(r,k)=>{const d=PERMDEF.find(x=>x.k===k),o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
+const canSetup=()=>perm('v_setup');
+const canAudit=()=>isAdmin()||perm('v_audit');
 const roleName=r=>r==='admin'?'Administrator':r==='sup'?'Supervisory technologist':'Technologist';
 const scoped=r=>r!=='admin';
 const nowIso=()=>new Date().toISOString();
@@ -283,6 +292,13 @@ function deptCell(u){
   const all=!Array.isArray(u.depts),has=id=>all||u.depts.includes(id);
   return `<div class="stack" style="gap:2px">${ds.map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap"><input type="checkbox" data-udept="${u.id}:${d.id}"${has(d.id)?' checked':''}>${esc(d.dept)}</label>`).join('')}${!all&&!u.depts.length?'<span class="small" style="color:var(--bad)">No access</span>':''}</div>`;
 }
+function renderPerms(){
+  const row=d=>`<tr><td>${esc(d.l)}</td>${['tech','sup'].map(r=>`<td style="text-align:center"><input type="checkbox" data-perm="${r}:${d.k}"${permFor(r,d.k)?' checked':''} aria-label="${esc(d.l)} for ${r==='sup'?'supervisory technologists':'technologists'}"></td>`).join('')}</tr>`;
+  const grp=g=>`<tr><th colspan="3" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
+  return `<div class="panel stack"><div><h3>What each user type can view and edit</h3><p class="muted small" style="margin:4px 0 0;max-width:80ch">Tick what technologists and supervisory technologists may do. Administrators always have full access. Department limits still apply: everyone only sees the departments they are given. Changes apply the next time each person's screen refreshes.</p></div>
+   <div class="scroll"><table class="t"><thead><tr><th>Permission</th><th style="text-align:center">Technologist</th><th style="text-align:center">Supervisory technologist</th></tr></thead><tbody>${grp('View')}${grp('Edit')}</tbody></table></div>
+   <div class="row"><button class="btn" data-act="permreset">Restore defaults</button><span class="small muted">Today (entering and viewing daily QC) is always available. These settings control what the app shows and allows. For strict protection of the data itself, keep the number of administrators small.</span></div></div>`;
+}
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
     return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}${u.email?' · '+esc(u.email):''}</div></td>
@@ -292,7 +308,7 @@ function renderUsers(){
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button> <button class="btn sm" data-act="uemailpw" data-id="${u.id}" title="Generate a new temporary password and prepare an email to this user">Email new password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
-  return `<div class="stack">${renderRequests()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack">${renderRequests()}${renderPerms()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>

@@ -87,7 +87,7 @@ function renderLimits(){
      <div class="grid2"><label class="f">Decimal places<select id="est-dp" data-estdp>${[0,1,2,3,4].map(d=>`<option${d===dp?' selected':''}>${d}</option>`).join('')}</select></label><label class="f">Effective from<input type="date" id="est-date" value="${UI.estDate||todayStr()}" max="${todayStr()}"></label></div>
      <label class="f">Comment (required)<textarea id="est-note" rows="2">${esc(UI.estNote!=null?UI.estNote:dflt)}</textarea></label>
      <p id="est-err" class="small" style="color:var(--bad);margin:0" hidden></p>
-     <div><button class="btn primary" data-act="estapply">Insert into ${esc(a.name)} QC limits</button></div>`
+     ${perm('e_limits')?`<div><button class="btn primary" data-act="estapply">Insert into ${esc(a.name)} QC limits</button></div>`:'<p class="small muted" style="margin:0">Your access level can view these limits but not insert them.</p>'}`
      :`<p class="muted" style="margin:0">${infos.map((x,i)=>x.ready?'':`${levelName(i)} needs ${EST_MIN-x.st.n} more value${EST_MIN-x.st.n===1?'':'s'}`).filter(Boolean).join(' · ')}. The insert option appears when every level has at least ${EST_MIN} values.</p>`}</div>`;
   }else if(s.applied){
     apply=`<div class="panel"><h3>Applied</h3><p class="small" style="margin:4px 0 0">Inserted into the QC limits by ${esc(s.applied.byName||'–')} on ${fmtTs(s.applied.at)}, effective ${fmtDate(s.applied.from)}.</p>

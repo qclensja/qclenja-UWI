@@ -18,12 +18,12 @@ function dueRow(a,flags,extra){
   const ins=Array.from({length:a.nlev},(_,lv)=>{
     const r=resultAt(a.id,lv,UI.date),l=t.levels[lv]||{};
     return `<label class="f">${levelName(lv)} <span class="mono small">${fmt(l.mean,dp)} ± ${fmt(l.sd,dp+1>4?4:dp+1)}</span><span class="small muted" style="font-weight:400">${esc(l.material||'')}${l.lot?' · Lot '+esc(l.lot):''}</span><span>${expChip(l.exp,UI.date)}</span>
-     <input type="number" step="any" inputmode="decimal" data-in="${a.id}:${lv}" value="${r?r.value:''}" aria-label="${esc(a.name)} ${levelName(lv)}">
+     <input type="number" step="any" inputmode="decimal"${perm('e_qc')?'':' disabled'} data-in="${a.id}:${lv}" value="${r?r.value:''}" aria-label="${esc(a.name)} ${levelName(lv)}">
      ${r?`<span>${chipFor(r,flags)}</span><span class="small muted" style="font-weight:400">${byShort(r)}</span>`:''}</label>`}).join('');
   const act=UI.skipOpen===a.id
     ?`<div class="row" style="flex:1 1 100%"><label class="f" style="flex:1 1 220px">Reason (e.g. analyser down, no reagent, not requested)<input type="text" id="skr-${a.id}" placeholder="Reason"></label><button class="btn primary sm" data-act="skipok" data-id="${a.id}">Confirm not performed</button><button class="btn sm" data-act="skipcancel">Cancel</button></div>`
     :isOD(a)?'':`<button class="btn sm" data-act="skip" data-id="${a.id}">Not performed</button>`;
-  return `<div class="due">${head}${ins}<button class="btn sm primary" data-act="saveone" data-id="${a.id}">Save QC results</button>${act}</div>`;
+  return `<div class="due">${head}${ins}${perm('e_qc')?`<button class="btn sm primary" data-act="saveone" data-id="${a.id}">Save QC results</button>${act}`:''}</div>`;
 }
 function alertCard(r,flags,full){
   const a=anOf(r.aid);if(!a)return '';
@@ -35,7 +35,8 @@ function alertCard(r,flags,full){
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <ul>${f.map(x=>`<li><b>${RULES[x.rule].name}:</b> ${RULES[x.rule].desc}</li>`).join('')}</ul>
    <details${full?' open':''} style="margin-top:8px"><summary><b>Suggested actions</b></summary><ul>${fixes.map(x=>`<li>${x}</li>`).join('')}</ul></details>
-   ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> <button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button></p>`
+   ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> ${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button>`:''}</p>`
+   :!perm('e_override')?`<p class="small muted" style="margin:8px 0 0">${isAdmin()?'':'Your access level can view this alert but not resolve it.'}</p>`
    :`<div class="row" style="margin-top:10px"><label class="f" style="flex:1 1 260px">${rej?'Override comment (required to accept this result)':'Note (optional)'}<textarea id="ov-${r.id}" rows="2" placeholder="e.g. Repeated with fresh vial, in control. Calibration done."></textarea></label>
     ${rej?`<button class="btn danger" data-act="override" data-id="${r.id}">Override with comment</button>`:''}${isAdmin()?`<button class="btn sm" data-act="delres" data-id="${r.id}">Delete result</button>`:''}</div>`}</div>`;
 }
@@ -78,7 +79,7 @@ function renderToday(){
   return `<div class="stack">
    ${rep.length?`<div class="stack"><h3>Just saved: ${rep.some(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject'))?'QC violations need attention':'warnings to review'}</h3>${rep.map(r=>alertCard(r,flags,true)).join('')}</div>`:''}
    ${expBanner()}
-   ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> <button class="btn sm" data-act="tab" data-t="alerts">Review and override</button></div>`:''}
+   ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> ${perm('v_alerts')?'<button class="btn sm" data-act="tab" data-t="alerts">Review and override</button>':'Please tell a supervisor.'}</div>`:''}
    <div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Daily QC</h2><div class="muted">${dl.length>1?esc(dl.map(d=>d.dept).join(', ')):esc(S.setup.dept)+' · '+esc(S.setup.sub)} · ${esc(analyserNameV())}</div></div>
     <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${modOpts.length?`<label class="f">Module<select id="modf" style="width:auto"><option value="">All modules</option>${modOpts.map(m=>`<option${m===UI.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="dayprev" aria-label="Previous day" title="Previous day">&#9664;</button><label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
     <button class="btn" data-act="daynext" aria-label="Next day" title="Next day"${UI.date>=todayStr()?' disabled':''}>&#9654;</button><button class="btn" data-act="today">Today</button></div></div>
@@ -88,7 +89,7 @@ function renderToday(){
    <div class="panel" style="padding:0">${due.length?byPanel(due):'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
    ${od.length?`<div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">On-demand tests <span class="small muted" style="font-weight:400">No fixed schedule. Enter QC on the date it is run.</span></div>${byPanel(od)}</div>`:''}
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}
-   <div class="row"><button class="btn primary" data-act="saveqc">Save All QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div></div>`;
+   ${perm('e_qc')?'<div class="row"><button class="btn primary" data-act="saveqc">Save All QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div>':'<p class="small muted">View only: your access level does not include entering QC.</p>'}</div>`;
 }
 function resolvedCard(r,flags){
   const a=anOf(r.aid);if(!a)return '';
@@ -99,7 +100,7 @@ function resolvedCard(r,flags){
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
    ${edits.length?`<div class="small" style="margin-top:6px"><b>Edit comments:</b>${edits.map(h=>`<div class="muted">${esc(h.reason)} (changed from ${fmt(h.value,dp)}${h.byName?' · '+esc(h.byName):''}${h.at?' · '+fmtTs(h.at):''})</div>`).join('')}</div>`:''}
-   <div class="row" style="margin-top:6px"><button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button></div></div>`;
+   <div class="row" style="margin-top:6px">${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button>`:''}</div></div>`;
 }
 function renderAlerts(){
   const flags=allFlags(),un=unresolved(flags),L=UI.resLimit||15;

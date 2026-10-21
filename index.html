@@ -393,11 +393,11 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[]});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:''});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -644,12 +644,12 @@ function dueRow(a,flags,extra){
   const ins=Array.from({length:a.nlev},(_,lv)=>{
     const r=resultAt(a.id,lv,UI.date),l=t.levels[lv]||{};
     return `<label class="f">${levelName(lv)} <span class="mono small">${fmt(l.mean,dp)} ± ${fmt(l.sd,dp+1>4?4:dp+1)}</span><span class="small muted" style="font-weight:400">${esc(l.material||'')}${l.lot?' · Lot '+esc(l.lot):''}</span><span>${expChip(l.exp,UI.date)}</span>
-     <input type="number" step="any" inputmode="decimal" data-in="${a.id}:${lv}" value="${r?r.value:''}" aria-label="${esc(a.name)} ${levelName(lv)}">
+     <input type="number" step="any" inputmode="decimal"${perm('e_qc')?'':' disabled'} data-in="${a.id}:${lv}" value="${r?r.value:''}" aria-label="${esc(a.name)} ${levelName(lv)}">
      ${r?`<span>${chipFor(r,flags)}</span><span class="small muted" style="font-weight:400">${byShort(r)}</span>`:''}</label>`}).join('');
   const act=UI.skipOpen===a.id
     ?`<div class="row" style="flex:1 1 100%"><label class="f" style="flex:1 1 220px">Reason (e.g. analyser down, no reagent, not requested)<input type="text" id="skr-${a.id}" placeholder="Reason"></label><button class="btn primary sm" data-act="skipok" data-id="${a.id}">Confirm not performed</button><button class="btn sm" data-act="skipcancel">Cancel</button></div>`
     :isOD(a)?'':`<button class="btn sm" data-act="skip" data-id="${a.id}">Not performed</button>`;
-  return `<div class="due">${head}${ins}<button class="btn sm primary" data-act="saveone" data-id="${a.id}">Save QC results</button>${act}</div>`;
+  return `<div class="due">${head}${ins}${perm('e_qc')?`<button class="btn sm primary" data-act="saveone" data-id="${a.id}">Save QC results</button>${act}`:''}</div>`;
 }
 function alertCard(r,flags,full){
   const a=anOf(r.aid);if(!a)return '';
@@ -661,7 +661,8 @@ function alertCard(r,flags,full){
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <ul>${f.map(x=>`<li><b>${RULES[x.rule].name}:</b> ${RULES[x.rule].desc}</li>`).join('')}</ul>
    <details${full?' open':''} style="margin-top:8px"><summary><b>Suggested actions</b></summary><ul>${fixes.map(x=>`<li>${x}</li>`).join('')}</ul></details>
-   ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> <button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button></p>`
+   ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> ${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button>`:''}</p>`
+   :!perm('e_override')?`<p class="small muted" style="margin:8px 0 0">${isAdmin()?'':'Your access level can view this alert but not resolve it.'}</p>`
    :`<div class="row" style="margin-top:10px"><label class="f" style="flex:1 1 260px">${rej?'Override comment (required to accept this result)':'Note (optional)'}<textarea id="ov-${r.id}" rows="2" placeholder="e.g. Repeated with fresh vial, in control. Calibration done."></textarea></label>
     ${rej?`<button class="btn danger" data-act="override" data-id="${r.id}">Override with comment</button>`:''}${isAdmin()?`<button class="btn sm" data-act="delres" data-id="${r.id}">Delete result</button>`:''}</div>`}</div>`;
 }
@@ -704,7 +705,7 @@ function renderToday(){
   return `<div class="stack">
    ${rep.length?`<div class="stack"><h3>Just saved: ${rep.some(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject'))?'QC violations need attention':'warnings to review'}</h3>${rep.map(r=>alertCard(r,flags,true)).join('')}</div>`:''}
    ${expBanner()}
-   ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> <button class="btn sm" data-act="tab" data-t="alerts">Review and override</button></div>`:''}
+   ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> ${perm('v_alerts')?'<button class="btn sm" data-act="tab" data-t="alerts">Review and override</button>':'Please tell a supervisor.'}</div>`:''}
    <div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Daily QC</h2><div class="muted">${dl.length>1?esc(dl.map(d=>d.dept).join(', ')):esc(S.setup.dept)+' · '+esc(S.setup.sub)} · ${esc(analyserNameV())}</div></div>
     <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${modOpts.length?`<label class="f">Module<select id="modf" style="width:auto"><option value="">All modules</option>${modOpts.map(m=>`<option${m===UI.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="dayprev" aria-label="Previous day" title="Previous day">&#9664;</button><label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
     <button class="btn" data-act="daynext" aria-label="Next day" title="Next day"${UI.date>=todayStr()?' disabled':''}>&#9654;</button><button class="btn" data-act="today">Today</button></div></div>
@@ -714,7 +715,7 @@ function renderToday(){
    <div class="panel" style="padding:0">${due.length?byPanel(due):'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
    ${od.length?`<div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">On-demand tests <span class="small muted" style="font-weight:400">No fixed schedule. Enter QC on the date it is run.</span></div>${byPanel(od)}</div>`:''}
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}
-   <div class="row"><button class="btn primary" data-act="saveqc">Save All QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div></div>`;
+   ${perm('e_qc')?'<div class="row"><button class="btn primary" data-act="saveqc">Save All QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div>':'<p class="small muted">View only: your access level does not include entering QC.</p>'}</div>`;
 }
 function resolvedCard(r,flags){
   const a=anOf(r.aid);if(!a)return '';
@@ -725,7 +726,7 @@ function resolvedCard(r,flags){
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
    ${edits.length?`<div class="small" style="margin-top:6px"><b>Edit comments:</b>${edits.map(h=>`<div class="muted">${esc(h.reason)} (changed from ${fmt(h.value,dp)}${h.byName?' · '+esc(h.byName):''}${h.at?' · '+fmtTs(h.at):''})</div>`).join('')}</div>`:''}
-   <div class="row" style="margin-top:6px"><button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button></div></div>`;
+   <div class="row" style="margin-top:6px">${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button>`:''}</div></div>`;
 }
 function renderAlerts(){
   const flags=allFlags(),un=unresolved(flags),L=UI.resLimit||15;
@@ -845,7 +846,7 @@ function renderCharts(){
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between">
     <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
      <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option></select></label></div>
-    <div class="row"><button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button><button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button></div></div>
+    <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
    ${charts}
    <div class="panel"><h3 style="margin-bottom:8px">Recent results</h3><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Level</th><th>Value</th><th>SD from mean</th><th>Status</th><th>Comment</th><th>Entered by</th><th>Entered</th></tr></thead><tbody>
@@ -1157,7 +1158,16 @@ const IDLE_MS=30*60*1000;
 let memSess=null,SESS=null,CU=null;
 const isAdmin=()=>!!CU&&CU.role==='admin';
 const isSup=()=>!!CU&&CU.role==='sup';
-const canSetup=()=>isAdmin()||isSup();
+const PERMDEF=[
+ {k:'v_charts',g:'View',l:'Charts',tech:1,sup:1},{k:'v_alerts',g:'View',l:'QC alerts',tech:1,sup:1},{k:'v_limits',g:'View',l:'Establish limits',tech:1,sup:1},{k:'v_rules',g:'View',l:'Westgard rules',tech:1,sup:1},
+ {k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1},
+ {k:'e_qc',g:'Edit',l:'Enter and edit QC values, mark QC not performed',tech:1,sup:1},{k:'e_override',g:'Edit',l:'Resolve violations with a comment, add notes, reopen violations',tech:1,sup:1},
+ {k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1},
+ {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1}];
+const perm=k=>{if(!CU)return false;if(CU.role==='admin')return true;const d=PERMDEF.find(x=>x.k===k);if(!d)return false;const r=CU.role==='sup'?'sup':'tech',o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
+const permFor=(r,k)=>{const d=PERMDEF.find(x=>x.k===k),o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
+const canSetup=()=>perm('v_setup');
+const canAudit=()=>isAdmin()||perm('v_audit');
 const roleName=r=>r==='admin'?'Administrator':r==='sup'?'Supervisory technologist':'Technologist';
 const scoped=r=>r!=='admin';
 const nowIso=()=>new Date().toISOString();
@@ -1437,6 +1447,13 @@ function deptCell(u){
   const all=!Array.isArray(u.depts),has=id=>all||u.depts.includes(id);
   return `<div class="stack" style="gap:2px">${ds.map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap"><input type="checkbox" data-udept="${u.id}:${d.id}"${has(d.id)?' checked':''}>${esc(d.dept)}</label>`).join('')}${!all&&!u.depts.length?'<span class="small" style="color:var(--bad)">No access</span>':''}</div>`;
 }
+function renderPerms(){
+  const row=d=>`<tr><td>${esc(d.l)}</td>${['tech','sup'].map(r=>`<td style="text-align:center"><input type="checkbox" data-perm="${r}:${d.k}"${permFor(r,d.k)?' checked':''} aria-label="${esc(d.l)} for ${r==='sup'?'supervisory technologists':'technologists'}"></td>`).join('')}</tr>`;
+  const grp=g=>`<tr><th colspan="3" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
+  return `<div class="panel stack"><div><h3>What each user type can view and edit</h3><p class="muted small" style="margin:4px 0 0;max-width:80ch">Tick what technologists and supervisory technologists may do. Administrators always have full access. Department limits still apply: everyone only sees the departments they are given. Changes apply the next time each person's screen refreshes.</p></div>
+   <div class="scroll"><table class="t"><thead><tr><th>Permission</th><th style="text-align:center">Technologist</th><th style="text-align:center">Supervisory technologist</th></tr></thead><tbody>${grp('View')}${grp('Edit')}</tbody></table></div>
+   <div class="row"><button class="btn" data-act="permreset">Restore defaults</button><span class="small muted">Today (entering and viewing daily QC) is always available. These settings control what the app shows and allows. For strict protection of the data itself, keep the number of administrators small.</span></div></div>`;
+}
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
     return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}${u.email?' · '+esc(u.email):''}</div></td>
@@ -1446,7 +1463,7 @@ function renderUsers(){
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button> <button class="btn sm" data-act="uemailpw" data-id="${u.id}" title="Generate a new temporary password and prepare an email to this user">Email new password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
-  return `<div class="stack">${renderRequests()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack">${renderRequests()}${renderPerms()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
@@ -1573,7 +1590,7 @@ function renderLimits(){
      <div class="grid2"><label class="f">Decimal places<select id="est-dp" data-estdp>${[0,1,2,3,4].map(d=>`<option${d===dp?' selected':''}>${d}</option>`).join('')}</select></label><label class="f">Effective from<input type="date" id="est-date" value="${UI.estDate||todayStr()}" max="${todayStr()}"></label></div>
      <label class="f">Comment (required)<textarea id="est-note" rows="2">${esc(UI.estNote!=null?UI.estNote:dflt)}</textarea></label>
      <p id="est-err" class="small" style="color:var(--bad);margin:0" hidden></p>
-     <div><button class="btn primary" data-act="estapply">Insert into ${esc(a.name)} QC limits</button></div>`
+     ${perm('e_limits')?`<div><button class="btn primary" data-act="estapply">Insert into ${esc(a.name)} QC limits</button></div>`:'<p class="small muted" style="margin:0">Your access level can view these limits but not insert them.</p>'}`
      :`<p class="muted" style="margin:0">${infos.map((x,i)=>x.ready?'':`${levelName(i)} needs ${EST_MIN-x.st.n} more value${EST_MIN-x.st.n===1?'':'s'}`).filter(Boolean).join(' · ')}. The insert option appears when every level has at least ${EST_MIN} values.</p>`}</div>`;
   }else if(s.applied){
     apply=`<div class="panel"><h3>Applied</h3><p class="small" style="margin:4px 0 0">Inserted into the QC limits by ${esc(s.applied.byName||'–')} on ${fmtTs(s.applied.at)}, effective ${fmtDate(s.applied.from)}.</p>
@@ -1763,6 +1780,7 @@ function mergeStates(L,R){
   const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
+  if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
   out.tomb=[...tomb];
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
@@ -1885,6 +1903,7 @@ function renderRules(){
    <h3 style="margin:6px 0 0">Warning rules</h3>${RORDER.filter(k=>RULES[k].sev!=='reject').map(card).join('')}</div></div>`;
 }
 /* ===== Setup summary, main render, events ===== */
+function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
   if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
   const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
@@ -1916,10 +1935,10 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():S.setup.sub+' · '+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']];if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canSetup())T.push(['audit','Audit log']);
+    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():renderSetupHome();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():setupView();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h;
@@ -1940,7 +1959,10 @@ document.addEventListener('click',e=>{
   if(!CU&&!PUBLIC.has(act))return;
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
-  if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
+  if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
+  const NEED={saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
+  if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
@@ -2076,7 +2098,8 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(!canSetup()&&!(t.id==='qcdate'||/^(instf|deptf|modf|cinst|cmod)$/.test(t.id)||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
+  if(d.perm){if(!isAdmin())return;const [r,k]=d.perm.split(':'),def=PERMDEF.find(x=>x.k===k);if(!def||!(r==='tech'||r==='sup'))return;S.perms=S.perms||{};S.perms[r]=S.perms[r]||{};S.perms[r][k]=t.checked;S.permsAt=nowIso();audit('Permissions changed',(r==='sup'?'Supervisory technologist':'Technologist')+': '+def.l+' '+(t.checked?'allowed':'not allowed'),null,[]);save();return render()}
+  if(!perm('e_setup')&&!(t.id==='qcdate'||/^(instf|deptf|modf|cinst|cmod)$/.test(t.id)||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
