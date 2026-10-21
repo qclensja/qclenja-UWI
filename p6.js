@@ -88,7 +88,7 @@ function authGate(){
     return shell(`<div><h2>Sign in</h2><p class="muted" style="margin:6px 0 0">Levey-Jennings QC for the clinical laboratory</p></div>
       <form data-form="login" class="stack">${fld('li-user','Username or email','text','autocapitalize="none" autocomplete="username" value="'+esc(UI.authUser||'')+'"')}${fld('li-pass','Password','password','autocomplete="current-password"')}${amsg()}
       <button class="btn primary" type="submit">Sign in</button><button class="btn" type="button" data-act="forgot">Forgot password?</button></form>
-      ${S.users.length||svcOn()?'<div class="small" style="margin-top:12px">New here? <a href="#" data-act="reqopen">Request access</a></div>':'<p class="small muted" style="margin:12px 0 0">This device is not connected to a laboratory yet. Open the QCLens link your administrator sent you, then sign in.</p>'}`);
+      ${S.users.length||svcOn()?'<div class="stack" style="gap:6px;margin-top:4px"><span class="small muted" style="text-align:center">New here?</span><button class="btn green" type="button" data-act="reqopen">Request access</button></div>':'<p class="small muted" style="margin:12px 0 0">This device is not connected to a laboratory yet. Open the QCLens link your administrator sent you, then sign in.</p>'}`);
   }
   if(CU.mustChange)return shell(`<div><h2>Choose a new password</h2><p class="muted" style="margin:6px 0 0">Hello ${esc(CU.name)}. Your password was set by an administrator. Choose your own before you continue.</p></div>
     <form data-form="forcepw" class="stack">${fld('cp-pass','New password (8 or more characters)','password','autocomplete="new-password"')}${fld('cp-pass2','Confirm new password','password','autocomplete="new-password"')}${amsg()}
