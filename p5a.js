@@ -51,11 +51,27 @@ function expBanner(){
    <details style="margin-top:6px"><summary>Show materials</summary><ul>${x.map(y=>`<li>${line(y)}</li>`).join('')}</ul><div class="small muted">Open the analyte on Charts and use Lot change to enter the new material and expiry date.</div></details></div>`;
 }
 const isOD=a=>(a.schedule||{}).type==='ondemand';
+function missedDays(inF){
+  const out=[],n=UI.missDays||14,t=new Date();
+  for(let i=1;i<=n;i++){
+    const d=dstr(new Date(t.getFullYear(),t.getMonth(),t.getDate()-i,12));
+    const miss=VA().filter(a=>inF(a)&&isDue(a,d)&&d>=(a.targets[0].from||'')&&!skipAt(a.id,d)&&!S.results.some(r=>r.aid===a.id&&r.date===d));
+    if(miss.length)out.push({d,miss});
+  }
+  return out;
+}
+function missedPanel(inF){
+  const m=missedDays(inF);
+  return `<details class="panel" style="padding:0"${m.length?' open':''}><summary style="padding:12px 16px;cursor:pointer"><b>Missed QC from previous days (${m.length} day${m.length===1?'':'s'})</b> <span class="muted small">Scheduled QC with no value and no "not performed" note</span></summary>
+   <div style="padding:0 16px 12px">${m.length?m.map(x=>`<div class="row" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:8px 0;gap:8px"><div><b>${fmtDate(x.d)}</b> <span class="muted small">${x.miss.length} analyte${x.miss.length===1?'':'s'}: ${esc(x.miss.slice(0,6).map(a=>a.name).join(', '))}${x.miss.length>6?' and '+(x.miss.length-6)+' more':''}</span></div><button class="btn sm primary" data-act="gotodate" data-d="${x.d}">Enter QC for this date</button></div>`).join(''):'<p class="small muted" style="margin:8px 0 0">Nothing missed in the last '+(UI.missDays||14)+' days.</p>'}
+   <div class="row" style="margin-top:8px"><button class="btn sm" data-act="missmore">Look back further</button><span class="small muted">You can also pick any earlier date with the date box above.</span></div></div></details>`;
+}
 function renderToday(){
-  const dl=visDepts(),inF=a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept);
+  const dl=visDepts(),inF=a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)&&(!UI.mod||(a.mod||'')===UI.mod);
+  const modOpts=[...new Set(VA().filter(a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)).map(a=>a.mod).filter(Boolean))].sort(),anyMod=VA().some(a=>a.mod);
   const flags=allFlags(),due=VA().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VA().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VA().filter(a=>inF(a)&&isOD(a));
   const un=unresolved(flags);
-  const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()?instOf(a)||'No analyser':'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
+  const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()||anyMod?(instOf(a)||'No analyser')+(a.mod?' · '+a.mod:''):'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
     return Object.entries(gi).map(([k,l])=>`${k?`<div class="angh" style="padding:10px 12px 6px;margin:0">${esc(k)}</div>`:''}${Object.entries(groupBy(l,a=>a.panel)).map(([p,pl])=>`<div class="small muted" style="${hd}">${esc(p)}</div>${pl.map(a=>dueRow(a,flags)).join('')}`).join('')}`).join('')};
   const done=due.filter(a=>skipAt(a.id,UI.date)||S.results.some(r=>r.aid===a.id&&r.date===UI.date)).length;
   const rep=UI.report.map(id=>S.results.find(r=>r.id===id)).filter(r=>r&&(flags[r.id]||[]).length);
@@ -64,9 +80,11 @@ function renderToday(){
    ${expBanner()}
    ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> <button class="btn sm" data-act="tab" data-t="alerts">Review and override</button></div>`:''}
    <div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Daily QC</h2><div class="muted">${dl.length>1?esc(dl.map(d=>d.dept).join(', ')):esc(S.setup.dept)+' · '+esc(S.setup.sub)} · ${esc(analyserNameV())}</div></div>
-    <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}<label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
-    <button class="btn" data-act="today">Today</button></div></div>
+    <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${modOpts.length?`<label class="f">Module<select id="modf" style="width:auto"><option value="">All modules</option>${modOpts.map(m=>`<option${m===UI.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="dayprev" aria-label="Previous day" title="Previous day">&#9664;</button><label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
+    <button class="btn" data-act="daynext" aria-label="Next day" title="Next day"${UI.date>=todayStr()?' disabled':''}>&#9654;</button><button class="btn" data-act="today">Today</button></div></div>
     <p class="small muted" style="margin:10px 0 0">${due.length} scheduled for ${fmtDate(UI.date)} · ${done} entered or marked not performed${due.length-done>0?` · <b>${due.length-done} waiting</b>`:''}</p></div>
+   ${UI.date<todayStr()?`<div class="alert warn" style="margin:0"><b>Entering QC for ${fmtDate(UI.date)}.</b> Values you save are plotted on that date, not today. <button class="btn sm" data-act="today">Back to today</button></div>`:''}
+   ${missedPanel(inF)}
    <div class="panel" style="padding:0">${due.length?byPanel(due):'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
    ${od.length?`<div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">On-demand tests <span class="small muted" style="font-weight:400">No fixed schedule. Enter QC on the date it is run.</span></div>${byPanel(od)}</div>`:''}
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}

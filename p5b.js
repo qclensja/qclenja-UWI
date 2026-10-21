@@ -56,8 +56,10 @@ function patternBox(a,lv,n){
 }
 function renderCharts(){
   if(!VA().length)return '<div class="panel empty">No analytes available. '+(isAdmin()?'Set up analytes first.':'Ask an administrator to give you access to a department.')+'</div>';
-  if(!VA().some(x=>x.id===UI.cid))UI.cid=VA()[0].id;
-  const a=anOf(UI.cid),flags=allFlags(),g=groupBy(VA(),x=>(multiInst()?instLabel(x)+' · ':'')+x.panel),dp=decs(a);
+  const cf=x=>(!UI.cinst||instOf(x)===UI.cinst)&&(!UI.cmod||(x.mod||'')===UI.cmod);let CL=VA().filter(cf);if(!CL.length){UI.cinst='';UI.cmod='';CL=VA()}
+  const cmods=[...new Set(VA().filter(x=>!UI.cinst||instOf(x)===UI.cinst).map(x=>x.mod).filter(Boolean))].sort(),cinsts=[...new Set(VA().map(instOf).filter(Boolean))];
+  if(!CL.some(x=>x.id===UI.cid))UI.cid=CL[0].id;
+  const a=anOf(UI.cid),flags=allFlags(),g=groupBy(CL,x=>(multiInst()?instLabel(x)+' · ':'')+x.panel),dp=decs(a);
   const t=curTarget(a);
   const charts=Array.from({length:a.nlev},(_,lv)=>{
     const c=ljSVG(a,lv,flags,UI.win,false),l=t.levels[lv];
@@ -69,7 +71,7 @@ function renderCharts(){
      <div class="legend"><span><i style="background:var(--accent)"></i>In control</span><span><i style="background:var(--warn)"></i>1₂ₛ warning</span><span><i style="background:var(--bad)"></i>Rule violation</span><span><i style="background:var(--surface);border:2px solid var(--bad);width:8px;height:8px"></i>Overridden</span><span><i style="background:var(--warn);opacity:.35;width:14px"></i>Trend</span><span><i style="background:var(--bad);opacity:.25;width:14px"></i>Shift</span><span>Points are plotted in SD units against the targets active on their date. Right-hand values are the current limits.</span></div></div>`}).join('');
   const rows=S.results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?1:x.date>y.date?-1:x.lv-y.lv).slice(0,20);
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between">
-    <div class="row"><label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
      <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option></select></label></div>
     <div class="row"><button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button><button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button></div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>

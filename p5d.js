@@ -10,6 +10,7 @@ function renderSetupHome(){
    <div class="small muted" style="margin-top:12px">Analysers and modules in ${esc(st.dept)}</div>${analyserEditor()}
    <div class="row" style="align-items:flex-end;margin-top:8px"><label class="f" style="flex:1 1 220px">New analyser<select data-path="analyser" data-r>${anOptions(st.dept,st.sub,st.analyser)}</select></label>
     ${st.analyser==='Other'?`<label class="f" style="flex:1 1 220px">Analyser name<input type="text" data-path="analyserOther" value="${esc(st.analyserOther)}" placeholder="Make and model"></label>`:''}
+    <label class="f" style="flex:1 1 160px">Label (optional)<input type="text" id="an-suffix" placeholder="e.g. Main lab" maxlength="24"></label>
     <button class="btn primary" data-act="ainstadd"${pickedName()?'':' disabled'}>Add analyser</button></div>
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
@@ -51,7 +52,7 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -83,9 +84,19 @@ document.addEventListener('click',e=>{
    case 'auditmore':AF.limit+=100;break;
    case 'xaudit':return exportAudit();
    case 'nlev':st.nlev=+el.dataset.n;break;
-   case 'ainstadd':{let n=pickedName();if(!n)return;st.analysers=st.analysers||[];const base=n;let k=2;
-     while(st.analysers.some(x=>x.toLowerCase()===n.toLowerCase()))n=base+' ('+(k++)+')';
-     st.analysers.push(n);st.amods=st.amods||{};st.amods[n]=(AMODS[baseName(base)]||[]).slice();st.analyser='';st.analyserOther='';if(n!==base)toast('Added as "'+n+'" so the two units can be told apart.');break}
+   case 'ainstadd':{let n=pickedName();if(!n)return;st.analysers=st.analysers||[];const base=n;
+     const sf=((document.getElementById('an-suffix')||{value:''}).value||'').trim().replace(/[()]/g,'');
+     if(sf)n=base+' ('+sf+')';
+     let k=2;const root=n;while(st.analysers.some(x=>x.toLowerCase()===n.toLowerCase()))n=sf?root+' '+(k++):base+' ('+(k++)+')';
+     st.analysers.push(n);st.amods=st.amods||{};st.amods[n]=(AMODS[baseName(base)]||[]).slice();st.analyser='';st.analyserOther='';if(n!==base&&!sf)toast('Added as "'+n+'" so the two units can be told apart. Use Rename to give it a label.');break}
+   case 'anren':UI.renI=+el.dataset.i;break;
+   case 'anrencancel':UI.renI=null;break;
+   case 'anrensave':{const i=+el.dataset.i,old=st.analysers[i],nw=((document.querySelector('[data-anrenv]')||{value:''}).value||'').trim().replace(/\s+/g,' ');
+     if(!nw)return toast('Enter a name.');if(nw===old){UI.renI=null;break}
+     if(st.analysers.some((x,j)=>j!==i&&x.toLowerCase()===nw.toLowerCase()))return toast('Another analyser in this department already has that name.');
+     st.analysers[i]=nw;if(st.amods&&st.amods[old]!==undefined){st.amods[nw]=st.amods[old];delete st.amods[old]}
+     DA().forEach(a=>{if(a.inst===old)a.inst=nw});if(UI.inst===old)UI.inst=nw;if(UI.cinst===old)UI.cinst=nw;
+     audit('Analyser renamed',old+' to '+nw);UI.renI=null;toast('Renamed to "'+nw+'".');break}
    case 'ainstdel':{const i=+el.dataset.i,n=st.analysers[i];if(n==null)break;st.analysers.splice(i,1);
      const moved=DA().filter(a=>a.inst===n);delete st.amods[n];moved.forEach(a=>{a.inst=st.analysers[0]||'';a.mod=defMod(a.name,a.inst)});
      if(moved.length)toast(moved.length+' analyte'+(moved.length>1?'s':'')+' moved to '+(st.analysers[0]||'no analyser')+'. Check step 3.');break}
@@ -135,6 +146,9 @@ document.addEventListener('click',e=>{
    case 'adddept':{syncCtx();const used=new Set((S.depts||[]).map(d=>d.dept)),d0=DEPTS.find(x=>!used.has(x))||DEPTS[0];
      st.prevCur=st.cur;st.cur=uid();S.depts.push({id:st.cur});st.dept=d0;st.sub=Object.keys(CAT[d0].subs)[0];st.analyser='';st.analyserOther='';st.analysers=[];st.amods={};st.sel={};st.selFor='';st.cpanels=[];st.adding=true;st.step=1;UI.editing=true;syncCtx();break}
    case 'today':UI.date=todayStr();UI.report=[];break;
+   case 'gotodate':UI.date=el.dataset.d;UI.report=[];UI.skipOpen=null;window.scrollTo(0,0);break;
+   case 'missmore':UI.missDays=(UI.missDays||14)+30;break;
+   case 'dayprev':case 'daynext':{const [y,m,d]=UI.date.split('-').map(Number),dt=new Date(y,m-1,d+(act==='dayprev'?-1:1),12),ns=dstr(dt);if(ns>todayStr())return;UI.date=ns;UI.report=[];UI.skipOpen=null;break}
    case 'saveqc':saveQC();break;
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'saveone':saveQC(id);break;
@@ -176,7 +190,7 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(!canSetup()&&!(t.id==='qcdate'||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
+  if(!canSetup()&&!(t.id==='qcdate'||/^(instf|deptf|modf|cinst|cmod)$/.test(t.id)||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
@@ -223,8 +237,11 @@ document.addEventListener('change',e=>{
   if(t.id==='as-new'){UI.asgNew=t.value;UI.asgName='';UI.asgMod='';return render()}
   if(t.id==='as-newmod'){UI.asgMod=t.value;return}
   if(t.id==='as-newname'){UI.asgName=t.value;return}
-  if(t.id==='instf'){UI.inst=t.value;return render()}
-  if(t.id==='deptf'){UI.dept=t.value;UI.inst='';return render()}
+  if(t.id==='instf'){UI.inst=t.value;UI.mod='';return render()}
+  if(t.id==='modf'){UI.mod=t.value;return render()}
+  if(t.id==='cinst'){UI.cinst=t.value;UI.cmod='';return render()}
+  if(t.id==='cmod'){UI.cmod=t.value;return render()}
+  if(t.id==='deptf'){UI.dept=t.value;UI.inst='';UI.mod='';return render()}
   if(t.id==='deptsw'){if(!canSeeD(t.value))return;syncCtx();loadCtx(t.value);save();return render()}
   if(d.llot){const [id,lv]=d.llot.split(':');anOf(id).targets[0].levels[+lv].lot=t.value.trim();save();return}
   if(d.lmat){const [id,lv]=d.lmat.split(':');anOf(id).targets[0].levels[+lv].material=t.value.trim();save();return refreshNext()}

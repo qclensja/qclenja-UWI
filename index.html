@@ -385,7 +385,7 @@ function anOptions(dept,sub,selected){
     if(names.length)h+=`<optgroup label="${esc(d)}">${names.map(opt).join('')}</optgroup>`});
   return h+`<option${selected==='Other'?' selected':''}>Other</option>`;
 }
-const baseName=n=>String(n).replace(/ \(\d+\)$/,'');
+const baseName=n=>{n=String(n);const m=/^(.*) \(([^)]*)\)$/.exec(n);return m&&(/^\d+$/.test(m[2])||AMODS[m[1]]!==undefined)?m[1]:n};
 /* departments/sub-departments renamed or moved since earlier versions */
 const MIGRATE=[['Blood Gas & POCT',null,'Blood Gas & Electrolytes',null],['Haematology','Coagulation','Coagulation','Coagulation'],['Haematology','ESR','Other Common Analysers','ESR'],['Clinical Chemistry','Immunoassay / Endocrine','Immunochemistry','Immunoassay / Endocrine']];
 function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o.dept===d&&(s===null||o.sub===s)){o.dept=nd;if(ns)o.sub=ns;break}}}
@@ -512,7 +512,7 @@ function byAnalyser(list,fn){
 function analyserEditor(){
   const st=S.setup,am=st.amods||{},mine=DA();
   return (st.analysers||[]).map((n,i)=>{const have=am[n]||[],all=[...new Set([...(AMODS[baseName(n)]||[]),...have])],cnt=mine.filter(a=>a.inst===n).length;
-    return `<div class="panelcard" style="margin-top:8px"><div class="row" style="justify-content:space-between;align-items:center"><b>${esc(n)}</b><span class="row" style="gap:8px"><span class="small muted">${cnt} analyte${cnt===1?'':'s'}</span><button type="button" class="btn sm" data-act="ainstdel" data-i="${i}"${st.analysers.length<2?' disabled title="A department needs at least one analyser"':''}>Remove</button></span></div>
+    return `<div class="panelcard" style="margin-top:8px"><div class="row" style="justify-content:space-between;align-items:center">${UI.renI===i?`<span class="row" style="gap:6px;flex:1 1 260px"><input type="text" data-anrenv value="${esc(n)}" aria-label="New name for ${esc(n)}" style="flex:1 1 200px"><button type="button" class="btn sm primary" data-act="anrensave" data-i="${i}">Save name</button><button type="button" class="btn sm" data-act="anrencancel">Cancel</button></span>`:`<b>${esc(n)}</b>`}<span class="row" style="gap:8px">${UI.renI===i?'':`<button type="button" class="btn sm" data-act="anren" data-i="${i}">Rename</button>`}<span class="small muted">${cnt} analyte${cnt===1?'':'s'}</span><button type="button" class="btn sm" data-act="ainstdel" data-i="${i}"${st.analysers.length<2?' disabled title="A department needs at least one analyser"':''}>Remove</button></span></div>
      <div class="row" style="gap:12px;margin-top:6px;align-items:center"><span class="small muted">Modules</span>${all.map(m=>`<label class="small" style="display:flex;gap:4px;align-items:center;font-weight:400"><input type="checkbox" data-amod="${i}:${esc(m)}"${have.includes(m)?' checked':''}>${esc(m)}</label>`).join('')||'<span class="small muted" style="font-weight:400">None</span>'}
      <input type="text" data-amodnew="${i}" placeholder="Add module, press Enter" style="width:190px" aria-label="Add a module to ${esc(n)}"></div></div>`}).join('')||'<span class="small muted">None added yet.</span>';
 }
@@ -564,7 +564,8 @@ function renderSetup(){
      <div class="f" style="grid-column:1/-1">Analysers in this department${analyserEditor()}
       <div class="row" style="align-items:flex-end;margin-top:8px"><label class="f" style="flex:1 1 220px">Add an analyser<select data-path="analyser" data-r>${anOptions(st.dept,st.sub,st.analyser)}</select></label>
       ${st.analyser==='Other'?`<label class="f" style="flex:1 1 220px">Analyser name<input type="text" data-path="analyserOther" value="${esc(st.analyserOther)}" placeholder="Make and model"></label>`:''}
-      <button type="button" class="btn" data-act="ainstadd"${pickedName()?'':' disabled'}>Add analyser</button></div>
+      <label class="f" style="flex:1 1 160px">Label (optional)<input type="text" id="an-suffix" placeholder="e.g. Main lab" maxlength="24"></label>
+    <button type="button" class="btn" data-act="ainstadd"${pickedName()?'':' disabled'}>Add analyser</button></div>
       <span class="small" style="font-weight:400">Add every analyser in this department and tick the modules fitted (for example cobas pro with ISE, c 503 and e 801). Each analyte is assigned to an analyser and module in step 3. Adding the same model again names it "(2)".</span></div>
      <div class="f">Control levels run each day (starting value)<div class="seg" role="group" aria-label="Control levels">${[1,2,3,4,5,6].map(n=>`<button type="button" data-act="nlev" data-n="${n}" aria-pressed="${st.nlev===n}">${n}</button>`).join('')}</div><span class="small" style="font-weight:400">You can change the number of levels for each analyte in step 4.</span></div></div>`;
     canNext=(st.analysers||[]).length>0;
@@ -676,11 +677,27 @@ function expBanner(){
    <details style="margin-top:6px"><summary>Show materials</summary><ul>${x.map(y=>`<li>${line(y)}</li>`).join('')}</ul><div class="small muted">Open the analyte on Charts and use Lot change to enter the new material and expiry date.</div></details></div>`;
 }
 const isOD=a=>(a.schedule||{}).type==='ondemand';
+function missedDays(inF){
+  const out=[],n=UI.missDays||14,t=new Date();
+  for(let i=1;i<=n;i++){
+    const d=dstr(new Date(t.getFullYear(),t.getMonth(),t.getDate()-i,12));
+    const miss=VA().filter(a=>inF(a)&&isDue(a,d)&&d>=(a.targets[0].from||'')&&!skipAt(a.id,d)&&!S.results.some(r=>r.aid===a.id&&r.date===d));
+    if(miss.length)out.push({d,miss});
+  }
+  return out;
+}
+function missedPanel(inF){
+  const m=missedDays(inF);
+  return `<details class="panel" style="padding:0"${m.length?' open':''}><summary style="padding:12px 16px;cursor:pointer"><b>Missed QC from previous days (${m.length} day${m.length===1?'':'s'})</b> <span class="muted small">Scheduled QC with no value and no "not performed" note</span></summary>
+   <div style="padding:0 16px 12px">${m.length?m.map(x=>`<div class="row" style="justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:8px 0;gap:8px"><div><b>${fmtDate(x.d)}</b> <span class="muted small">${x.miss.length} analyte${x.miss.length===1?'':'s'}: ${esc(x.miss.slice(0,6).map(a=>a.name).join(', '))}${x.miss.length>6?' and '+(x.miss.length-6)+' more':''}</span></div><button class="btn sm primary" data-act="gotodate" data-d="${x.d}">Enter QC for this date</button></div>`).join(''):'<p class="small muted" style="margin:8px 0 0">Nothing missed in the last '+(UI.missDays||14)+' days.</p>'}
+   <div class="row" style="margin-top:8px"><button class="btn sm" data-act="missmore">Look back further</button><span class="small muted">You can also pick any earlier date with the date box above.</span></div></div></details>`;
+}
 function renderToday(){
-  const dl=visDepts(),inF=a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept);
+  const dl=visDepts(),inF=a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)&&(!UI.mod||(a.mod||'')===UI.mod);
+  const modOpts=[...new Set(VA().filter(a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)).map(a=>a.mod).filter(Boolean))].sort(),anyMod=VA().some(a=>a.mod);
   const flags=allFlags(),due=VA().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VA().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VA().filter(a=>inF(a)&&isOD(a));
   const un=unresolved(flags);
-  const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()?instOf(a)||'No analyser':'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
+  const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()||anyMod?(instOf(a)||'No analyser')+(a.mod?' · '+a.mod:''):'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
     return Object.entries(gi).map(([k,l])=>`${k?`<div class="angh" style="padding:10px 12px 6px;margin:0">${esc(k)}</div>`:''}${Object.entries(groupBy(l,a=>a.panel)).map(([p,pl])=>`<div class="small muted" style="${hd}">${esc(p)}</div>${pl.map(a=>dueRow(a,flags)).join('')}`).join('')}`).join('')};
   const done=due.filter(a=>skipAt(a.id,UI.date)||S.results.some(r=>r.aid===a.id&&r.date===UI.date)).length;
   const rep=UI.report.map(id=>S.results.find(r=>r.id===id)).filter(r=>r&&(flags[r.id]||[]).length);
@@ -689,9 +706,11 @@ function renderToday(){
    ${expBanner()}
    ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> <button class="btn sm" data-act="tab" data-t="alerts">Review and override</button></div>`:''}
    <div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Daily QC</h2><div class="muted">${dl.length>1?esc(dl.map(d=>d.dept).join(', ')):esc(S.setup.dept)+' · '+esc(S.setup.sub)} · ${esc(analyserNameV())}</div></div>
-    <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}<label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
-    <button class="btn" data-act="today">Today</button></div></div>
+    <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${modOpts.length?`<label class="f">Module<select id="modf" style="width:auto"><option value="">All modules</option>${modOpts.map(m=>`<option${m===UI.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="dayprev" aria-label="Previous day" title="Previous day">&#9664;</button><label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
+    <button class="btn" data-act="daynext" aria-label="Next day" title="Next day"${UI.date>=todayStr()?' disabled':''}>&#9654;</button><button class="btn" data-act="today">Today</button></div></div>
     <p class="small muted" style="margin:10px 0 0">${due.length} scheduled for ${fmtDate(UI.date)} · ${done} entered or marked not performed${due.length-done>0?` · <b>${due.length-done} waiting</b>`:''}</p></div>
+   ${UI.date<todayStr()?`<div class="alert warn" style="margin:0"><b>Entering QC for ${fmtDate(UI.date)}.</b> Values you save are plotted on that date, not today. <button class="btn sm" data-act="today">Back to today</button></div>`:''}
+   ${missedPanel(inF)}
    <div class="panel" style="padding:0">${due.length?byPanel(due):'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
    ${od.length?`<div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">On-demand tests <span class="small muted" style="font-weight:400">No fixed schedule. Enter QC on the date it is run.</span></div>${byPanel(od)}</div>`:''}
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}
@@ -809,8 +828,10 @@ function patternBox(a,lv,n){
 }
 function renderCharts(){
   if(!VA().length)return '<div class="panel empty">No analytes available. '+(isAdmin()?'Set up analytes first.':'Ask an administrator to give you access to a department.')+'</div>';
-  if(!VA().some(x=>x.id===UI.cid))UI.cid=VA()[0].id;
-  const a=anOf(UI.cid),flags=allFlags(),g=groupBy(VA(),x=>(multiInst()?instLabel(x)+' · ':'')+x.panel),dp=decs(a);
+  const cf=x=>(!UI.cinst||instOf(x)===UI.cinst)&&(!UI.cmod||(x.mod||'')===UI.cmod);let CL=VA().filter(cf);if(!CL.length){UI.cinst='';UI.cmod='';CL=VA()}
+  const cmods=[...new Set(VA().filter(x=>!UI.cinst||instOf(x)===UI.cinst).map(x=>x.mod).filter(Boolean))].sort(),cinsts=[...new Set(VA().map(instOf).filter(Boolean))];
+  if(!CL.some(x=>x.id===UI.cid))UI.cid=CL[0].id;
+  const a=anOf(UI.cid),flags=allFlags(),g=groupBy(CL,x=>(multiInst()?instLabel(x)+' · ':'')+x.panel),dp=decs(a);
   const t=curTarget(a);
   const charts=Array.from({length:a.nlev},(_,lv)=>{
     const c=ljSVG(a,lv,flags,UI.win,false),l=t.levels[lv];
@@ -822,7 +843,7 @@ function renderCharts(){
      <div class="legend"><span><i style="background:var(--accent)"></i>In control</span><span><i style="background:var(--warn)"></i>1₂ₛ warning</span><span><i style="background:var(--bad)"></i>Rule violation</span><span><i style="background:var(--surface);border:2px solid var(--bad);width:8px;height:8px"></i>Overridden</span><span><i style="background:var(--warn);opacity:.35;width:14px"></i>Trend</span><span><i style="background:var(--bad);opacity:.25;width:14px"></i>Shift</span><span>Points are plotted in SD units against the targets active on their date. Right-hand values are the current limits.</span></div></div>`}).join('');
   const rows=S.results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?1:x.date>y.date?-1:x.lv-y.lv).slice(0,20);
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between">
-    <div class="row"><label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
      <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option></select></label></div>
     <div class="row"><button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button><button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button></div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
@@ -1875,6 +1896,7 @@ function renderSetupHome(){
    <div class="small muted" style="margin-top:12px">Analysers and modules in ${esc(st.dept)}</div>${analyserEditor()}
    <div class="row" style="align-items:flex-end;margin-top:8px"><label class="f" style="flex:1 1 220px">New analyser<select data-path="analyser" data-r>${anOptions(st.dept,st.sub,st.analyser)}</select></label>
     ${st.analyser==='Other'?`<label class="f" style="flex:1 1 220px">Analyser name<input type="text" data-path="analyserOther" value="${esc(st.analyserOther)}" placeholder="Make and model"></label>`:''}
+    <label class="f" style="flex:1 1 160px">Label (optional)<input type="text" id="an-suffix" placeholder="e.g. Main lab" maxlength="24"></label>
     <button class="btn primary" data-act="ainstadd"${pickedName()?'':' disabled'}>Add analyser</button></div>
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
@@ -1916,7 +1938,7 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -1948,9 +1970,19 @@ document.addEventListener('click',e=>{
    case 'auditmore':AF.limit+=100;break;
    case 'xaudit':return exportAudit();
    case 'nlev':st.nlev=+el.dataset.n;break;
-   case 'ainstadd':{let n=pickedName();if(!n)return;st.analysers=st.analysers||[];const base=n;let k=2;
-     while(st.analysers.some(x=>x.toLowerCase()===n.toLowerCase()))n=base+' ('+(k++)+')';
-     st.analysers.push(n);st.amods=st.amods||{};st.amods[n]=(AMODS[baseName(base)]||[]).slice();st.analyser='';st.analyserOther='';if(n!==base)toast('Added as "'+n+'" so the two units can be told apart.');break}
+   case 'ainstadd':{let n=pickedName();if(!n)return;st.analysers=st.analysers||[];const base=n;
+     const sf=((document.getElementById('an-suffix')||{value:''}).value||'').trim().replace(/[()]/g,'');
+     if(sf)n=base+' ('+sf+')';
+     let k=2;const root=n;while(st.analysers.some(x=>x.toLowerCase()===n.toLowerCase()))n=sf?root+' '+(k++):base+' ('+(k++)+')';
+     st.analysers.push(n);st.amods=st.amods||{};st.amods[n]=(AMODS[baseName(base)]||[]).slice();st.analyser='';st.analyserOther='';if(n!==base&&!sf)toast('Added as "'+n+'" so the two units can be told apart. Use Rename to give it a label.');break}
+   case 'anren':UI.renI=+el.dataset.i;break;
+   case 'anrencancel':UI.renI=null;break;
+   case 'anrensave':{const i=+el.dataset.i,old=st.analysers[i],nw=((document.querySelector('[data-anrenv]')||{value:''}).value||'').trim().replace(/\s+/g,' ');
+     if(!nw)return toast('Enter a name.');if(nw===old){UI.renI=null;break}
+     if(st.analysers.some((x,j)=>j!==i&&x.toLowerCase()===nw.toLowerCase()))return toast('Another analyser in this department already has that name.');
+     st.analysers[i]=nw;if(st.amods&&st.amods[old]!==undefined){st.amods[nw]=st.amods[old];delete st.amods[old]}
+     DA().forEach(a=>{if(a.inst===old)a.inst=nw});if(UI.inst===old)UI.inst=nw;if(UI.cinst===old)UI.cinst=nw;
+     audit('Analyser renamed',old+' to '+nw);UI.renI=null;toast('Renamed to "'+nw+'".');break}
    case 'ainstdel':{const i=+el.dataset.i,n=st.analysers[i];if(n==null)break;st.analysers.splice(i,1);
      const moved=DA().filter(a=>a.inst===n);delete st.amods[n];moved.forEach(a=>{a.inst=st.analysers[0]||'';a.mod=defMod(a.name,a.inst)});
      if(moved.length)toast(moved.length+' analyte'+(moved.length>1?'s':'')+' moved to '+(st.analysers[0]||'no analyser')+'. Check step 3.');break}
@@ -2000,6 +2032,9 @@ document.addEventListener('click',e=>{
    case 'adddept':{syncCtx();const used=new Set((S.depts||[]).map(d=>d.dept)),d0=DEPTS.find(x=>!used.has(x))||DEPTS[0];
      st.prevCur=st.cur;st.cur=uid();S.depts.push({id:st.cur});st.dept=d0;st.sub=Object.keys(CAT[d0].subs)[0];st.analyser='';st.analyserOther='';st.analysers=[];st.amods={};st.sel={};st.selFor='';st.cpanels=[];st.adding=true;st.step=1;UI.editing=true;syncCtx();break}
    case 'today':UI.date=todayStr();UI.report=[];break;
+   case 'gotodate':UI.date=el.dataset.d;UI.report=[];UI.skipOpen=null;window.scrollTo(0,0);break;
+   case 'missmore':UI.missDays=(UI.missDays||14)+30;break;
+   case 'dayprev':case 'daynext':{const [y,m,d]=UI.date.split('-').map(Number),dt=new Date(y,m-1,d+(act==='dayprev'?-1:1),12),ns=dstr(dt);if(ns>todayStr())return;UI.date=ns;UI.report=[];UI.skipOpen=null;break}
    case 'saveqc':saveQC();break;
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'saveone':saveQC(id);break;
@@ -2041,7 +2076,7 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(!canSetup()&&!(t.id==='qcdate'||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
+  if(!canSetup()&&!(t.id==='qcdate'||/^(instf|deptf|modf|cinst|cmod)$/.test(t.id)||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
@@ -2088,8 +2123,11 @@ document.addEventListener('change',e=>{
   if(t.id==='as-new'){UI.asgNew=t.value;UI.asgName='';UI.asgMod='';return render()}
   if(t.id==='as-newmod'){UI.asgMod=t.value;return}
   if(t.id==='as-newname'){UI.asgName=t.value;return}
-  if(t.id==='instf'){UI.inst=t.value;return render()}
-  if(t.id==='deptf'){UI.dept=t.value;UI.inst='';return render()}
+  if(t.id==='instf'){UI.inst=t.value;UI.mod='';return render()}
+  if(t.id==='modf'){UI.mod=t.value;return render()}
+  if(t.id==='cinst'){UI.cinst=t.value;UI.cmod='';return render()}
+  if(t.id==='cmod'){UI.cmod=t.value;return render()}
+  if(t.id==='deptf'){UI.dept=t.value;UI.inst='';UI.mod='';return render()}
   if(t.id==='deptsw'){if(!canSeeD(t.value))return;syncCtx();loadCtx(t.value);save();return render()}
   if(d.llot){const [id,lv]=d.llot.split(':');anOf(id).targets[0].levels[+lv].lot=t.value.trim();save();return}
   if(d.lmat){const [id,lv]=d.lmat.split(':');anOf(id).targets[0].levels[+lv].material=t.value.trim();save();return refreshNext()}

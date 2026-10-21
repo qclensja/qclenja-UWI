@@ -87,7 +87,7 @@ function anOptions(dept,sub,selected){
     if(names.length)h+=`<optgroup label="${esc(d)}">${names.map(opt).join('')}</optgroup>`});
   return h+`<option${selected==='Other'?' selected':''}>Other</option>`;
 }
-const baseName=n=>String(n).replace(/ \(\d+\)$/,'');
+const baseName=n=>{n=String(n);const m=/^(.*) \(([^)]*)\)$/.exec(n);return m&&(/^\d+$/.test(m[2])||AMODS[m[1]]!==undefined)?m[1]:n};
 /* departments/sub-departments renamed or moved since earlier versions */
 const MIGRATE=[['Blood Gas & POCT',null,'Blood Gas & Electrolytes',null],['Haematology','Coagulation','Coagulation','Coagulation'],['Haematology','ESR','Other Common Analysers','ESR'],['Clinical Chemistry','Immunoassay / Endocrine','Immunochemistry','Immunoassay / Endocrine']];
 function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o.dept===d&&(s===null||o.sub===s)){o.dept=nd;if(ns)o.sub=ns;break}}}
