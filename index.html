@@ -1317,11 +1317,11 @@ async function doSvcConn(){
   try{await svcCall('/ping',{},false)}catch(e){GH=old;UI.ghMsg=e.message;return}
   ghSaveCfg();UI.ghMsg='';UI.auth='';toast('Connected. Sign in with your QCLens username or email and password.');
 }
-const mailBody=c=>'Hello '+c.name+',\n\nYour QCLens access has been approved.\n\nSign in at: '+location.href.split('#')[0]+'\nUsername: '+c.username+' (or your email address)\nTemporary password: '+c.pw+'\n\nYou will be asked to choose your own password the first time you sign in.\n';
+const mailBody=c=>'Hello '+c.name+',\n\n'+(c.kind==='reset'?'An administrator has set a new temporary password for your QCLens account.':'Your QCLens access has been approved.')+'\n\nSign in at: '+location.href.split('#')[0]+'\nUsername: '+c.username+' (or your email address)\nTemporary password: '+c.pw+'\n\nYou will be asked to choose your own password the first time you sign in.\n';
 function credBox(){
   const c=UI.lastCred;if(!c)return '';
-  const href='mailto:'+encodeURIComponent(c.email||'')+'?subject='+encodeURIComponent('Your QCLens access')+'&body='+encodeURIComponent(mailBody(c));
-  return `<div class="panel stack" style="border-color:var(--accent)"><h3>Send these sign-in details to ${esc(c.name)}</h3>
+  const href='mailto:'+encodeURIComponent(c.email||'')+'?subject='+encodeURIComponent(c.kind==='reset'?'Your new QCLens password':'Your QCLens access')+'&body='+encodeURIComponent(mailBody(c));
+  return `<div class="panel stack" style="border-color:var(--accent)"><h3>${c.kind==='reset'?'Send the new password to':'Send these sign-in details to'} ${esc(c.name)}</h3>
    <div class="panelcard small"><div>Username: <b class="mono">${esc(c.username)}</b>${c.email?` (or ${esc(c.email)})`:''}</div><div>Temporary password: <b class="mono">${esc(c.pw)}</b></div></div>
    <p class="small muted" style="margin:0">QCLens cannot send email by itself. Press <b>Email these details</b> to open a ready-written message in your email app, addressed to ${esc(c.email||'the worker')}. This password is shown only now.</p>
    <div class="row">${c.email?`<a class="btn primary" href="${href}">Email these details</a>`:''}<button class="btn" data-act="copycred">Copy message</button><button class="btn" data-act="credok">Done</button></div></div>`;
@@ -1361,6 +1361,13 @@ async function doUserEdit(){
   u.name=name;u.username=un;if(email)u.email=email;else delete u.email;u.mod=nowIso();
   audit('User details changed',ch.join('; '));UI.uedit=null;save();toast('User details saved.');
 }
+async function doEmailPw(id){
+  const u=S.users.find(x=>x.id===id);if(!u)return;
+  if(!u.email){UI.uedit=u.id;return toast('This user has no email address. Add one in Edit first.')}
+  const pw=genPw();u.pw=await hashPw(pw);u.mustChange=true;u.mod=nowIso();u.fails=0;u.lockUntil=0;pwQueue(u.id,u.pw);
+  audit('Password reset by administrator',u.name+' ('+u.username+'), new password prepared for email');
+  UI.lastCred={kind:'reset',name:u.name,email:u.email,username:u.username,pw};save();window.scrollTo(0,0);
+}
 async function doUserReset(){
   const id=UI.resetFor,u=S.users.find(x=>x.id===id),p=gv('rs-pass');
   if(!u)return;if(p.length<8)return toast('The temporary password needs at least 8 characters.');
@@ -1399,7 +1406,7 @@ function renderUsers(){
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
-       :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
+       :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button> <button class="btn sm" data-act="uemailpw" data-id="${u.id}" title="Generate a new temporary password and prepare an email to this user">Email new password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
   return `<div class="stack">${renderRequests()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
@@ -1891,8 +1898,8 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno']);
-  const ADMONLY=new Set(['uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
@@ -1911,6 +1918,7 @@ document.addEventListener('click',e=>{
      u.active=u.active===false;u.mod=nowIso();audit(u.active?'User enabled':'User disabled',u.name+' ('+u.username+')');break}
    case 'uedit':UI.uedit=id;UI.udel=null;UI.resetFor=null;break;
    case 'ueditno':UI.uedit=null;break;
+   case 'uemailpw':doEmailPw(id).then(()=>render());return;
    case 'udel':UI.udel=id;break;
    case 'udelno':UI.udel=null;break;
    case 'udelok':{const u=S.users.find(x=>x.id===id);UI.udel=null;if(!u||u.id===CU.id)return;
