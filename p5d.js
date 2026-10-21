@@ -136,6 +136,7 @@ document.addEventListener('click',e=>{
      st.prevCur=st.cur;st.cur=uid();S.depts.push({id:st.cur});st.dept=d0;st.sub=Object.keys(CAT[d0].subs)[0];st.analyser='';st.analyserOther='';st.analysers=[];st.amods={};st.sel={};st.selFor='';st.cpanels=[];st.adding=true;st.step=1;UI.editing=true;syncCtx();break}
    case 'today':UI.date=todayStr();UI.report=[];break;
    case 'saveqc':saveQC();break;
+   case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'saveone':saveQC(id);break;
    case 'skip':stashDrafts();UI.skipOpen=id;break;
    case 'skipcancel':UI.skipOpen=null;break;

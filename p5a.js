@@ -72,15 +72,30 @@ function renderToday(){
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}
    <div class="row"><button class="btn primary" data-act="saveqc">Save All QC results</button><span class="muted small">Empty boxes are ignored. Saving again on the same date replaces earlier values.</span></div></div>`;
 }
+function resolvedCard(r,flags){
+  const a=anOf(r.aid);if(!a)return '';
+  const f=flags[r.id]||[],z=zOf(a,r),t=targetFor(a,r.date).levels[r.lv],dp=decs(a),rej=f.some(x=>x.sev==='reject');
+  const edits=(r.hist||[]).filter(h=>h.reason);
+  return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(a.name)}</b> · ${levelName(r.lv)} · ${fmtDate(r.date)}${instTag(a)}<br>
+   <span class="mono">${fmt(r.value,dp)} ${esc(a.unit)}</span> <span class="muted small">(${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp)})</span><br><span class="small muted">Entered: ${byLine(r)}</span></div>
+   <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
+   <div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
+   ${edits.length?`<div class="small" style="margin-top:6px"><b>Edit comments:</b>${edits.map(h=>`<div class="muted">${esc(h.reason)} (changed from ${fmt(h.value,dp)}${h.byName?' · '+esc(h.byName):''}${h.at?' · '+fmtTs(h.at):''})</div>`).join('')}</div>`:''}
+   <div class="row" style="margin-top:6px"><button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button></div></div>`;
+}
 function renderAlerts(){
-  const flags=allFlags(),un=unresolved(flags);
+  const flags=allFlags(),un=unresolved(flags),L=UI.resLimit||15;
   const warn=VR().filter(r=>!r.ov&&(flags[r.id]||[]).length&&!(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1).slice(0,15);
-  const ov=VR().filter(r=>r.ov).sort((x,y)=>x.date<y.date?1:-1).slice(0,30);
+  const byNew=(x,y)=>(y.ov.at||y.date)>(x.ov.at||x.date)?1:-1;
+  const resRej=VR().filter(r=>r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort(byNew);
+  const resOther=VR().filter(r=>r.ov&&!(flags[r.id]||[]).some(x=>x.sev==='reject')).sort(byNew);
   return `<div class="stack"><h2>QC alerts</h2>
    <h3>Unresolved violations (${un.length})</h3>
-   ${un.length?un.map(r=>alertCard(r,flags,true)).join(''):'<div class="panel empty">No unresolved violations. All results are in control or overridden with a comment.</div>'}
-   ${warn.length?`<h3>Recent warnings (1₂ₛ)</h3>${warn.map(r=>alertCard(r,flags,false)).join('')}`:''}
-   ${ov.length?`<h3>Overridden results</h3>${ov.map(r=>alertCard(r,flags,false)).join('')}`:''}</div>`;
+   ${un.length?un.map(r=>alertCard(r,flags,true)).join(''):'<div class="panel empty">No unresolved violations. All results are in control or resolved with a comment.</div>'}
+   ${warn.length?`<h3>Recent warnings</h3>${warn.map(r=>alertCard(r,flags,false)).join('')}`:''}
+   <h3>Resolved violations (${resRej.length})</h3>
+   ${resRej.length?`<p class="small muted" style="margin:0">Rejections that were accepted with a comment explaining what was done. Newest first.</p>${resRej.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resRej.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resRej.length-L} left)</button></div>`:''}`:'<div class="panel empty">No resolved violations yet.</div>'}
+   ${resOther.length?`<h3>Reviewed warnings and notes (${resOther.length})</h3>${resOther.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resOther.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resOther.length-L} left)</button></div>`:''}`:''}</div>`;
 }
 const LATE_MS=3600000;
 function saveQC(scope){
