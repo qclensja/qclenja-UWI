@@ -11,6 +11,7 @@ const svcOn=()=>!!(GH.on&&GH.svc);
 const ghOn=()=>!!(GH.on&&(GH.svc||(GH.token&&GH.owner&&GH.repo)));
 const ghReady=()=>ghOn()&&(!GH.svc||!!CRED);
 try{const m=/[#&]svc=([^&]+)/.exec(location.hash||'');if(m&&!GH.svc){GH={svc:decodeURIComponent(m[1]),on:true};ghSaveCfg();history.replaceState(null,'',location.pathname+location.search)}}catch(e){}
+try{if(location.hash==='#first-setup'){UI.setupNew=true;history.replaceState(null,'',location.pathname+location.search)}}catch(e){}
 /* shared default: config.json next to the page ({"svc":"https://..."}) connects every new device automatically */
 if(!GH.svc&&!(GH.token&&GH.repo)&&/^https?:/.test(location.protocol)){
   UI.cfgWait=true;
