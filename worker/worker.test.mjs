@@ -26,4 +26,7 @@ r=await post('/push',{u:'tim@x.com',hash:'H2',sha,data:{users:[]},pwset:[{id:'t1
 r=await post('/pull',{u:'jaba',hash:'HACK'});ok('tech cannot set admin pw',r.s===401);
 r=await post('/pull',{u:'tim',hash:'H3'});ok('new pw works',r.s===200);
 r=await post('/pull',{u:'tim',hash:'H2'});ok('old pw rejected',r.s===401);
+r=await post('/pull',{u:'jaba',hash:'H1'});sha=r.j.sha;
+r=await post('/push',{u:'jaba',hash:'H1',sha,data:{users:[{...adm,pw:undefined}],tomb:['t1']}});ok('admin deletes user',r.s===200);
+r=await post('/pull',{u:'tim',hash:'H3'});ok('deleted user cannot sign in',r.s===401);
 srv.close();

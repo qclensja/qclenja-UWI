@@ -1385,7 +1385,7 @@ function renderUsers(){
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
-       :`<button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}`}</td></tr>`}).join('');
+       :`<button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>`}).join('');
   return `<div class="stack">${renderRequests()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
@@ -1877,8 +1877,8 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy']);
-  const ADMONLY=new Set(['rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok']);
+  const ADMONLY=new Set(['udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(isSup()&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   if(act.startsWith('est')&&estAct(act,el))return;
   switch(act){
@@ -1895,6 +1895,12 @@ document.addEventListener('click',e=>{
    case 'utoggle':{const u=S.users.find(x=>x.id===id);if(!u||u.id===CU.id)return;
      if(u.role==='admin'&&u.active!==false&&nAdmins()<=1)return toast('There must be at least one active administrator.');
      u.active=u.active===false;u.mod=nowIso();audit(u.active?'User enabled':'User disabled',u.name+' ('+u.username+')');break}
+   case 'udel':UI.udel=id;break;
+   case 'udelno':UI.udel=null;break;
+   case 'udelok':{const u=S.users.find(x=>x.id===id);UI.udel=null;if(!u||u.id===CU.id)return;
+     if(u.role==='admin'&&u.active!==false&&nAdmins()<=1)return toast('There must be at least one active administrator.');
+     tomb(id);S.users=S.users.filter(x=>x.id!==id);if(GH.pwq)GH.pwq=GH.pwq.filter(x=>x.id!==id);
+     audit('User deleted',u.name+' ('+u.username+(u.email?', '+u.email:'')+')');toast('User deleted. Their past QC entries stay on record.');break}
    case 'ureset':UI.resetFor=id;break;
    case 'ucancel':UI.resetFor=null;break;
    case 'auditmore':AF.limit+=100;break;

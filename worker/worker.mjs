@@ -36,7 +36,8 @@ export function applyRules(R,C,caller,pwset){
       if(ru){o.pw=ru.pw;if(ru.rec)o.rec=ru.rec}
       if(pw[cu.id])o.pw=pw[cu.id].pw;
       return o.pw?o:null}).filter(Boolean);
-    rm.forEach((ru,id)=>{if(!users.some(u=>u.id===id))users.push(ru)});
+    const dead=new Set(C.tomb||[]);
+    rm.forEach((ru,id)=>{if(!dead.has(id)&&!users.some(u=>u.id===id))users.push(ru)});
     if(!users.some(u=>u.role==='admin'&&u.active!==false))users=R.users;
   }else{
     users=(R.users||[]).map(ru=>{if(ru.id!==caller.id)return ru;const cu=(C.users||[]).find(u=>u.id===ru.id)||{},o={...ru,lastLogin:cu.lastLogin||ru.lastLogin};
