@@ -31,7 +31,7 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():S.setup.sub+' · '+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],...(perm('e_qc')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
+    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
     h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():setupView();
@@ -56,7 +56,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={obsave:'e_qc',obsaveone:'e_qc',obmode:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -231,8 +231,8 @@ document.addEventListener('change',e=>{
     else if(d.ml!==undefined&&UI.mdr){const [i,f]=d.ml.split(':');UI.mdr.levels[+i][f]=t.value}
     else if(d.masel!==undefined&&UI.mAp){UI.mAp.sel[d.masel]=t.checked?1:0;return render()}
     return}
-  if(d.ob!==undefined){if(!perm('e_qc'))return;UI.obd=UI.obd||{};UI.obd[d.ob]=t.value;return}
-  if(/^ob-/.test(t.id)){if(!perm('e_qc'))return;const o=obState();
+  if(d.ob!==undefined){if(!perm('e_other'))return;UI.obd=UI.obd||{};UI.obd[d.ob]=t.value;return}
+  if(/^ob-/.test(t.id)){if(!perm('e_other'))return;const o=obState();
     if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;else if(t.id==='ob-day')o.day=t.value||o.day;else if(t.id==='ob-all')o.all=t.checked;
     else if(t.id==='ob-inst'){o.inst=t.value;o.mod=''}else if(t.id==='ob-mod')o.mod=t.value;
     return render()}
