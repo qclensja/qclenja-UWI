@@ -56,7 +56,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={obsave:'e_qc',obmode:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={obsave:'e_qc',obsaveone:'e_qc',obmode:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -184,6 +184,7 @@ document.addEventListener('click',e=>{
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'obsave':saveOther();break;
+   case 'obsaveone':saveOther(id);break;
    case 'obmode':obState().mode=el.dataset.m;break;
    case 'saveone':saveQC(id);break;
    case 'skip':stashDrafts();UI.skipOpen=id;break;

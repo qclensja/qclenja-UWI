@@ -1953,10 +1953,10 @@ function renderOther(){
    <div class="panel"><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Schedule</th>${Array.from({length:a.nlev},(_,lv)=>`<th>${levelName(lv)}<div class="mono small muted" style="font-weight:400">${fmt(t.levels[lv].mean,dp)} ± ${fmt(t.levels[lv].sd,dp+1>4?4:dp+1)}</div></th>`).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="9" class="muted">No dates in this range.</td></tr>'}</tbody></table></div>
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="obsave">Save and plot these values${nIn?' ('+nIn+')':''}</button><button class="btn" data-act="tab" data-t="charts" data-aid="${a.id}">View chart</button><span class="muted small">Empty boxes are ignored. Values you enter for other analytes are kept while you switch.</span></div></div></div>`;
 }
-function saveOther(){
-  const o=obState(),entries=Object.entries(UI.obd).filter(([k,v])=>String(v).trim()!=='');
+function saveOther(only){
+  const o=obState(),entries=Object.entries(UI.obd).filter(([k,v])=>String(v).trim()!==''&&(!only||k.split('|')[0]===only));
   const mine=entries.filter(([k])=>true);
-  if(!mine.length)return toast('Enter at least one QC value.');
+  if(!mine.length)return toast(only?'Enter a value for this analyte first.':'Enter at least one QC value.');
   const ids=[],added=[],byAn={};let bad=0,exist=0,notAllowed=0;
   mine.forEach(([k,v])=>{
     const [aid,d,lv]=k.split('|'),n=num(v),an=anOf(aid);
@@ -1967,7 +1967,7 @@ function saveOther(){
     (byAn[aid]||(byAn[aid]=[])).push(d);added.push(an.name+' '+levelName(+lv)+' '+fmtDate(d)+'='+n);
   });
   Object.keys(byAn).forEach(aid=>{const an=anOf(aid);audit('QC entered for earlier days',an.name+': '+[...new Set(byAn[aid])].sort().map(fmtDate).join(', ')+' ('+byAn[aid].length+' value'+(byAn[aid].length>1?'s':'')+')',null,[an.dept])});
-  UI.obd={};save();
+  if(only)entries.forEach(([k])=>delete UI.obd[k]);else UI.obd={};save();
   if(!ids.length)return toast(bad?'Some values are not numbers.':'Nothing new to save.');
   const f=allFlags(),n=ids.filter(id=>(f[id]||[]).some(x=>x.sev==='reject')).length;
   toast(ids.length+' value'+(ids.length>1?'s':'')+' saved and plotted.'+(n?' '+n+' violation'+(n>1?'s':'')+' found. See QC alerts.':''));
@@ -1985,18 +1985,18 @@ function renderOtherDay(o,all,yest){
   if(!o.all)L=L.filter(outstanding);
   const maxL=Math.max(1,...L.map(x=>x.nlev)),g=groupBy(L,x=>(multiInst()?instLabel(x)+' · ':'')+x.panel);
   const nIn=Object.values(UI.obd).filter(v=>String(v).trim()!=='').length;
-  const body=Object.entries(g).map(([p,l])=>`<tr><td colspan="${maxL+1}" class="small muted" style="font-weight:600;background:var(--soft,transparent)">${esc(p)}</td></tr>`+l.map(a=>{const dp=decs(a);
+  const body=Object.entries(g).map(([p,l])=>`<tr><td colspan="${maxL+2}" class="small muted" style="font-weight:600;background:var(--soft,transparent)">${esc(p)}</td></tr>`+l.map(a=>{const dp=decs(a);
     return `<tr><td><b>${esc(a.name)}</b> <span class="small muted">${esc(a.unit||'')}${instTag(a)}</span></td>${Array.from({length:maxL},(_,lv)=>{
       if(lv>=a.nlev)return '<td></td>';const r=resultAt(a.id,lv,d);
       if(r)return `<td><span class="mono">${fmt(r.value,dp)}</span> <span class="small">${chipFor(r,flags)}</span></td>`;
       const dv=UI.obd[a.id+'|'+d+'|'+lv];
-      return `<td><input type="number" step="any" inputmode="decimal" data-ob="${a.id}|${d}|${lv}" value="${dv!==undefined?esc(dv):''}" aria-label="${esc(a.name)} ${levelName(lv)}" style="width:100px"></td>`}).join('')}</tr>`}).join('')).join('');
+      return `<td><input type="number" step="any" inputmode="decimal" data-ob="${a.id}|${d}|${lv}" value="${dv!==undefined?esc(dv):''}" aria-label="${esc(a.name)} ${levelName(lv)}" style="width:100px"></td>`}).join('')}<td>${miss(a).length?`<button class="btn sm primary" data-act="obsaveone" data-id="${a.id}">Save</button>`:'<span class="small muted">Complete</span>'}</td></tr>`}).join('')).join('');
   return `<div class="stack"><div class="panel stack"><div><h2>Other QC</h2>${obModeSw(o)}<p class="muted small" style="margin:8px 0 0;max-width:80ch">Pick a day and enter every QC value that was missed on it. By default only analytes scheduled that day with values still missing are listed. Type the values you have, then save.</p></div>
    <div class="row">${insts.length>1?`<label class="f">Analyser<select id="ob-inst" style="width:auto"><option value="">All analysers</option>${insts.map(n=>`<option${n===o.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${mods.length?`<label class="f">Module<select id="ob-mod" style="width:auto"><option value="">All modules</option>${mods.map(m=>`<option${m===o.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}
     <label class="f">Day<input type="date" id="ob-day" value="${d}" max="${yest}" style="width:auto"></label>
     <label class="f" style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="ob-all"${o.all?' checked':''}> Show all analytes, not just outstanding</label></div>
    <p class="small muted" style="margin:0"><b>${fmtDate(d)}</b> (${DOW[dowOf(d)]}) · ${nOut} analyte${nOut===1?'':'s'} outstanding</p></div>
-   <div class="panel"><div class="scroll"><table class="t"><thead><tr><th>Analyte</th>${Array.from({length:maxL},(_,lv)=>`<th>${levelName(lv)}</th>`).join('')}</tr></thead><tbody>${body||'<tr><td colspan="9" class="muted">Nothing outstanding for this day.</td></tr>'}</tbody></table></div>
+   <div class="panel"><div class="scroll"><table class="t"><thead><tr><th>Analyte</th>${Array.from({length:maxL},(_,lv)=>`<th>${levelName(lv)}</th>`).join('')}<th></th></tr></thead><tbody>${body||'<tr><td colspan="9" class="muted">Nothing outstanding for this day.</td></tr>'}</tbody></table></div>
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="obsave">Save and plot these values${nIn?' ('+nIn+')':''}</button><span class="muted small">Empty boxes are ignored. Values already saved are shown as they are.</span></div></div></div>`;
 }
 /* ===== QC material library: enter a material once, apply it to many tests ===== */
@@ -2090,7 +2090,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={obsave:'e_qc',obmode:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={obsave:'e_qc',obsaveone:'e_qc',obmode:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -2218,6 +2218,7 @@ document.addEventListener('click',e=>{
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'obsave':saveOther();break;
+   case 'obsaveone':saveOther(id);break;
    case 'obmode':obState().mode=el.dataset.m;break;
    case 'saveone':saveQC(id);break;
    case 'skip':stashDrafts();UI.skipOpen=id;break;
