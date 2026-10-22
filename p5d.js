@@ -56,7 +56,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={obsave:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={obsave:'e_qc',obmode:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -184,6 +184,7 @@ document.addEventListener('click',e=>{
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'obsave':saveOther();break;
+   case 'obmode':obState().mode=el.dataset.m;break;
    case 'saveone':saveQC(id);break;
    case 'skip':stashDrafts();UI.skipOpen=id;break;
    case 'skipcancel':UI.skipOpen=null;break;
@@ -231,7 +232,7 @@ document.addEventListener('change',e=>{
     return}
   if(d.ob!==undefined){if(!perm('e_qc'))return;UI.obd=UI.obd||{};UI.obd[d.ob]=t.value;return}
   if(/^ob-/.test(t.id)){if(!perm('e_qc'))return;const o=obState();
-    if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;
+    if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;else if(t.id==='ob-day')o.day=t.value||o.day;else if(t.id==='ob-all')o.all=t.checked;
     else if(t.id==='ob-inst'){o.inst=t.value;o.mod=''}else if(t.id==='ob-mod')o.mod=t.value;
     return render()}
   if(d.perm){if(!isAdmin())return;const [r,k]=d.perm.split(':'),def=PERMDEF.find(x=>x.k===k);if(!def||!(r==='tech'||r==='sup'||r==='cons'))return;S.perms=S.perms||{};S.perms[r]=S.perms[r]||{};S.perms[r][k]=t.checked;S.permsAt=nowIso();audit('Permissions changed',(r==='sup'?'Supervisory technologist':r==='cons'?'Consultant / Resident':'Technologist')+': '+def.l+' '+(t.checked?'allowed':'not allowed'),null,[]);save();return render()}
