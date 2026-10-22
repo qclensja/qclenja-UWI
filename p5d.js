@@ -183,6 +183,7 @@ document.addEventListener('click',e=>{
    case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
+   case 'donetoggle':UI.doneOpen=!UI.doneOpen;break;
    case 'obsave':saveOther();break;
    case 'obsaveone':saveOther(id);break;
    case 'obmode':obState().mode=el.dataset.m;break;
