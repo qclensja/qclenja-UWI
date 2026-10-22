@@ -87,6 +87,7 @@ function mergeStates(L,R){
   out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts,(a,b)=>((b.modAt||'')>(a.modAt||'')?b:a));out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
   const newerMod=(a,b)=>{const am=a.modAt||'',bm=b.modAt||'';return bm>am?b:am>bm?a:null};
   out.est=by(L.est,R.est,(a,b)=>newerMod(a,b)||(b.runs&&a.runs&&b.runs.length>a.runs.length?b:a));
+  out.materials=by(L.materials,R.materials,(a,b)=>newerMod(a,b)||a);
   out.analytes=by(L.analytes,R.analytes,(a,b)=>newerMod(a,b)||(b.targets.length>a.targets.length?b:a));
   const ok=new Set(out.analytes.map(a=>a.id));
   out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));

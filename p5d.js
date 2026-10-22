@@ -4,7 +4,7 @@ function renderSetupHome(){
   if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
   const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}</div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results?</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
    <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b> · ${esc(st.sub)}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
@@ -16,7 +16,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderMaterials()}${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -53,8 +53,8 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
-  const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   const NEED={obsave:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
@@ -154,6 +154,34 @@ document.addEventListener('click',e=>{
    case 'missmore':UI.missDays=(UI.missDays||14)+30;break;
    case 'dayprev':case 'daynext':{const [y,m,d]=UI.date.split('-').map(Number),dt=new Date(y,m-1,d+(act==='dayprev'?-1:1),12),ns=dstr(dt);if(ns>todayStr())return;UI.date=ns;UI.report=[];UI.skipOpen=null;break}
    case 'saveqc':saveQC();break;
+   case 'deldept':UI.delDept=true;break;
+   case 'deldeptno':UI.delDept=false;break;
+   case 'deldeptok':{UI.delDept=false;if(!isAdmin())return;if(deptList().length<2)return toast('There must be at least one department.');
+     const id=st.cur,nm=st.dept,ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),nr=S.results.filter(r=>ids.includes(r.aid)).length;
+     tomb(id,...ids);S.analytes=S.analytes.filter(a=>a.dept!==id);S.results=S.results.filter(r=>!ids.includes(r.aid));S.skips=S.skips.filter(s=>!ids.includes(s.aid));S.est=(S.est||[]).filter(e=>!ids.includes(e.aid));
+     S.depts=S.depts.filter(d=>d.id!==id);S.users.forEach(u=>{if(Array.isArray(u.depts)&&u.depts.includes(id)){u.depts=u.depts.filter(x=>x!==id);u.mod=nowIso()}});
+     const nx=S.depts.find(d=>d.dept);if(nx){st.cur='';loadCtx(nx.id)}UI.dept='';UI.inst='';UI.mod='';
+     audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted.');break}
+   case 'matnew':UI.mdr={id:'',name:'',levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
+   case 'matedit':{const m=(S.materials||[]).find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
+   case 'matcancel':UI.mdr=null;break;
+   case 'matsave':{const d=UI.mdr;if(!d)break;const nm=(d.name||'').trim();if(!nm)return toast('Give this QC product a name.');
+     if((S.materials||[]).some(x=>x.id!==d.id&&x.name.toLowerCase()===nm.toLowerCase()))return toast('A QC material with that name already exists.');
+     if(d.levels.some(l=>!(l.material||'').trim()))return toast('Every level needs a material name.');
+     const rec={id:d.id||uid(),name:nm,levels:d.levels.map(l=>({material:l.material.trim(),lot:(l.lot||'').trim(),exp:l.exp||''}))};
+     S.materials=S.materials||[];const i=S.materials.findIndex(x=>x.id===rec.id);if(i>=0)Object.assign(S.materials[i],rec);else S.materials.push(rec);
+     audit(i>=0?'QC material edited':'QC material added',nm,null,[]);UI.mdr=null;toast('QC material saved.');break}
+   case 'matdel':UI.mdel=id;break;
+   case 'matdelno':UI.mdel=null;break;
+   case 'matdelok':{const m=(S.materials||[]).find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
+   case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
+   case 'matapplycancel':UI.mAp=null;break;
+   case 'matselall':if(UI.mAp){DA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
+   case 'matselnone':if(UI.mAp)UI.mAp.sel={};break;
+   case 'matrun':{const m=(S.materials||[]).find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=DA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
+     const n=applyMat(m,list,'cur');audit('QC material applied',m.name+' to '+n+' test'+(n===1?'':'s')+': '+list.slice(0,8).map(a=>a.name).join(', ')+(list.length>8?' and more':''));UI.mAp=null;toast(m.name+' applied to '+n+' test'+(n===1?'':'s')+'.');break}
+   case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
+     const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'obsave':saveOther();break;
    case 'saveone':saveQC(id);break;
@@ -195,6 +223,12 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
+  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined){if(!perm('e_setup'))return;
+    if(d.mf!==undefined&&UI.mdr)UI.mdr[d.mf]=t.value;
+    else if(d.mn!==undefined&&UI.mdr){const n=+t.value;while(UI.mdr.levels.length<n)UI.mdr.levels.push(blankMatLv());UI.mdr.levels.length=n;return render()}
+    else if(d.ml!==undefined&&UI.mdr){const [i,f]=d.ml.split(':');UI.mdr.levels[+i][f]=t.value}
+    else if(d.masel!==undefined&&UI.mAp){UI.mAp.sel[d.masel]=t.checked?1:0;return render()}
+    return}
   if(d.ob!==undefined){if(!perm('e_qc'))return;UI.obd=UI.obd||{};UI.obd[d.ob]=t.value;return}
   if(/^ob-/.test(t.id)){if(!perm('e_qc'))return;const o=obState();
     if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;
