@@ -1,5 +1,5 @@
-/* ===== Establish limits: mean and SD from 20 to 40 runs ===== */
-const EST_MIN=20,EST_MAX=40;
+/* ===== Establish limits: mean and SD from 20 to 60 runs ===== */
+const EST_MIN=20,EST_MAX=60;
 const estOf=id=>(S.est||(S.est=[])).find(s=>s.id===id);
 function estStats(vals){
   const n=vals.length;if(!n)return {n:0,mean:0,sd:0,cv:0,min:0,max:0};
