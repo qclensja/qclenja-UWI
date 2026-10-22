@@ -84,9 +84,10 @@ function mergeStates(L,R){
   const by=(a,b,pick)=>{const m=new Map();(b||[]).forEach(x=>m.set(x.id,x));(a||[]).forEach(x=>m.set(x.id,m.has(x.id)&&pick?pick(x,m.get(x.id)):x));return [...m.values()].filter(x=>!tomb.has(x.id))};
   const newer=(a,b)=>((a.upd||a).at||'')>=((b.upd||b).at||'')?a:b;
   const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;return x};
-  out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts);out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
-  out.est=by(L.est,R.est,(a,b)=>b.runs&&a.runs&&b.runs.length>a.runs.length?b:a);
-  out.analytes=by(L.analytes,R.analytes,(a,b)=>b.targets.length>a.targets.length?b:a);
+  out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts,(a,b)=>((b.modAt||'')>(a.modAt||'')?b:a));out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
+  const newerMod=(a,b)=>{const am=a.modAt||'',bm=b.modAt||'';return bm>am?b:am>bm?a:null};
+  out.est=by(L.est,R.est,(a,b)=>newerMod(a,b)||(b.runs&&a.runs&&b.runs.length>a.runs.length?b:a));
+  out.analytes=by(L.analytes,R.analytes,(a,b)=>newerMod(a,b)||(b.targets.length>a.targets.length?b:a));
   const ok=new Set(out.analytes.map(a=>a.id));
   out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));
   const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
@@ -99,7 +100,7 @@ function mergeStates(L,R){
 }
 const tomb=(...ids)=>{S.tomb=S.tomb||[];ids.forEach(i=>{if(i&&!S.tomb.includes(i))S.tomb.push(i)})};
 function ghAdopt(M){
-  M.tab=S.tab;S=M;if(CU)CU=S.users.find(u=>u.id===CU.id&&u.active!==false)||null;
+  M.tab=S.tab;S=M;try{const id=S.setup.cur;if(id&&S.depts.some(d=>d.id===id))loadCtx(id)}catch(e){}if(CU)CU=S.users.find(u=>u.id===CU.id&&u.active!==false)||null;
   try{mem=JSON.stringify(S)}catch(e){}
   const a=document.activeElement,typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
   if(typing||UI.modal){GHS.defer=true}else render();
