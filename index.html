@@ -1159,16 +1159,17 @@ let memSess=null,SESS=null,CU=null;
 const isAdmin=()=>!!CU&&CU.role==='admin';
 const isSup=()=>!!CU&&CU.role==='sup';
 const PERMDEF=[
- {k:'v_charts',g:'View',l:'Charts',tech:1,sup:1},{k:'v_alerts',g:'View',l:'QC alerts',tech:1,sup:1},{k:'v_limits',g:'View',l:'Establish limits',tech:1,sup:1},{k:'v_rules',g:'View',l:'Westgard rules',tech:1,sup:1},
- {k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1},
- {k:'e_qc',g:'Edit',l:'Enter and edit QC values, mark QC not performed',tech:1,sup:1},{k:'e_override',g:'Edit',l:'Resolve violations with a comment, add notes, reopen violations',tech:1,sup:1},
- {k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1},
- {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1}];
-const perm=k=>{if(!CU)return false;if(CU.role==='admin')return true;const d=PERMDEF.find(x=>x.k===k);if(!d)return false;const r=CU.role==='sup'?'sup':'tech',o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
+ {k:'v_charts',g:'View',l:'Charts',tech:1,sup:1,cons:1},{k:'v_alerts',g:'View',l:'QC alerts',tech:1,sup:1,cons:1},{k:'v_limits',g:'View',l:'Establish limits',tech:1,sup:1,cons:1},{k:'v_rules',g:'View',l:'Westgard rules',tech:1,sup:1,cons:1},
+ {k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1,cons:0},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1,cons:1},
+ {k:'e_qc',g:'Edit',l:'Enter and edit QC values, mark QC not performed',tech:1,sup:1,cons:0},{k:'e_override',g:'Edit',l:'Resolve violations with a comment, add notes, reopen violations',tech:1,sup:1,cons:1},
+ {k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1,cons:0},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1,cons:0},
+ {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1,cons:0},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1,cons:1}];
+const perm=k=>{if(!CU)return false;if(CU.role==='admin')return true;const d=PERMDEF.find(x=>x.k===k);if(!d)return false;const r=CU.role==='sup'?'sup':CU.role==='cons'?'cons':'tech',o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
 const permFor=(r,k)=>{const d=PERMDEF.find(x=>x.k===k),o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
+const PROLES=[['tech','Technologist'],['sup','Supervisory technologist'],['cons','Consultant / Resident']];
 const canSetup=()=>perm('v_setup');
 const canAudit=()=>isAdmin()||perm('v_audit');
-const roleName=r=>r==='admin'?'Administrator':r==='sup'?'Supervisory technologist':'Technologist';
+const roleName=r=>r==='admin'?'Administrator':r==='sup'?'Supervisory technologist':r==='cons'?'Consultant / Resident':'Technologist';
 const scoped=r=>r!=='admin';
 const nowIso=()=>new Date().toISOString();
 const fmtTs=iso=>{if(!iso)return '';const d=new Date(iso);return isNaN(d)?'':pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
@@ -1380,7 +1381,7 @@ function renderRequests(){
   const row=r=>{const open=UI.appr===r.id;
     return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><b>${esc(r.name)}</b><div class="small muted">${esc(r.email)} · requested ${fmtTs(r.at)}</div></div>
      ${open?'':`<div class="row"><button class="btn sm primary" data-act="rqapprove" data-id="${r.id}">Approve…</button><button class="btn sm danger" data-act="rqreject" data-id="${r.id}">Decline</button></div>`}</div>
-     ${open?`<div class="stack" style="margin-top:10px"><label class="f">Access level<select id="rq-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
+     ${open?`<div class="stack" style="margin-top:10px"><label class="f">Access level<select id="rq-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="cons">Consultant / Resident</option><option value="admin">Administrator</option></select></label>
       ${deptList().length?`<div class="f">Departments<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="rq-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span></div>`:''}
       <div class="row"><button class="btn primary" data-act="rqconfirm" data-id="${r.id}">Approve and create account</button><button class="btn" data-act="rqcancel">Cancel</button></div></div>`:''}</div>`};
   return `${credBox()}<div class="panel stack"><div><h2>Access requests</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Workers ask for access from the sign-in screen with their name and email address. Approving creates their account with a temporary password for you to email to them.</p></div>
@@ -1448,27 +1449,27 @@ function deptCell(u){
   return `<div class="stack" style="gap:2px">${ds.map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap"><input type="checkbox" data-udept="${u.id}:${d.id}"${has(d.id)?' checked':''}>${esc(d.dept)}</label>`).join('')}${!all&&!u.depts.length?'<span class="small" style="color:var(--bad)">No access</span>':''}</div>`;
 }
 function renderPerms(){
-  const row=d=>`<tr><td>${esc(d.l)}</td>${['tech','sup'].map(r=>`<td style="text-align:center"><input type="checkbox" data-perm="${r}:${d.k}"${permFor(r,d.k)?' checked':''} aria-label="${esc(d.l)} for ${r==='sup'?'supervisory technologists':'technologists'}"></td>`).join('')}</tr>`;
-  const grp=g=>`<tr><th colspan="3" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
-  return `<div class="panel stack"><div><h3>What each user type can view and edit</h3><p class="muted small" style="margin:4px 0 0;max-width:80ch">Tick what technologists and supervisory technologists may do. Administrators always have full access. Department limits still apply: everyone only sees the departments they are given. Changes apply the next time each person's screen refreshes.</p></div>
-   <div class="scroll"><table class="t"><thead><tr><th>Permission</th><th style="text-align:center">Technologist</th><th style="text-align:center">Supervisory technologist</th></tr></thead><tbody>${grp('View')}${grp('Edit')}</tbody></table></div>
+  const row=d=>`<tr><td>${esc(d.l)}</td>${PROLES.map(([r,n])=>`<td style="text-align:center"><input type="checkbox" data-perm="${r}:${d.k}"${permFor(r,d.k)?' checked':''} aria-label="${esc(d.l)} for ${esc(n)}"></td>`).join('')}</tr>`;
+  const grp=g=>`<tr><th colspan="4" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
+  return `<div class="panel stack"><div><h3>What each user type can view and edit</h3><p class="muted small" style="margin:4px 0 0;max-width:80ch">Tick what technologists, supervisory technologists and consultants/residents may do. Administrators always have full access. Department limits still apply: everyone only sees the departments they are given. Changes apply the next time each person's screen refreshes.</p></div>
+   <div class="scroll"><table class="t"><thead><tr><th>Permission</th><th style="text-align:center">Technologist</th><th style="text-align:center">Supervisory technologist</th><th style="text-align:center">Consultant / Resident</th></tr></thead><tbody>${grp('View')}${grp('Edit')}</tbody></table></div>
    <div class="row"><button class="btn" data-act="permreset">Restore defaults</button><span class="small muted">Today (entering and viewing daily QC) is always available. These settings control what the app shows and allows. For strict protection of the data itself, keep the number of administrators small.</span></div></div>`;
 }
 function renderUsers(){
   const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
     return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}${u.email?' · '+esc(u.email):''}</div></td>
-     <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="sup"${u.role==='sup'?' selected':''}>Supervisory technologist</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
+     <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}"><option value="tech"${u.role==='tech'?' selected':''}>Technologist</option><option value="sup"${u.role==='sup'?' selected':''}>Supervisory technologist</option><option value="cons"${u.role==='cons'?' selected':''}>Consultant / Resident</option><option value="admin"${u.role==='admin'?' selected':''}>Administrator</option></select>`}</td>
      <td>${deptCell(u)}</td>
      <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
      <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
      <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
        :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button> <button class="btn sm" data-act="uemailpw" data-id="${u.id}" title="Generate a new temporary password and prepare an email to this user">Email new password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
-  return `<div class="stack">${renderRequests()}${renderPerms()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
+  return `<div class="stack">${renderRequests()}${renderPerms()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory technologists can also open Setup and the Audit log for those departments. Consultants and residents review QC and resolve violations; the permissions table below sets exactly what they can do. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
    <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
     <label class="f">Email address (optional)<input type="email" id="nu-email" autocapitalize="none"></label>
-    <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="admin">Administrator</option></select></label>
+    <label class="f">Role<select id="nu-role"><option value="tech">Technologist</option><option value="sup">Supervisory technologist</option><option value="cons">Consultant / Resident</option><option value="admin">Administrator</option></select></label>
     ${deptList().length?`<div class="f" style="grid-column:1/-1">Departments this user can see<span class="row" style="gap:14px;flex-wrap:wrap">${deptList().map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" id="nu-d-${d.id}" checked>${esc(d.dept)}</label>`).join('')}</span><span class="small muted" style="font-weight:400">Ignored for administrators, who see every department.</span></div>`:''}
     <label class="f">Temporary password<span class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" id="nu-pass" autocomplete="off"><button class="btn sm" type="button" data-act="genpw" data-t="nu-pass">Generate</button></span></label></div>
     <div><button class="btn primary" type="submit">Create user</button></div></form>
@@ -1902,6 +1903,63 @@ function renderRules(){
    <h3 style="margin:6px 0 0">Rejection rules</h3>${RORDER.filter(k=>RULES[k].sev==='reject').map(card).join('')}
    <h3 style="margin:6px 0 0">Warning rules</h3>${RORDER.filter(k=>RULES[k].sev!=='reject').map(card).join('')}</div></div>`;
 }
+/* ===== Other QC: plot QC values for earlier days that were never entered ===== */
+const obState=()=>{
+  const t=new Date(),d=n=>dstr(new Date(t.getFullYear(),t.getMonth(),t.getDate()-n,12));
+  const o=UI.ob||(UI.ob={aid:'',from:d(14),to:d(1),sched:false,inst:'',mod:''});if(!UI.obd)UI.obd={};return o;
+};
+function obDates(o){
+  const out=[];let [y,m,dd]=o.to.split('-').map(Number);const lim=o.from;
+  for(let i=0;i<62;i++){const ds=dstr(new Date(y,m-1,dd-i,12));if(ds<lim)break;out.push(ds)}
+  return out;
+}
+function renderOther(){
+  const o=obState(),yest=dstr(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()-1,12));
+  if(o.to>yest)o.to=yest;if(o.from>o.to)o.from=o.to;
+  const all=VA();if(!all.length)return '<div class="panel empty">No analytes available.</div>';
+  const cf=x=>(!o.inst||instOf(x)===o.inst)&&(!o.mod||(x.mod||'')===o.mod);let L=all.filter(cf);if(!L.length){o.inst='';o.mod='';L=all}
+  if(!L.some(x=>x.id===o.aid))o.aid=L[0].id;
+  const a=anOf(o.aid),t=curTarget(a),dp=decs(a),insts=[...new Set(all.map(instOf).filter(Boolean))],mods=[...new Set(all.filter(x=>!o.inst||instOf(x)===o.inst).map(x=>x.mod).filter(Boolean))].sort();
+  const g=groupBy(L,x=>(multiInst()?instLabel(x)+' · ':'')+x.panel);
+  let dates=obDates(o);const total=dates.length;
+  if(o.sched)dates=dates.filter(d=>isDue(a,d));
+  const flags=allFlags();
+  const rows=dates.map(d=>{
+    const sk=skipAt(a.id,d),dueD=isDue(a,d),dw=DOW[dowOf(d)];
+    const cells=Array.from({length:a.nlev},(_,lv)=>{const r=resultAt(a.id,lv,d);
+      if(r)return `<td><span class="mono">${fmt(r.value,dp)}</span> <span class="small">${chipFor(r,flags)}</span></td>`;
+      const dv=UI.obd[a.id+'|'+d+'|'+lv];
+      return `<td><input type="number" step="any" inputmode="decimal" data-ob="${a.id}|${d}|${lv}" value="${dv!==undefined?esc(dv):''}" aria-label="${esc(a.name)} ${levelName(lv)} on ${fmtDate(d)}" style="width:110px"></td>`}).join('');
+    return `<tr><td style="white-space:nowrap"><b>${fmtDate(d)}</b><div class="small muted">${dw}</div></td><td class="small">${isOD(a)?'On demand':dueD?'Scheduled':'Not scheduled'}${sk?'<br><span class="chip">Not performed</span>':''}</td>${cells}</tr>`}).join('');
+  const nIn=Object.values(UI.obd).filter(v=>String(v).trim()!=='').length;
+  return `<div class="stack"><div class="panel stack"><div><h2>Other QC</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Plot QC values for earlier days that were never entered. Pick an analyte and a range of dates, type the values you have, and save. Each value is plotted on the chart on its own date. Days that already have a value are shown as they are; to change those, use the Today tab.</p></div>
+   <div class="row">${insts.length>1?`<label class="f">Analyser<select id="ob-inst" style="width:auto"><option value="">All analysers</option>${insts.map(n=>`<option${n===o.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${mods.length?`<label class="f">Module<select id="ob-mod" style="width:auto"><option value="">All modules</option>${mods.map(m=>`<option${m===o.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}
+    <label class="f">Analyte<select id="ob-aid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${all.filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <label class="f">From<input type="date" id="ob-from" value="${o.from}" max="${o.to}" style="width:auto"></label><label class="f">To<input type="date" id="ob-to" value="${o.to}" max="${yest}" style="width:auto"></label>
+    <label class="f" style="flex-direction:row;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="ob-sched"${o.sched?' checked':''}> Scheduled days only</label></div>
+   <p class="small muted" style="margin:0">${esc(a.name)} ${esc(a.unit)}${instTag(a)} · ${esc(scheduleText(a))}${total>=62?' · showing the 62 most recent days in the range':''}</p></div>
+   <div class="panel"><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Schedule</th>${Array.from({length:a.nlev},(_,lv)=>`<th>${levelName(lv)}<div class="mono small muted" style="font-weight:400">${fmt(t.levels[lv].mean,dp)} ± ${fmt(t.levels[lv].sd,dp+1>4?4:dp+1)}</div></th>`).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="9" class="muted">No dates in this range.</td></tr>'}</tbody></table></div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-act="obsave">Save and plot these values${nIn?' ('+nIn+')':''}</button><button class="btn" data-act="tab" data-t="charts" data-aid="${a.id}">View chart</button><span class="muted small">Empty boxes are ignored. Values you enter for other analytes are kept while you switch.</span></div></div></div>`;
+}
+function saveOther(){
+  const o=obState(),entries=Object.entries(UI.obd).filter(([k,v])=>String(v).trim()!=='');
+  const mine=entries.filter(([k])=>true);
+  if(!mine.length)return toast('Enter at least one QC value.');
+  const ids=[],added=[],byAn={};let bad=0,exist=0,notAllowed=0;
+  mine.forEach(([k,v])=>{
+    const [aid,d,lv]=k.split('|'),n=num(v),an=anOf(aid);
+    if(n==null){bad++;return}if(!an||!canSee(an)){notAllowed++;return}
+    if(resultAt(aid,+lv,d)){exist++;return}
+    const r={id:uid(),aid,lv:+lv,date:d,value:n,ov:null,backfill:true,...stampNow()};S.results.push(r);ids.push(r.id);
+    S.skips=S.skips.filter(s=>!(s.aid===aid&&s.date===d));
+    (byAn[aid]||(byAn[aid]=[])).push(d);added.push(an.name+' '+levelName(+lv)+' '+fmtDate(d)+'='+n);
+  });
+  Object.keys(byAn).forEach(aid=>{const an=anOf(aid);audit('QC entered for earlier days',an.name+': '+[...new Set(byAn[aid])].sort().map(fmtDate).join(', ')+' ('+byAn[aid].length+' value'+(byAn[aid].length>1?'s':'')+')',null,[an.dept])});
+  UI.obd={};save();
+  if(!ids.length)return toast(bad?'Some values are not numbers.':'Nothing new to save.');
+  const f=allFlags(),n=ids.filter(id=>(f[id]||[]).some(x=>x.sev==='reject')).length;
+  toast(ids.length+' value'+(ids.length>1?'s':'')+' saved and plotted.'+(n?' '+n+' violation'+(n>1?'s':'')+' found. See QC alerts.':''));
+}
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
@@ -1935,10 +1993,10 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():S.setup.sub+' · '+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
+    const T=[['today','Today'],...(perm('e_qc')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():setupView();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():setupView();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h;
@@ -1960,7 +2018,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={obsave:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -2059,6 +2117,7 @@ document.addEventListener('click',e=>{
    case 'dayprev':case 'daynext':{const [y,m,d]=UI.date.split('-').map(Number),dt=new Date(y,m-1,d+(act==='dayprev'?-1:1),12),ns=dstr(dt);if(ns>todayStr())return;UI.date=ns;UI.report=[];UI.skipOpen=null;break}
    case 'saveqc':saveQC();break;
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
+   case 'obsave':saveOther();break;
    case 'saveone':saveQC(id);break;
    case 'skip':stashDrafts();UI.skipOpen=id;break;
    case 'skipcancel':UI.skipOpen=null;break;
@@ -2098,7 +2157,12 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(d.perm){if(!isAdmin())return;const [r,k]=d.perm.split(':'),def=PERMDEF.find(x=>x.k===k);if(!def||!(r==='tech'||r==='sup'))return;S.perms=S.perms||{};S.perms[r]=S.perms[r]||{};S.perms[r][k]=t.checked;S.permsAt=nowIso();audit('Permissions changed',(r==='sup'?'Supervisory technologist':'Technologist')+': '+def.l+' '+(t.checked?'allowed':'not allowed'),null,[]);save();return render()}
+  if(d.ob!==undefined){if(!perm('e_qc'))return;UI.obd=UI.obd||{};UI.obd[d.ob]=t.value;return}
+  if(/^ob-/.test(t.id)){if(!perm('e_qc'))return;const o=obState();
+    if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;
+    else if(t.id==='ob-inst'){o.inst=t.value;o.mod=''}else if(t.id==='ob-mod')o.mod=t.value;
+    return render()}
+  if(d.perm){if(!isAdmin())return;const [r,k]=d.perm.split(':'),def=PERMDEF.find(x=>x.k===k);if(!def||!(r==='tech'||r==='sup'||r==='cons'))return;S.perms=S.perms||{};S.perms[r]=S.perms[r]||{};S.perms[r][k]=t.checked;S.permsAt=nowIso();audit('Permissions changed',(r==='sup'?'Supervisory technologist':r==='cons'?'Consultant / Resident':'Technologist')+': '+def.l+' '+(t.checked?'allowed':'not allowed'),null,[]);save();return render()}
   if(!perm('e_setup')&&!(t.id==='qcdate'||/^(instf|deptf|modf|cinst|cmod)$/.test(t.id)||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
