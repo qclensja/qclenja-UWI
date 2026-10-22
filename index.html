@@ -393,15 +393,15 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:''});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[]});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 /* change stamps: every analyte, department and limits set remembers when it last changed, so an out-of-date copy on another device can never overwrite a newer edit */
 const canonS=v=>Array.isArray(v)?'['+v.map(canonS).join(',')+']':v&&typeof v==='object'?'{'+Object.keys(v).filter(k=>k!=='_h'&&k!=='modAt').sort().map(k=>JSON.stringify(k)+':'+canonS(v[k])).join(',')+'}':JSON.stringify(v);
 const shash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36)};
-function initHashes(o){['analytes','depts','est'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
+function initHashes(o){['analytes','depts','est','materials'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -427,7 +427,7 @@ function load(){
 let S=load();
 function stampMods(){
   const now=new Date().toISOString();
-  ['analytes','depts','est'].forEach(k=>(S[k]||[]).forEach(x=>{const h=shash(canonS(x));if(x._h===undefined)x._h=h;else if(x._h!==h){x._h=h;x.modAt=now}}));
+  ['analytes','depts','est','materials'].forEach(k=>(S[k]||[]).forEach(x=>{const h=shash(canonS(x));if(x._h===undefined)x._h=h;else if(x._h!==h){x._h=h;x.modAt=now}}));
 }
 function save(){
   try{syncCtx()}catch(e){}
@@ -616,7 +616,7 @@ function renderSetup(){
      <div class="stack">${byAnalyser(DA(),(p,list,inst)=>{const K=Math.max(...list.map(a=>a.nlev));return `<div class="panelcard" data-g="${esc(inst)}"><h3><span>${esc(p)}</span></h3>
       <div class="small muted" style="margin-top:6px">QC materials for the whole panel</div>
       ${Array.from({length:K},(_,i)=>`<div class="row" style="margin:4px 0;align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span><label class="f" style="flex:2 1 180px">QC material<input type="text" data-pm="${i}" placeholder="e.g. Multiqual Level ${i+1}"></label><label class="f" style="flex:1 1 110px">Lot no.<input type="text" data-pl="${i}"></label><label class="f" style="flex:0 0 140px">Expiry date<input type="date" data-pe="${i}"></label></div>`).join('')}
-      <div class="row" style="margin-bottom:4px"><button class="btn sm" data-act="papply" data-p="${esc(p)}">Apply to panel</button></div>
+      <div class="row" style="margin-bottom:4px"><button class="btn sm" data-act="papply" data-p="${esc(p)}">Apply to panel</button>${(S.materials||[]).length?`<select data-matsel="${esc(p)}" aria-label="Saved QC material" style="width:auto"><option value="">Saved QC material…</option>${matOptions('')}</select><button class="btn sm" data-act="matpanel" data-p="${esc(p)}">Apply saved material</button>`:''}</div>
       ${list.map(a=>{const t=a.targets[0],lo=Math.max(1,minLv(a));return `<div style="border-top:1px solid var(--line);padding:10px 0;margin-top:8px"><div class="row" style="align-items:center">
         <b style="flex:1 1 130px;min-width:0">${esc(a.name)} <span class="muted small">${esc(a.unit)}</span></b>
         <label class="f" style="flex:0 1 120px">Control levels<select data-nlev="${a.id}">${[1,2,3,4,5,6].filter(n=>n>=lo).map(n=>`<option${n===a.nlev?' selected':''}>${n}</option>`).join('')}</select></label></div>
@@ -1785,6 +1785,7 @@ function mergeStates(L,R){
   out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts,(a,b)=>((b.modAt||'')>(a.modAt||'')?b:a));out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
   const newerMod=(a,b)=>{const am=a.modAt||'',bm=b.modAt||'';return bm>am?b:am>bm?a:null};
   out.est=by(L.est,R.est,(a,b)=>newerMod(a,b)||(b.runs&&a.runs&&b.runs.length>a.runs.length?b:a));
+  out.materials=by(L.materials,R.materials,(a,b)=>newerMod(a,b)||a);
   out.analytes=by(L.analytes,R.analytes,(a,b)=>newerMod(a,b)||(b.targets.length>a.targets.length?b:a));
   const ok=new Set(out.analytes.map(a=>a.id));
   out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));
@@ -1970,13 +1971,46 @@ function saveOther(){
   const f=allFlags(),n=ids.filter(id=>(f[id]||[]).some(x=>x.sev==='reject')).length;
   toast(ids.length+' value'+(ids.length>1?'s':'')+' saved and plotted.'+(n?' '+n+' violation'+(n>1?'s':'')+' found. See QC alerts.':''));
 }
+/* ===== QC material library: enter a material once, apply it to many tests ===== */
+const blankMatLv=()=>({material:'',lot:'',exp:''});
+function applyMat(m,list,which){
+  let n=0;
+  list.forEach(a=>{const t=which==='first'?a.targets[0]:a.targets[a.targets.length-1];
+    m.levels.slice(0,a.nlev).forEach((l,i)=>{const L=t.levels[i];if(!L)return;L.material=l.material||'';L.lot=l.lot||'';L.exp=l.exp||''});n++});
+  return n;
+}
+function matLine(m){return m.levels.map((l,i)=>levelName(i)+': '+(l.material||'(no name)')+(l.lot?' · Lot '+l.lot:'')+(l.exp?' · exp '+fmtDate(l.exp):'')).join('<br>')}
+function renderMaterials(){
+  const ms=(S.materials||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)),d=UI.mdr,ap=UI.mAp,mine=DA();
+  const form=d?`<div class="panelcard stack"><h3>${d.id?'Edit QC material':'New QC material'}</h3>
+    <div class="row"><label class="f" style="flex:2 1 240px">Name of this QC product<input type="text" data-mf="name" value="${esc(d.name)}" placeholder="e.g. Bio-Rad Multiqual"></label>
+    <label class="f" style="flex:0 1 140px">Control levels<select data-mn>${[1,2,3,4,5,6].map(n=>`<option${n===d.levels.length?' selected':''}>${n}</option>`).join('')}</select></label></div>
+    ${d.levels.map((l,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
+      <label class="f" style="flex:2 1 170px">Material name<input type="text" data-ml="${i}:material" value="${esc(l.material)}" placeholder="e.g. Multiqual Level ${i+1}"></label>
+      <label class="f" style="flex:1 1 100px">Lot no.<input type="text" data-ml="${i}:lot" value="${esc(l.lot)}"></label>
+      <label class="f" style="flex:0 0 140px">Expiry date<input type="date" data-ml="${i}:exp" value="${esc(l.exp||'')}"></label></div>`).join('')}
+    <div class="row"><button class="btn primary" data-act="matsave">Save material</button><button class="btn" data-act="matcancel">Cancel</button></div></div>`:'';
+  const applyBox=m=>{
+    const sel=ap.sel||{},g=groupBy(mine,a=>(multiInst()?instLabel(a)+' · ':'')+a.panel),nSel=Object.keys(sel).filter(k=>sel[k]).length;
+    return `<div class="panelcard stack" style="margin-top:8px"><b>Apply "${esc(m.name)}" to tests in ${esc(S.setup.dept||'this department')}</b>
+     <div class="row"><button class="btn sm" data-act="matselall">Select all</button><button class="btn sm" data-act="matselnone">Clear</button><span class="small muted">${nSel} selected</span></div>
+     ${Object.entries(g).map(([p,l])=>`<div><div class="small muted" style="font-weight:600;margin:6px 0 2px">${esc(p)}</div><div class="row" style="gap:6px 16px">${l.map(a=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" data-masel="${a.id}"${sel[a.id]?' checked':''}>${esc(a.name)}</label>`).join('')}</div></div>`).join('')||'<span class="small muted">No tests in this department.</span>'}
+     <p class="small muted" style="margin:0">Fills in the material name, lot number and expiry date for each control level. Means and SDs are not changed. Level 1 gets the first level of the material, and so on. If a lot change has already been recorded for a test, use <b>Lot change</b> on the Charts screen instead.</p>
+     <div class="row"><button class="btn primary" data-act="matrun" data-id="${m.id}"${nSel?'':' disabled'}>Apply to ${nSel} test${nSel===1?'':'s'}</button><button class="btn" data-act="matapplycancel">Cancel</button></div></div>`};
+  return `<div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>QC materials</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Enter a QC product once, with its material names, lot numbers and expiry dates, then apply it to as many tests as you like instead of typing it again for each one.</p></div>${d?'':'<button class="btn primary" data-act="matnew">Add QC material</button>'}</div>
+   ${form}
+   ${ms.map(m=>`<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(m.name)}</b><div class="small muted" style="margin-top:4px">${matLine(m).split('<br>').map(esc).join('<br>')}</div></div>
+     <div class="row" style="gap:6px"><button class="btn sm primary" data-act="matapply" data-id="${m.id}">Apply to tests</button><button class="btn sm" data-act="matedit" data-id="${m.id}">Edit</button>${UI.mdel===m.id?`<button class="btn sm danger" data-act="matdelok" data-id="${m.id}">Yes, delete</button><button class="btn sm" data-act="matdelno">Cancel</button>`:`<button class="btn sm danger" data-act="matdel" data-id="${m.id}">Delete</button>`}</div></div>
+     ${ap&&ap.id===m.id?applyBox(m):''}</div>`).join('')||(d?'':'<p class="small muted" style="margin:0">No QC materials saved yet.</p>')}</div>`;
+}
+function matOptions(sel){return (S.materials||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}"${m.id===sel?' selected':''}>${esc(m.name)}</option>`).join('')}
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
   if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
   const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}</div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results?</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
    <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b> · ${esc(st.sub)}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
@@ -1988,7 +2022,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderMaterials()}${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -2025,8 +2059,8 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
-  const ADMONLY=new Set(['uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   const NEED={obsave:'e_qc',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
@@ -2126,6 +2160,34 @@ document.addEventListener('click',e=>{
    case 'missmore':UI.missDays=(UI.missDays||14)+30;break;
    case 'dayprev':case 'daynext':{const [y,m,d]=UI.date.split('-').map(Number),dt=new Date(y,m-1,d+(act==='dayprev'?-1:1),12),ns=dstr(dt);if(ns>todayStr())return;UI.date=ns;UI.report=[];UI.skipOpen=null;break}
    case 'saveqc':saveQC();break;
+   case 'deldept':UI.delDept=true;break;
+   case 'deldeptno':UI.delDept=false;break;
+   case 'deldeptok':{UI.delDept=false;if(!isAdmin())return;if(deptList().length<2)return toast('There must be at least one department.');
+     const id=st.cur,nm=st.dept,ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),nr=S.results.filter(r=>ids.includes(r.aid)).length;
+     tomb(id,...ids);S.analytes=S.analytes.filter(a=>a.dept!==id);S.results=S.results.filter(r=>!ids.includes(r.aid));S.skips=S.skips.filter(s=>!ids.includes(s.aid));S.est=(S.est||[]).filter(e=>!ids.includes(e.aid));
+     S.depts=S.depts.filter(d=>d.id!==id);S.users.forEach(u=>{if(Array.isArray(u.depts)&&u.depts.includes(id)){u.depts=u.depts.filter(x=>x!==id);u.mod=nowIso()}});
+     const nx=S.depts.find(d=>d.dept);if(nx){st.cur='';loadCtx(nx.id)}UI.dept='';UI.inst='';UI.mod='';
+     audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted.');break}
+   case 'matnew':UI.mdr={id:'',name:'',levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
+   case 'matedit':{const m=(S.materials||[]).find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
+   case 'matcancel':UI.mdr=null;break;
+   case 'matsave':{const d=UI.mdr;if(!d)break;const nm=(d.name||'').trim();if(!nm)return toast('Give this QC product a name.');
+     if((S.materials||[]).some(x=>x.id!==d.id&&x.name.toLowerCase()===nm.toLowerCase()))return toast('A QC material with that name already exists.');
+     if(d.levels.some(l=>!(l.material||'').trim()))return toast('Every level needs a material name.');
+     const rec={id:d.id||uid(),name:nm,levels:d.levels.map(l=>({material:l.material.trim(),lot:(l.lot||'').trim(),exp:l.exp||''}))};
+     S.materials=S.materials||[];const i=S.materials.findIndex(x=>x.id===rec.id);if(i>=0)Object.assign(S.materials[i],rec);else S.materials.push(rec);
+     audit(i>=0?'QC material edited':'QC material added',nm,null,[]);UI.mdr=null;toast('QC material saved.');break}
+   case 'matdel':UI.mdel=id;break;
+   case 'matdelno':UI.mdel=null;break;
+   case 'matdelok':{const m=(S.materials||[]).find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
+   case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
+   case 'matapplycancel':UI.mAp=null;break;
+   case 'matselall':if(UI.mAp){DA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
+   case 'matselnone':if(UI.mAp)UI.mAp.sel={};break;
+   case 'matrun':{const m=(S.materials||[]).find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=DA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
+     const n=applyMat(m,list,'cur');audit('QC material applied',m.name+' to '+n+' test'+(n===1?'':'s')+': '+list.slice(0,8).map(a=>a.name).join(', ')+(list.length>8?' and more':''));UI.mAp=null;toast(m.name+' applied to '+n+' test'+(n===1?'':'s')+'.');break}
+   case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
+     const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'obsave':saveOther();break;
    case 'saveone':saveQC(id);break;
@@ -2167,6 +2229,12 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
+  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined){if(!perm('e_setup'))return;
+    if(d.mf!==undefined&&UI.mdr)UI.mdr[d.mf]=t.value;
+    else if(d.mn!==undefined&&UI.mdr){const n=+t.value;while(UI.mdr.levels.length<n)UI.mdr.levels.push(blankMatLv());UI.mdr.levels.length=n;return render()}
+    else if(d.ml!==undefined&&UI.mdr){const [i,f]=d.ml.split(':');UI.mdr.levels[+i][f]=t.value}
+    else if(d.masel!==undefined&&UI.mAp){UI.mAp.sel[d.masel]=t.checked?1:0;return render()}
+    return}
   if(d.ob!==undefined){if(!perm('e_qc'))return;UI.obd=UI.obd||{};UI.obd[d.ob]=t.value;return}
   if(/^ob-/.test(t.id)){if(!perm('e_qc'))return;const o=obState();
     if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;
