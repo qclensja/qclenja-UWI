@@ -47,12 +47,13 @@ function ljSVG(a,lv,flags,n,forExport){
   return {svg:s+'</svg>',count:win.length,flagged:stat.filter(x=>x==='rej').length,warn:stat.filter(x=>x==='warn').length,cur};
 }
 function patternBox(a,lv,n){
+  const flags0=allFlags();
   const pts=S.results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:1),win=new Set((n>0?pts.slice(-n):pts).map(r=>r.id));
   const sp=patternsFor(a,lv,S.results).filter(p=>p.ids.some(id=>win.has(id))).sort((x,y)=>x.to<y.to?1:-1).slice(0,4);
   if(!sp.length)return '';
   return `<div class="alert warn" style="margin-top:10px"><b>${sp.some(p=>p.kind==='trend')&&sp.some(p=>p.kind==='shift')?'Trend and shift detected':sp[0].kind==='trend'?'Trend detected':'Shift detected'} on ${levelName(lv)}</b>
    ${sp.map(p=>{const tr=p.kind==='trend',R=RULES[tr?'T7':'S6'];return `<details${p===sp[0]?' open':''} style="margin-top:8px"><summary><span class="chip warn">${tr?'Trend':'Shift'} ${p.dir>0?'upward':'downward'}</span> ${p.n} runs, ${fmtDate(p.from)} to ${fmtDate(p.to)}${p.open?' · <b>still ongoing</b>':' · ended'}</summary>
-      <p class="small" style="margin:6px 0 0">${tr?'Results are moving steadily '+(p.dir>0?'up':'down')+' without a change in targets.':'Results have stayed '+(p.dir>0?'above':'below')+' the mean for '+p.n+' consecutive runs.'} ${R.desc}</p><div class="small" style="margin-top:6px"><b>Suggested actions</b></div><ul class="small" style="margin:4px 0 0">${R.fix.map(x=>`<li>${x}</li>`).join('')}</ul></details>`}).join('')}</div>`;
+      <p class="small" style="margin:6px 0 0">${tr?'Results are moving steadily '+(p.dir>0?'up':'down')+' without a change in targets.':'Results have stayed '+(p.dir>0?'above':'below')+' the mean for '+p.n+' consecutive runs.'} ${R.desc}</p><div class="small" style="margin-top:6px"><b>Suggested actions</b></div><ul class="small" style="margin:4px 0 0">${R.fix.map(x=>`<li>${x}</li>`).join('')}</ul>${patternOverride(a,lv,p,flags0)}</details>`}).join('')}</div>`;
 }
 function renderCharts(){
   if(!VA().length)return '<div class="panel empty">No analytes available. '+(isAdmin()?'Set up analytes first.':'Ask an administrator to give you access to a department.')+'</div>';
@@ -169,4 +170,21 @@ function saveTargetEdit(){
   levels.forEach((l,i)=>Object.assign(t.levels[i],l));
   audit('Target change edited',a.name+' (was '+was+') now from '+fmtDate(date)+': '+t.type+'. '+note,null,[a.dept]);
   UI.modal=null;UI.thOpen=a.id;save();toast('Lot change updated.');
+}
+
+/* override a trend or shift with a comment */
+const patKey=(a,lv,p)=>a.id+'|'+lv+'|'+p.kind+'|'+p.from;
+const patFlagged=p=>p.ids.slice(p.kind==='trend'?6:5);
+function patternOverride(a,lv,p,flags){
+  const k=patKey(a,lv,p),res=patFlagged(p).map(id=>S.results.find(r=>r.id===id)).filter(Boolean);
+  if(!res.length)return '';
+  const ov=res.find(r=>r.ov&&r.ov.pattern===p.kind);
+  const open=res.filter(r=>!r.ov&&statusOf(flags,r)==='warn');
+  if(ov&&!open.length)return `<div class="small" style="margin:10px 0 0;padding:8px 10px;border-left:3px solid var(--good);background:var(--surface2);border-radius:4px"><b>Overridden:</b> ${esc(ov.ov.comment)} <span class="muted">(${ov.ov.byName?esc(ov.ov.byName)+' · ':''}${fmtTs(ov.ov.at)})</span>${perm('e_override')?` <button class="btn sm" data-act="punover" data-k="${esc(k)}">Reopen</button>`:''}</div>`;
+  if(!perm('e_override'))return '<p class="small muted" style="margin:10px 0 0">Your access level can view this but not override it.</p>';
+  return `<div class="row" style="margin-top:10px"><label class="f" style="flex:1 1 280px">Override comment (required)<textarea rows="2" data-pk="${esc(k)}" placeholder="e.g. Shift began at the new reagent lot. Recalibrated and QC is back on target."></textarea></label><button class="btn" data-act="povr" data-k="${esc(k)}">Override ${p.kind==='trend'?'trend':'shift'} with comment</button></div>`;
+}
+function patternFind(k){
+  const [aid,lv,kind,from]=k.split('|'),a=anOf(aid);if(!a)return {};
+  const p=patternsFor(a,+lv,S.results).find(x=>x.kind===kind&&x.from===from);return {a,lv:+lv,p};
 }

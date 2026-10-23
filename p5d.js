@@ -56,7 +56,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['csubadd','csubno','rcustom','rreset','nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['rcustom','rreset','deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={povr:'e_override',punover:'e_override',tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -202,6 +202,14 @@ document.addEventListener('click',e=>{
    case 'unskip':audit('Not performed undone',(anOf(id)||{}).name+' on '+fmtDate(UI.date));S.skips=S.skips.filter(s=>!(s.aid===id&&s.date===UI.date));break;
    case 'override':{const c=document.getElementById('ov-'+id).value.trim();if(!c){toast('Write a comment before overriding.');return}
      const r=S.results.find(x=>x.id===id);r.ov={comment:c,...stampNow()};audit('Override',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+': '+c);save();toast('Override recorded with your comment.');break}
+   case 'povr':{const k=el.dataset.k,box=[...document.querySelectorAll('[data-pk]')].find(x=>x.getAttribute('data-pk')===k),c=(box&&box.value||'').trim();
+     if(!c){toast('Write a comment before overriding.');return}
+     const {a,lv,p}=patternFind(k);if(!p)break;const fl=allFlags();let n=0;
+     patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&!r.ov&&statusOf(fl,r)==='warn'){r.ov={comment:c,pattern:p.kind,...stampNow()};n++}});
+     audit('Override',a.name+' '+levelName(lv)+' '+(p.kind==='trend'?'trend':'shift')+' '+fmtDate(p.from)+' to '+fmtDate(p.to)+': '+c,null,[a.dept]);UI.pOpen=k;save();toast((p.kind==='trend'?'Trend':'Shift')+' overridden with your comment.');break}
+   case 'punover':{const k=el.dataset.k,{a,lv,p}=patternFind(k);if(!p)break;
+     patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&r.ov&&r.ov.pattern===p.kind)r.ov=null});
+     audit('Override removed',a.name+' '+levelName(lv)+' '+(p.kind==='trend'?'trend':'shift')+' '+fmtDate(p.from),null,[a.dept]);break}
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
    case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;

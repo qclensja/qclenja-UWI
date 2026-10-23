@@ -853,12 +853,13 @@ function ljSVG(a,lv,flags,n,forExport){
   return {svg:s+'</svg>',count:win.length,flagged:stat.filter(x=>x==='rej').length,warn:stat.filter(x=>x==='warn').length,cur};
 }
 function patternBox(a,lv,n){
+  const flags0=allFlags();
   const pts=S.results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:1),win=new Set((n>0?pts.slice(-n):pts).map(r=>r.id));
   const sp=patternsFor(a,lv,S.results).filter(p=>p.ids.some(id=>win.has(id))).sort((x,y)=>x.to<y.to?1:-1).slice(0,4);
   if(!sp.length)return '';
   return `<div class="alert warn" style="margin-top:10px"><b>${sp.some(p=>p.kind==='trend')&&sp.some(p=>p.kind==='shift')?'Trend and shift detected':sp[0].kind==='trend'?'Trend detected':'Shift detected'} on ${levelName(lv)}</b>
    ${sp.map(p=>{const tr=p.kind==='trend',R=RULES[tr?'T7':'S6'];return `<details${p===sp[0]?' open':''} style="margin-top:8px"><summary><span class="chip warn">${tr?'Trend':'Shift'} ${p.dir>0?'upward':'downward'}</span> ${p.n} runs, ${fmtDate(p.from)} to ${fmtDate(p.to)}${p.open?' · <b>still ongoing</b>':' · ended'}</summary>
-      <p class="small" style="margin:6px 0 0">${tr?'Results are moving steadily '+(p.dir>0?'up':'down')+' without a change in targets.':'Results have stayed '+(p.dir>0?'above':'below')+' the mean for '+p.n+' consecutive runs.'} ${R.desc}</p><div class="small" style="margin-top:6px"><b>Suggested actions</b></div><ul class="small" style="margin:4px 0 0">${R.fix.map(x=>`<li>${x}</li>`).join('')}</ul></details>`}).join('')}</div>`;
+      <p class="small" style="margin:6px 0 0">${tr?'Results are moving steadily '+(p.dir>0?'up':'down')+' without a change in targets.':'Results have stayed '+(p.dir>0?'above':'below')+' the mean for '+p.n+' consecutive runs.'} ${R.desc}</p><div class="small" style="margin-top:6px"><b>Suggested actions</b></div><ul class="small" style="margin:4px 0 0">${R.fix.map(x=>`<li>${x}</li>`).join('')}</ul>${patternOverride(a,lv,p,flags0)}</details>`}).join('')}</div>`;
 }
 function renderCharts(){
   if(!VA().length)return '<div class="panel empty">No analytes available. '+(isAdmin()?'Set up analytes first.':'Ask an administrator to give you access to a department.')+'</div>';
@@ -975,6 +976,23 @@ function saveTargetEdit(){
   levels.forEach((l,i)=>Object.assign(t.levels[i],l));
   audit('Target change edited',a.name+' (was '+was+') now from '+fmtDate(date)+': '+t.type+'. '+note,null,[a.dept]);
   UI.modal=null;UI.thOpen=a.id;save();toast('Lot change updated.');
+}
+
+/* override a trend or shift with a comment */
+const patKey=(a,lv,p)=>a.id+'|'+lv+'|'+p.kind+'|'+p.from;
+const patFlagged=p=>p.ids.slice(p.kind==='trend'?6:5);
+function patternOverride(a,lv,p,flags){
+  const k=patKey(a,lv,p),res=patFlagged(p).map(id=>S.results.find(r=>r.id===id)).filter(Boolean);
+  if(!res.length)return '';
+  const ov=res.find(r=>r.ov&&r.ov.pattern===p.kind);
+  const open=res.filter(r=>!r.ov&&statusOf(flags,r)==='warn');
+  if(ov&&!open.length)return `<div class="small" style="margin:10px 0 0;padding:8px 10px;border-left:3px solid var(--good);background:var(--surface2);border-radius:4px"><b>Overridden:</b> ${esc(ov.ov.comment)} <span class="muted">(${ov.ov.byName?esc(ov.ov.byName)+' · ':''}${fmtTs(ov.ov.at)})</span>${perm('e_override')?` <button class="btn sm" data-act="punover" data-k="${esc(k)}">Reopen</button>`:''}</div>`;
+  if(!perm('e_override'))return '<p class="small muted" style="margin:10px 0 0">Your access level can view this but not override it.</p>';
+  return `<div class="row" style="margin-top:10px"><label class="f" style="flex:1 1 280px">Override comment (required)<textarea rows="2" data-pk="${esc(k)}" placeholder="e.g. Shift began at the new reagent lot. Recalibrated and QC is back on target."></textarea></label><button class="btn" data-act="povr" data-k="${esc(k)}">Override ${p.kind==='trend'?'trend':'shift'} with comment</button></div>`;
+}
+function patternFind(k){
+  const [aid,lv,kind,from]=k.split('|'),a=anOf(aid);if(!a)return {};
+  const p=patternsFor(a,+lv,S.results).find(x=>x.kind===kind&&x.from===from);return {a,lv:+lv,p};
 }
 /* ===== Excel export ===== */
 const LIGHT={zone1:'#F2F6F7',zone2:'#FBF3DF',zone3:'#FBE6E3',accent:'#0B6E78',muted:'#55666F',ink:'#15222B',surface:'#FFFFFF',bad:'#BF3A2D',warn:'#A35F00',grid:'#E1E7EA'};
@@ -2234,7 +2252,7 @@ document.addEventListener('click',e=>{
   const ADMIN=new Set(['csubadd','csubno','rcustom','rreset','nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['rcustom','rreset','deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={povr:'e_override',punover:'e_override',tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -2380,6 +2398,14 @@ document.addEventListener('click',e=>{
    case 'unskip':audit('Not performed undone',(anOf(id)||{}).name+' on '+fmtDate(UI.date));S.skips=S.skips.filter(s=>!(s.aid===id&&s.date===UI.date));break;
    case 'override':{const c=document.getElementById('ov-'+id).value.trim();if(!c){toast('Write a comment before overriding.');return}
      const r=S.results.find(x=>x.id===id);r.ov={comment:c,...stampNow()};audit('Override',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+': '+c);save();toast('Override recorded with your comment.');break}
+   case 'povr':{const k=el.dataset.k,box=[...document.querySelectorAll('[data-pk]')].find(x=>x.getAttribute('data-pk')===k),c=(box&&box.value||'').trim();
+     if(!c){toast('Write a comment before overriding.');return}
+     const {a,lv,p}=patternFind(k);if(!p)break;const fl=allFlags();let n=0;
+     patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&!r.ov&&statusOf(fl,r)==='warn'){r.ov={comment:c,pattern:p.kind,...stampNow()};n++}});
+     audit('Override',a.name+' '+levelName(lv)+' '+(p.kind==='trend'?'trend':'shift')+' '+fmtDate(p.from)+' to '+fmtDate(p.to)+': '+c,null,[a.dept]);UI.pOpen=k;save();toast((p.kind==='trend'?'Trend':'Shift')+' overridden with your comment.');break}
+   case 'punover':{const k=el.dataset.k,{a,lv,p}=patternFind(k);if(!p)break;
+     patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&r.ov&&r.ov.pattern===p.kind)r.ov=null});
+     audit('Override removed',a.name+' '+levelName(lv)+' '+(p.kind==='trend'?'trend':'shift')+' '+fmtDate(p.from),null,[a.dept]);break}
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
    case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
