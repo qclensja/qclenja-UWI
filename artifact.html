@@ -1079,6 +1079,7 @@ function renderAddModal(){
     <label class="f">Schedule<select id="a-sched" data-mre>${first?`<option value="panel"${d.sched==='panel'?' selected':''}>Same as rest of panel (${esc(scheduleText(first))})</option>`:''}<option value="daily"${d.sched==='daily'?' selected':''}>Every day</option><option value="weekdays"${d.sched==='weekdays'?' selected':''}>Specific days of the week</option><option value="interval"${d.sched==='interval'?' selected':''}>Every N days</option><option value="ondemand"${d.sched==='ondemand'?' selected':''}>On demand (no fixed schedule)</option></select></label></div>
    ${d.sched==='weekdays'?`<div class="days" role="group" aria-label="Days">${[1,2,3,4,5,6,0].map(x=>`<label><input type="checkbox" data-adow="${x}"${dowOn(x)?' checked':''}>${DOW[x]}</label>`).join('')}</div>`:''}
    ${d.sched==='interval'?`<label class="f" style="flex-direction:row;align-items:center;gap:6px">every<input type="number" min="2" max="90" id="a-every" value="${esc(d.every)}" style="width:70px">days, starting<input type="date" id="a-start" value="${esc(d.start)}" style="width:auto"></label>`:''}
+   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="a-matlib" data-mre><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. You still enter the mean and SD.</span></label>`:''}
    <div class="small muted">Each level has its own QC material name and lot number.</div>
    ${Array.from({length:n},(_,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
      <label class="f" style="flex:2 1 170px">QC material<input type="text" id="a-mat-${i}" value="${esc((d.mats||[])[i]||'')}" placeholder="Material name"></label>
@@ -2289,6 +2290,7 @@ document.addEventListener('change',e=>{
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
+    if(t.id==='a-matlib'&&t.value){const ml=(S.materials||[]).find(x=>x.id===t.value);if(ml){UI.modal.n=ml.levels.length;ml.levels.forEach((l,i)=>{dr.mats[i]=l.material||'';dr.lots[i]=l.lot||'';dr.exps[i]=l.exp||''});toast(ml.name+' filled in. Enter the mean and SD for each level.')}}
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
   if(d.aunit){setUnit(anOf(d.aunit),t.value.trim());save();return}
