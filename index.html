@@ -882,6 +882,7 @@ function renderModal(){
    <h2>Lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules restart from the effective date, so the old lot does not count against the new one.</p>
    <div class="stack"><div class="grid2"><label class="f">Reason<select id="m-type">${CHG.map(c=>`<option>${c}</option>`).join('')}</select></label>
     <label class="f">Effective from<input type="date" id="m-date" value="${todayStr()}" max="${todayStr()}"></label></div>
+   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="m-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. Enter the new mean and SD below.</span></label>`:''}
    <div class="scroll"><table class="t"><thead><tr><th>Level</th><th>QC material</th><th>Lot no.</th><th>Expiry date</th><th>Current mean</th><th>Current SD</th><th>New mean</th><th>New SD</th></tr></thead><tbody>
    ${t.levels.slice(0,a.nlev).map((l,i)=>`<tr><td>${levelName(i)}</td><td><input type="text" id="m-mat-${i}" value="${esc(l.material)}" style="width:170px" aria-label="${levelName(i)} QC material"></td><td><input type="text" id="m-lot-${i}" value="${esc(l.lot)}" style="width:100px" aria-label="${levelName(i)} lot"></td><td><input type="date" id="m-exp-${i}" value="${esc(l.exp||'')}" style="width:140px" aria-label="${levelName(i)} expiry date"></td><td class="mono">${fmt(l.mean,dp+1)}</td><td class="mono">${fmt(l.sd,dp+1)}</td><td><input type="number" step="any" id="m-mean-${i}" value="${l.mean==null?'':l.mean}" style="width:100px"></td><td><input type="number" step="any" min="0" id="m-sd-${i}" value="${l.sd==null?'':l.sd}" style="width:90px"></td></tr>`).join('')}</tbody></table></div>
    <label class="f">Comment explaining the change (required)<textarea id="m-note" rows="3" placeholder="e.g. New lot of Bio-Rad Level 1/2 opened. Means set from 20-point lot crossover."></textarea></label>
@@ -2341,9 +2342,9 @@ document.addEventListener('change',e=>{
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
-  if(t.id==='e-matlib'){const ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&UI.modal.edit?anOf(UI.modal.edit):null;
+  if(t.id==='e-matlib'||t.id==='m-matlib'){const pf=t.id==='e-matlib'?'e':'m',ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
     if(ml&&a){const k=Math.min(a.nlev,ml.levels.length),set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};
-      for(let i=0;i<k;i++){set('e-mat-'+i,ml.levels[i].material||'');set('e-lot-'+i,ml.levels[i].lot||'');set('e-exp-'+i,ml.levels[i].exp||'')}
+      for(let i=0;i<k;i++){set(pf+'-mat-'+i,ml.levels[i].material||'');set(pf+'-lot-'+i,ml.levels[i].lot||'');set(pf+'-exp-'+i,ml.levels[i].exp||'')}
       toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+(ml.levels.length<a.nlev?'. This analyte has more levels, fill in the rest by hand.':'.'))}
     t.value='';return}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;

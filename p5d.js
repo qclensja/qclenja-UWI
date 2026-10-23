@@ -255,9 +255,9 @@ document.addEventListener('change',e=>{
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
-  if(t.id==='e-matlib'){const ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&UI.modal.edit?anOf(UI.modal.edit):null;
+  if(t.id==='e-matlib'||t.id==='m-matlib'){const pf=t.id==='e-matlib'?'e':'m',ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
     if(ml&&a){const k=Math.min(a.nlev,ml.levels.length),set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};
-      for(let i=0;i<k;i++){set('e-mat-'+i,ml.levels[i].material||'');set('e-lot-'+i,ml.levels[i].lot||'');set('e-exp-'+i,ml.levels[i].exp||'')}
+      for(let i=0;i<k;i++){set(pf+'-mat-'+i,ml.levels[i].material||'');set(pf+'-lot-'+i,ml.levels[i].lot||'');set(pf+'-exp-'+i,ml.levels[i].exp||'')}
       toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+(ml.levels.length<a.nlev?'. This analyte has more levels, fill in the rest by hand.':'.'))}
     t.value='';return}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
