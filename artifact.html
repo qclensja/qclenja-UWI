@@ -238,8 +238,11 @@ const RULES={
 const RORDER=['1-2s','1-3s','2-2s','R-4s','4-1s','10x','T7','S6'];
 const SCOPED=['2-2s','4-1s','10x'];
 const SCOPE_TXT={both:'Within each level or across levels (either one triggers it)',within:'Within each level only (each level on its own)',across:'Across levels only (all levels together, in the order they were run)'};
-const scopeOf=k=>{try{const v=S.rules&&S.rules[k+'@'];return v==='within'||v==='across'?v:'both'}catch(e){return 'both'}};
-const ruleOn=k=>{try{return !S.rules||S.rules[k]!==false}catch(e){return true}};
+/* rules are set for the whole laboratory, and a department can have its own set (S.drules[deptId]) */
+const rulesFor=d=>{try{const o=d&&S.drules&&S.drules[d];return o||S.rules||{}}catch(e){return {}}};
+const hasOwnRules=d=>{try{return !!(d&&S.drules&&S.drules[d])}catch(e){return false}};
+const scopeOf=(k,d)=>{const v=rulesFor(d)[k+'@'];return v==='within'||v==='across'?v:'both'};
+const ruleOn=(k,d)=>rulesFor(d)[k]!==false;
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -254,11 +257,11 @@ function patternsFor(a,lv,results){
       let j=i+1;while(j+1<seg.length&&Math.sign(seg[j+1].z-seg[j].z)===d)j++;
       if(j-i+1>=7)push('trend',d,seg.slice(i,j+1),seg);i=d?j:j+1}
   });
-  return out.filter(p=>ruleOn(p.kind==='shift'?'S6':'T7'));
+  return out.filter(p=>ruleOn(p.kind==='shift'?'S6':'T7',a.dept));
 }
 function evaluate(a,results){
   const out={}; // resultId -> [{rule,sev}]
-  const add=(r,rule)=>{if(!ruleOn(rule))return;const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
+  const D=a.dept,add=(r,rule)=>{if(!ruleOn(rule,D))return;const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
   const rs=results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:x.lv-y.lv);
   const segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -267,7 +270,7 @@ function evaluate(a,results){
     const byLv={};seg.forEach(p=>(byLv[p.r.lv]||(byLv[p.r.lv]=[])).push(p));
     const byDate={};seg.forEach(p=>(byDate[p.r.date]||(byDate[p.r.date]=[])).push(p));
     const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
-    const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k)!=='across',ac=k=>multi&&scopeOf(k)!=='within';
+    const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k,D)!=='across',ac=k=>multi&&scopeOf(k,D)!=='within';
     Object.values(byLv).forEach(arr=>{
       if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
       if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
@@ -395,7 +398,7 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[]});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[],drules:{},drulesAt:{}});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 /* change stamps: every analyte, department and limits set remembers when it last changed, so an out-of-date copy on another device can never overwrite a newer edit */
@@ -403,7 +406,7 @@ const canonS=v=>Array.isArray(v)?'['+v.map(canonS).join(',')+']':v&&typeof v==='
 const shash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36)};
 function initHashes(o){['analytes','depts','est','materials'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -486,6 +489,14 @@ let toastT;
 function toast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';t.setAttribute('role','status');document.body.appendChild(t)}t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3500)}
 /* ===== Setup wizard ===== */
 const STEPS=['Department & analyser','Analytes','Schedule & analyser','Control targets'];
+/* sub-departments: the built-in ones, plus custom ones any department of this type already uses */
+function subList(dept){
+  const base=Object.keys((CAT[dept]||{subs:{}}).subs),out=base.slice();
+  const add=n=>{if(n&&!out.some(x=>x.toLowerCase()===String(n).toLowerCase()))out.push(n)};
+  (S.depts||[]).forEach(r=>{if(r.dept===dept)add(r.sub)});
+  if(S.setup.dept===dept)add(S.setup.sub);
+  return out;
+}
 const subKey=()=>S.setup.dept+'|'+S.setup.sub;
 const panelsNow=()=>((CAT[S.setup.dept]||{subs:{}}).subs[S.setup.sub]||[]).map(p=>({...p,items:p.items.concat((S.setup.padd||{})[subKey()+'|'+p.name]||[])}));
 function ensureSel(){
@@ -571,7 +582,8 @@ function renderSetup(){
     body=`<div class="grid2">
      <label class="f">Laboratory name (optional)<input type="text" data-path="lab" value="${esc(st.lab)}" placeholder="e.g. Main Laboratory"></label>
      <label class="f">Department<select data-path="dept" data-r>${DEPTS.map(x=>`<option${x===st.dept?' selected':''}>${x}</option>`).join('')}</select></label>
-     <label class="f">Sub-department<select data-path="sub" data-r>${Object.keys(d.subs).map(x=>`<option${x===st.sub?' selected':''}>${x}</option>`).join('')}</select></label>
+     <div class="f">Sub-department<select data-path="sub" data-r aria-label="Sub-department">${subList(st.dept).map(x=>`<option${x===st.sub?' selected':''}>${esc(x)}</option>`).join('')}<option value="__new">+ Add a custom sub-department…</option></select>
+      ${UI.csub?`<div class="row" style="align-items:flex-end;margin-top:6px"><label class="f" style="flex:1 1 200px">New sub-department name<input type="text" id="csub-name" maxlength="40" placeholder="e.g. Special Chemistry"></label><button type="button" class="btn primary" data-act="csubadd">Use this sub-department</button><button type="button" class="btn" data-act="csubno">Cancel</button></div><span id="csub-err" class="small" style="color:var(--bad)" hidden></span>`:''}</div>
      <div class="f" style="grid-column:1/-1">Analysers in this department${analyserEditor()}
       <div class="row" style="align-items:flex-end;margin-top:8px"><label class="f" style="flex:1 1 220px">Add an analyser<select data-path="analyser" data-r>${anOptions(st.dept,st.sub,st.analyser)}</select></label>
       ${st.analyser==='Other'?`<label class="f" style="flex:1 1 220px">Analyser name<input type="text" data-path="analyserOther" value="${esc(st.analyserOther)}" placeholder="Make and model"></label>`:''}
@@ -585,7 +597,7 @@ function renderSetup(){
     ensureSel();
     const ps=panelsNow(),uOf=i=>st.units[i.name]!=null?st.units[i.name]:i.unit;
     const unitIn=(attr,v)=>`<input type="text" class="unitin" list="unitlist" ${attr} value="${esc(v)}" aria-label="Unit" title="Unit">`;
-    body=`<p class="hint">Routine panels for <b>${esc(st.sub)}</b> on the ${esc(analyserName())} are ticked. Untick anything you do not run. Edit a unit if your lab reports it differently (for example mg/dL instead of mmol/L). Changing a unit does not convert existing results or targets. Add your own panels and tests at the bottom.${S.setup.done?' Panels and tests already in use are greyed out and cannot be unticked or deleted here; use Remove under Panels and analytes if you really need to take one out.':''}</p>
+    body=`${ps.length?'':`<div class="alert warn" style="margin:0 0 10px"><b>${esc(st.sub)}</b> is a custom sub-department, so it has no suggested panels. Create your own panels and tests below.</div>`}<p class="hint">Routine panels for <b>${esc(st.sub)}</b> on the ${esc(analyserName())} are ticked. Untick anything you do not run. Edit a unit if your lab reports it differently (for example mg/dL instead of mmol/L). Changing a unit does not convert existing results or targets. Add your own panels and tests at the bottom.${S.setup.done?' Panels and tests already in use are greyed out and cannot be unticked or deleted here; use Remove under Panels and analytes if you really need to take one out.':''}</p>
      <datalist id="unitlist">${UNITS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist>
      <div class="grid2">${ps.map(p=>{const s=st.sel[p.name]||{},nL=p.items.filter(i=>isAdded(i.name)).length,allL=nL===p.items.length&&nL>0;const all=p.items.every(i=>s[i.name]||isAdded(i.name));
       return `<div class="panelcard${allL?' locked':''}"><h3><span>${esc(p.name)} ${p.routine?'<span class="chip acc">Routine</span>':''}${allL?' <span class="chip">Already added</span>':nL?' <span class="chip">'+nL+' already added</span>':''}</span>
@@ -863,6 +875,7 @@ function renderCharts(){
     <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
    ${charts}
+   ${targetHistory(a)}
    <div class="panel"><h3 style="margin-bottom:8px">Recent results</h3><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Level</th><th>Value</th><th>SD from mean</th><th>Status</th><th>Comment</th><th>Entered by</th><th>Entered</th></tr></thead><tbody>
    ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${levelName(r.lv)}</td><td class="mono">${fmt(r.value,dp+1)}</td><td class="mono">${zOf(a,r).toFixed(2)}</td><td>${chipFor(r,flags)}</td><td class="small">${r.ov?esc(r.ov.comment):''}</td><td>${esc(r.byName||'–')}</td><td class="small">${r.at?fmtTs(r.at):'–'}${r.upd?'<br>edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at)+(r.upd.reason?'<br><i>Reason: '+esc(r.upd.reason)+'</i>':''):''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</tbody></table></div></div></div>`;
 }
@@ -871,6 +884,7 @@ const CHG=['New control lot','New reagent lot','New calibrator lot','After recal
 function renderModal(){
   const m=UI.modal;if(!m)return '';
   if(m.acct)return renderAcctModal();
+  if(m.tedit!==undefined)return renderTargetEditModal();
   if(m.add)return renderAddModal();
   if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
@@ -907,6 +921,53 @@ function saveLot(){
   a.targets=a.targets.filter(x=>x.from!==date);a.targets.push(t);a.targets.sort((x,y)=>x.from<y.from?-1:1);
   audit('Targets changed',a.name+' from '+fmtDate(date)+': '+t.type+'. '+note,null,a.dept);
   UI.modal=null;save();toast('New targets saved from '+fmtDate(date)+'.');
+}
+
+/* ===== History of lot changes and target adjustments: edit or delete ===== */
+function targetHistory(a){
+  const dp=decs(a),can=perm('e_lot');
+  if(a.targets.length<2&&!can)return '';
+  const rows=a.targets.map((t,i)=>{
+    const first=i===0,c=UI.tdel&&UI.tdel.aid===a.id&&UI.tdel.i===i;
+    const lv=t.levels.slice(0,a.nlev).map((l,k)=>levelName(k)+': '+esc(l.material||'–')+(l.lot?' · Lot '+esc(l.lot):'')+(l.exp?' · exp '+fmtDate(l.exp):'')+' · mean '+fmt(l.mean,dp+1)+' · SD '+fmt(l.sd,dp+1)).join('<br>');
+    return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${first?'Starting targets':esc(t.type||'Target change')}</b> <span class="small muted">${first&&!t.from?'from the first QC':'effective '+fmtDate(t.from)}${t.byName?' · '+esc(t.byName):''}${t.at?' · '+fmtTs(t.at):''}</span>
+      <div class="small" style="margin-top:6px">${lv}</div>${t.comment&&!first?`<div class="small" style="margin-top:6px"><b>Comment:</b> ${esc(t.comment)}</div>`:''}${t.edited?`<div class="small muted" style="margin-top:4px">Edited by ${esc(t.edited.byName||'')} · ${fmtTs(t.edited.at)}</div>`:''}</div>
+      ${can?`<div class="row" style="gap:6px;flex-wrap:nowrap">${first?'<span class="small muted">Edit under Setup</span>':c?`<span class="small">Delete this change? Results from ${fmtDate(t.from)} will use the earlier targets.</span><button class="btn sm danger" data-act="tdelok" data-id="${a.id}" data-i="${i}">Yes, delete</button><button class="btn sm" data-act="tdelno">Cancel</button>`:`<button class="btn sm" data-act="tedit" data-id="${a.id}" data-i="${i}">Edit</button><button class="btn sm danger" data-act="tdel" data-id="${a.id}" data-i="${i}">Delete</button>`}</div>`:''}</div></div>`}).join('');
+  return `<details class="panel" style="padding:0"${UI.thOpen===a.id?' open':''} data-thopen="${a.id}"><summary style="padding:12px 16px;cursor:pointer"><b>Lot changes and target adjustments (${a.targets.length-1})</b> <span class="muted small">Review, edit or delete earlier changes</span></summary><div class="stack" style="padding:0 16px 14px">${rows}</div></details>`;
+}
+function renderTargetEditModal(){
+  const m=UI.modal,a=anOf(m.aid),t=a&&a.targets[m.tedit];if(!a||!t){UI.modal=null;return ''}
+  const prev=a.targets[m.tedit-1],next=a.targets[m.tedit+1];
+  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:880px" role="dialog" aria-modal="true" aria-label="Edit lot change" data-stop>
+   <h2>Edit lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules are checked again for the results this change covers.</p>
+   <div class="stack"><div class="grid2"><label class="f">Reason<select id="t-type">${CHG.map(c=>`<option${c===t.type?' selected':''}>${c}</option>`).join('')}${CHG.includes(t.type)||!t.type?'':`<option selected>${esc(t.type)}</option>`}</select></label>
+    <label class="f">Effective from<input type="date" id="t-date" value="${esc(t.from)}" min="${prev?esc(prev.from):''}" max="${next?esc(next.from):todayStr()}"></label></div>
+   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="t-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
+   <div class="scroll"><table class="t"><thead><tr><th>Level</th><th>QC material</th><th>Lot no.</th><th>Expiry date</th><th>Mean</th><th>SD</th></tr></thead><tbody>
+   ${t.levels.slice(0,a.nlev).map((l,i)=>`<tr><td>${levelName(i)}</td><td><input type="text" id="t-mat-${i}" value="${esc(l.material||'')}" style="width:170px" aria-label="${levelName(i)} QC material"></td><td><input type="text" id="t-lot-${i}" value="${esc(l.lot||'')}" style="width:100px" aria-label="${levelName(i)} lot"></td><td><input type="date" id="t-exp-${i}" value="${esc(l.exp||'')}" aria-label="${levelName(i)} expiry"></td><td><input type="number" step="any" id="t-mean-${i}" value="${l.mean!=null?esc(String(l.mean)):''}" style="width:92px" aria-label="${levelName(i)} mean"></td><td><input type="number" step="any" min="0" id="t-sd-${i}" value="${l.sd!=null?esc(String(l.sd)):''}" style="width:80px" aria-label="${levelName(i)} SD"></td></tr>`).join('')}</tbody></table></div>
+   <label class="f">Comment explaining the change (required)<textarea id="t-note" rows="3">${esc(t.comment||'')}</textarea></label>
+   <p id="t-err" class="small" style="color:var(--bad);margin:0" hidden></p>
+   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="mclose">Cancel</button><button class="btn primary" data-act="teditsave">Save changes</button></div></div></div></div>`;
+}
+function saveTargetEdit(){
+  const m=UI.modal,a=anOf(m.aid),t=a&&a.targets[m.tedit],g=id=>document.getElementById(id),err=g('t-err');
+  if(!a||!t)return;
+  const fail=x=>{err.textContent=x;err.hidden=false;return true};
+  const date=g('t-date').value,note=g('t-note').value.trim(),prev=a.targets[m.tedit-1],next=a.targets[m.tedit+1];
+  const levels=[];for(let i=0;i<a.nlev;i++)levels.push({mean:num(g('t-mean-'+i).value),sd:num(g('t-sd-'+i).value),material:g('t-mat-'+i).value.trim(),lot:g('t-lot-'+i).value.trim(),exp:g('t-exp-'+i).value});
+  if(!date)return fail('Choose the date this change is effective from.');
+  if(date>todayStr())return fail('The effective date cannot be in the future.');
+  if(prev&&date<=prev.from)return fail('This change must start after the previous one ('+fmtDate(prev.from)+').');
+  if(next&&date>=next.from)return fail('This change must start before the next one ('+fmtDate(next.from)+'). Edit or delete the later change first.');
+  if(!note)return fail('Add a comment explaining the change.');
+  if(levels.some(l=>!l.material))return fail('Every level needs a QC material name.');
+  if(levels.some(l=>!l.exp))return fail('Every level needs an expiry date.');
+  if(levels.some(l=>l.mean==null||!(l.sd>0)))return fail('Every level needs a mean and an SD above zero.');
+  const was=fmtDate(t.from)+': '+t.levels.slice(0,a.nlev).map(l=>[l.material,l.lot,l.mean,l.sd].join('/')).join(' | ');
+  t.from=date;t.type=g('t-type').value;t.comment=note;t.edited={...stampNow()};
+  levels.forEach((l,i)=>Object.assign(t.levels[i],l));
+  audit('Target change edited',a.name+' (was '+was+') now from '+fmtDate(date)+': '+t.type+'. '+note,null,[a.dept]);
+  UI.modal=null;UI.thOpen=a.id;save();toast('Lot change updated.');
 }
 /* ===== Excel export ===== */
 const LIGHT={zone1:'#F2F6F7',zone2:'#FBF3DF',zone3:'#FBE6E3',accent:'#0B6E78',muted:'#55666F',ink:'#15222B',surface:'#FFFFFF',bad:'#BF3A2D',warn:'#A35F00',grid:'#E1E7EA'};
@@ -1848,6 +1909,8 @@ function mergeStates(L,R){
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
+  out.drules={};out.drulesAt={};{const ids=new Set([...Object.keys(L.drulesAt||{}),...Object.keys(R.drulesAt||{}),...Object.keys(L.drules||{}),...Object.keys(R.drules||{})]);
+   ids.forEach(id=>{const lr=(L.drulesAt||{})[id]||'',rr=(R.drulesAt||{})[id]||'',useR=rr>lr;const src=useR?R:L;if((src.drules||{})[id]!==undefined)out.drules[id]=src.drules[id];if(useR?rr:lr)out.drulesAt[id]=useR?rr:lr})}
   out.tomb=[...tomb];
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
@@ -1950,23 +2013,41 @@ function renderGithub(){
 </div>`;
 }
 /* ===== Westgard rules tab: shows every rule applied to QC points; admin switches them on or off ===== */
-function ruleCounts(){
+function rdeptList(){return isAdmin()?deptList():visDepts()}
+function rdeptSel(){
+  const L=rdeptList();if(!L.length)return '';
+  if(isAdmin()){return UI.rdept&&L.some(d=>d.id===UI.rdept)?UI.rdept:''}
+  return UI.rdept&&L.some(d=>d.id===UI.rdept)?UI.rdept:L[0].id;
+}
+const rdeptName=id=>{const d=deptList().find(x=>x.id===id);return d?d.dept:'this department'};
+function rdTarget(){
+  const d=rdeptSel();
+  if(!d)return {obj:(S.rules=S.rules||{}),stamp:()=>{S.rulesAt=nowIso()},label:'the laboratory',depts:[]};
+  if(!hasOwnRules(d))return null;
+  return {obj:S.drules[d],stamp:()=>{S.drulesAt=S.drulesAt||{};S.drulesAt[d]=nowIso()},label:rdeptName(d),depts:[d]};
+}
+function ruleCounts(dept){
   const c={};RORDER.forEach(k=>c[k]=0);const res=VR();
-  VA().forEach(a=>{const f=evaluate(a,res);Object.values(f).forEach(l=>l.forEach(x=>{if(c[x.rule]!=null)c[x.rule]++}))});
+  VA().filter(a=>!dept||a.dept===dept).forEach(a=>{const f=evaluate(a,res);Object.values(f).forEach(l=>l.forEach(x=>{if(c[x.rule]!=null)c[x.rule]++}))});
   const p=VA().length;return c;
 }
 function renderRules(){
-  const cnt=ruleCounts(),adm=isAdmin(),off=RORDER.filter(k=>!ruleOn(k)).length;
-  const card=k=>{const R=RULES[k],on=ruleOn(k),rej=R.sev==='reject';
+  const D=rdeptSel(),own=hasOwnRules(D),cnt=ruleCounts(D),admAll=isAdmin(),adm=admAll&&(!D||own),off=RORDER.filter(k=>!ruleOn(k,D)).length,dl=rdeptList();
+  const scopeOf2=k=>scopeOf(k,D),ruleOn2=k=>ruleOn(k,D);
+  const card=k=>{const R=RULES[k],on=ruleOn2(k),rej=R.sev==='reject';
     return `<div class="panelcard" style="${on?'':'opacity:.65'}"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px">
      <div><div class="row" style="gap:8px"><b style="font-size:1.05em">${R.name}</b><span class="chip ${rej?'bad':'warn'}">${rej?'Rejection rule':'Warning rule'}</span><span class="chip ${on?'good':''}">${on?'On':'Off'}</span></div>
      <p class="small" style="margin:6px 0 0;max-width:80ch">${R.desc}</p>
-     ${SCOPED.includes(k)?(adm?`<label class="f" style="margin-top:8px;max-width:560px">How this rule counts controls<select data-rscope="${k}">${Object.entries(SCOPE_TXT).map(([v,t])=>`<option value="${v}"${scopeOf(k)===v?' selected':''}>${t}</option>`).join('')}</select></label>`:`<p class="small" style="margin:6px 0 0"><b>Counts controls:</b> ${SCOPE_TXT[scopeOf(k)]}</p>`)+`<p class="small muted" style="margin:4px 0 0;max-width:80ch">${k==='10x'?'Example: with "across levels", 5 controls above the mean on Level 1 plus 5 on Level 2 count as 10. With "within each level", all 10 must be on one level.':k==='4-1s'?'Example: with "across levels", 2 on Level 1 and 2 on Level 2 beyond 1 SD on the same side count as 4.':'Example: with "across levels", Level 1 and Level 2 in the same run both beyond 2 SD on the same side trigger it. With "within each level", two consecutive runs of the same level must do so.'}</p>`:''}
+     ${SCOPED.includes(k)?(adm?`<label class="f" style="margin-top:8px;max-width:560px">How this rule counts controls<select data-rscope="${k}">${Object.entries(SCOPE_TXT).map(([v,t])=>`<option value="${v}"${scopeOf2(k)===v?' selected':''}>${t}</option>`).join('')}</select></label>`:`<p class="small" style="margin:6px 0 0"><b>Counts controls:</b> ${SCOPE_TXT[scopeOf2(k)]}</p>`)+`<p class="small muted" style="margin:4px 0 0;max-width:80ch">${k==='10x'?'Example: with "across levels", 5 controls above the mean on Level 1 plus 5 on Level 2 count as 10. With "within each level", all 10 must be on one level.':k==='4-1s'?'Example: with "across levels", 2 on Level 1 and 2 on Level 2 beyond 1 SD on the same side count as 4.':'Example: with "across levels", Level 1 and Level 2 in the same run both beyond 2 SD on the same side trigger it. With "within each level", two consecutive runs of the same level must do so.'}</p>`:''}
      <p class="small muted" style="margin:6px 0 0">Flagged ${cnt[k]} time${cnt[k]===1?'':'s'} in the QC points you can see.</p>
      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">What to do when it triggers</summary><ol class="small" style="margin:6px 0 0 18px;padding:0">${R.fix.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></details></div>
      ${adm?`<label class="row" style="gap:8px;flex-wrap:nowrap;white-space:nowrap;font-weight:600"><input type="checkbox" data-rulet="${k}"${on?' checked':''} aria-label="Apply ${esc(R.name)}"> Apply</label>`:''}</div></div>`};
-  return `<div class="stack"><div class="panel stack"><div><h2>Westgard rules</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Every rule QCLens checks on each QC point, across all control levels and analytes.${adm?' As administrator you can switch a rule off for the whole laboratory. A rule that is off is not checked, shown on charts or counted in alerts, and the change is recorded in the audit log.':' Only an administrator can switch rules on or off.'}</p></div>
-   ${off?`<div class="panelcard" style="border-color:var(--warn)"><b>${off} rule${off===1?' is':'s are'} switched off.</b> <span class="small">QC points are not being checked against ${RORDER.filter(k=>!ruleOn(k)).map(k=>RULES[k].name).join(', ')}.</span></div>`:''}
+  const deptBar=dl.length>1||(dl.length===1&&admAll)?`<div class="row" style="align-items:flex-end;gap:10px"><label class="f">Rules for<select id="rdept" style="width:auto;min-width:240px">${admAll?`<option value=""${D?'':' selected'}>All departments (laboratory rules)</option>`:''}${dl.map(d=>`<option value="${d.id}"${d.id===D?' selected':''}>${esc(d.dept)}${hasOwnRules(d.id)?' (own rules)':''}</option>`).join('')}</select></label>
+    ${D&&admAll?(own?`<button class="btn" data-act="rreset">Use the laboratory rules again</button>`:`<button class="btn primary" data-act="rcustom">Set own rules for ${esc(rdeptName(D))}</button>`):''}</div>
+    ${D?`<p class="small" style="margin:0"><b>${esc(rdeptName(D))}</b> ${own?'has its own rules. Changes here apply to this department only.':'follows the laboratory rules.'}${admAll&&!own?' Press <b>Set own rules</b> to give it a separate set, starting from the laboratory rules.':''}</p>`:`<p class="small" style="margin:0">These are the laboratory rules. Departments that do not have their own rules follow them.</p>`}`:'';
+  return `<div class="stack"><div class="panel stack"><div><h2>Westgard rules</h2><p class="muted small" style="margin:4px 0 0;max-width:80ch">Every rule QCLens checks on each QC point, across all control levels and analytes.${adm?' As administrator you can switch a rule off for the whole laboratory, or give a department its own set of rules. A rule that is off is not checked, shown on charts or counted in alerts, and the change is recorded in the audit log.':' Only an administrator can switch rules on or off.'}</p></div>
+   ${deptBar}
+   ${off?`<div class="panelcard" style="border-color:var(--warn)"><b>${off} rule${off===1?' is':'s are'} switched off.</b> <span class="small">QC points are not being checked against ${RORDER.filter(k=>!ruleOn2(k)).map(k=>RULES[k].name).join(', ')}.</span></div>`:''}
    <h3 style="margin:6px 0 0">Rejection rules</h3>${RORDER.filter(k=>RULES[k].sev==='reject').map(card).join('')}
    <h3 style="margin:6px 0 0">Warning rules</h3>${RORDER.filter(k=>RULES[k].sev!=='reject').map(card).join('')}</div></div>`;
 }
@@ -2143,10 +2224,10 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
-  const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['csubadd','csubno','rcustom','rreset','nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMONLY=new Set(['rcustom','rreset','deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -2219,7 +2300,7 @@ document.addEventListener('click',e=>{
    case 'papply':{const card=el.closest('.panelcard');let any=false;
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
-   case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);if(S.drules)delete S.drules[id];const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
    case 'newlab':UI.setupNew=true;break;
    case 'svcopen':e.preventDefault();UI.auth='conn';UI.ghMsg='';UI.ghDraft=null;break;
    case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
@@ -2273,6 +2354,14 @@ document.addEventListener('click',e=>{
    case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
+   case 'rcustom':{const D=rdeptSel();if(!D||!isAdmin())break;S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[D]=JSON.parse(JSON.stringify(S.rules||{}));S.drulesAt[D]=nowIso();audit('Department rules set',rdeptName(D)+' now has its own Westgard rules, copied from the laboratory rules',null,[D]);toast(rdeptName(D)+' now has its own rules.');break}
+   case 'rreset':{const D=rdeptSel();if(!D||!isAdmin())break;S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[D]=null;S.drulesAt[D]=nowIso();audit('Department rules removed',rdeptName(D)+' follows the laboratory Westgard rules again',null,[D]);toast(rdeptName(D)+' follows the laboratory rules again.');break}
+   case 'csubadd':{const nm=((document.getElementById('csub-name')||{}).value||'').trim().replace(/\s+/g,' '),er=document.getElementById('csub-err');
+     const bad=m=>{if(er){er.textContent=m;er.hidden=false}return true};
+     if(!nm){bad('Enter a name for the sub-department.');return}
+     if(subList(st.dept).some(x=>x.toLowerCase()===nm.toLowerCase())){st.sub=subList(st.dept).find(x=>x.toLowerCase()===nm.toLowerCase());st.selFor='';UI.csub=false;toast(nm+' already exists. It is selected.');break}
+     st.sub=nm;st.selFor='';UI.csub=false;toast('Sub-department "'+nm+'" added. Create its panels in the next step.');break}
+   case 'csubno':UI.csub=false;break;
    case 'donetoggle':UI.doneOpen=!UI.doneOpen;break;
    case 'obsave':saveOther();break;
    case 'obsaveone':saveOther(id);break;
@@ -2287,6 +2376,12 @@ document.addEventListener('click',e=>{
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
    case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
+   case 'tedit':UI.modal={aid:id,tedit:+el.dataset.i};UI.thOpen=id;break;
+   case 'teditsave':if(saveTargetEdit())return;break;
+   case 'tdel':UI.tdel={aid:id,i:+el.dataset.i};UI.thOpen=id;break;
+   case 'tdelno':UI.tdel=null;break;
+   case 'tdelok':{const a=anOf(id),i=+el.dataset.i,t=a&&a.targets[i];UI.tdel=null;if(!a||!t||i===0)break;
+     a.targets.splice(i,1);audit('Target change deleted',a.name+': '+(t.type||'Target change')+' effective '+fmtDate(t.from)+' ('+t.levels.slice(0,a.nlev).map(l=>[l.material,l.lot,l.mean,l.sd].join('/')).join(' | ')+')',null,[a.dept]);UI.thOpen=id;toast('Lot change deleted. Earlier targets now apply from that date.');break}
    case 'addopen':{const f=DA().find(x=>x.panel===el.dataset.p);UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev};break}
    case 'sugg':{const rp=panelsNow().find(p=>p.name===el.dataset.p),it=rp.items.find(i=>i.name===el.dataset.n),f=DA().find(x=>x.panel===el.dataset.p);
      UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev,name:it.name,unit:st.units[it.name]!=null?st.units[it.name]:it.unit};break}
@@ -2335,8 +2430,9 @@ document.addEventListener('change',e=>{
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
   if(t.id==='af-to'){AF.to=t.value;AF.limit=100;return render()}
-  if(d.rscope){if(!isAdmin())return;S.rules=S.rules||{};const v=t.value;if(v==='within'||v==='across')S.rules[d.rscope+'@']=v;else delete S.rules[d.rscope+'@'];S.rulesAt=nowIso();audit('Westgard rule scope changed',RULES[d.rscope].name+': '+SCOPE_TXT[scopeOf(d.rscope)],null,[]);save();return render()}
-  if(d.rulet){if(!isAdmin())return;S.rules=S.rules||{};const on=t.checked;if(on)delete S.rules[d.rulet];else S.rules[d.rulet]=false;S.rulesAt=nowIso();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name,null,[]);save();return render()}
+  if(d.rscope){if(!isAdmin())return;const tg=rdTarget();if(!tg)return render();const v=t.value;if(v==='within'||v==='across')tg.obj[d.rscope+'@']=v;else delete tg.obj[d.rscope+'@'];tg.stamp();audit('Westgard rule scope changed',RULES[d.rscope].name+': '+SCOPE_TXT[v==='within'||v==='across'?v:'both']+' ('+tg.label+')',null,tg.depts);save();return render()}
+  if(d.rulet){if(!isAdmin())return;const tg=rdTarget();if(!tg)return render();const on=t.checked;if(on)delete tg.obj[d.rulet];else tg.obj[d.rulet]=false;tg.stamp();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name+' ('+tg.label+')',null,tg.depts);save();return render()}
+  if(t.id==='rdept'){UI.rdept=t.value;return render()}
   if((d.udept||d.urole)&&!isAdmin())return;
   if(d.path==='dept'&&!isAdmin())return;
   if(d.udept){const [uid_,did]=d.udept.split(':'),u=S.users.find(x=>x.id===uid_);if(!u)return;
@@ -2346,7 +2442,7 @@ document.addEventListener('change',e=>{
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
-  if(t.id==='e-matlib'||t.id==='m-matlib'){const pf=t.id==='e-matlib'?'e':'m',ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
+  if(t.id==='e-matlib'||t.id==='m-matlib'||t.id==='t-matlib'){const pf=t.id[0],ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
     if(ml&&a){const k=Math.min(a.nlev,ml.levels.length),set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};
       for(let i=0;i<k;i++){set(pf+'-mat-'+i,ml.levels[i].material||'');set(pf+'-lot-'+i,ml.levels[i].lot||'');set(pf+'-exp-'+i,ml.levels[i].exp||'')}
       toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+(ml.levels.length<a.nlev?'. This analyte has more levels, fill in the rest by hand.':'.'))}
@@ -2359,7 +2455,8 @@ document.addEventListener('change',e=>{
   if(d.rnp){const oldN=d.rnp,v=t.value.trim(),cp=st.cpanels.find(c=>c.name===d.rnp);
     if(!v||(v!==d.rnp&&panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===v.toLowerCase()))){toast(v?'A panel with that name already exists.':'Panel name cannot be empty.');return render()}
     DA().forEach(a=>{if(a.panel===d.rnp)a.panel=v});cp.name=v;save();document.querySelectorAll('[data-rnp]').forEach(x=>{if(x.getAttribute('data-rnp')===oldN){x.setAttribute('data-rnp',v);x.value=v}});document.querySelectorAll('[data-p]').forEach(x=>{if(x.getAttribute('data-p')===oldN)x.setAttribute('data-p',v)});return}
-  if(d.path){st[d.path]=t.value;
+  if(d.path==='sub'&&t.value==='__new'){UI.csub=true;return render()}
+  if(d.path){UI.csub=false;st[d.path]=t.value;
     if(d.path==='dept'){st.sub=Object.keys(CAT[t.value].subs)[0];st.analyser='';st.analysers=[];st.amods={};st.selFor=''}
     if(d.path==='sub')st.selFor='';
     save();return render()}
@@ -2399,7 +2496,7 @@ document.addEventListener('change',e=>{
   if(t.id==='win'){UI.win=+t.value;return render()}
   if(t.id==='restore'&&t.files[0]){const fr=new FileReader();fr.onload=()=>{try{const o=JSON.parse(fr.result);if(!o||!Array.isArray(o.analytes)||!o.setup)throw 0;const kU=S.users,kA=S.audit;S=norm(o);if(!S.users.length)S.users=kU;if(!S.audit.length)S.audit=kA;UI.editing=false;CU=S.users.find(u=>u.id===(SESS&&SESS.uid)&&u.active!==false)||null;if(!CU){SESS=null;writeSess()}else audit('Backup restored','Data restored from a backup file');save();render();toast('Backup restored.')}catch(x){toast('That file is not a valid QC backup.')}};fr.readAsText(t.files[0])}
 });
-document.addEventListener('toggle',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-more'))UI.moreOpen=e.target.open},true);
+document.addEventListener('toggle',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-more'))UI.moreOpen=e.target.open;if(e.target.hasAttribute&&e.target.hasAttribute('data-thopen')){const id=e.target.getAttribute('data-thopen');if(e.target.open)UI.thOpen=id;else if(UI.thOpen===id)UI.thOpen=null}},true);
 /* chart tooltips */
 document.addEventListener('pointerover',e=>{
   const h=e.target.closest&&e.target.closest('.hit');if(!h)return;

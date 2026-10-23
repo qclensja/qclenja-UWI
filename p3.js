@@ -55,8 +55,11 @@ const RULES={
 const RORDER=['1-2s','1-3s','2-2s','R-4s','4-1s','10x','T7','S6'];
 const SCOPED=['2-2s','4-1s','10x'];
 const SCOPE_TXT={both:'Within each level or across levels (either one triggers it)',within:'Within each level only (each level on its own)',across:'Across levels only (all levels together, in the order they were run)'};
-const scopeOf=k=>{try{const v=S.rules&&S.rules[k+'@'];return v==='within'||v==='across'?v:'both'}catch(e){return 'both'}};
-const ruleOn=k=>{try{return !S.rules||S.rules[k]!==false}catch(e){return true}};
+/* rules are set for the whole laboratory, and a department can have its own set (S.drules[deptId]) */
+const rulesFor=d=>{try{const o=d&&S.drules&&S.drules[d];return o||S.rules||{}}catch(e){return {}}};
+const hasOwnRules=d=>{try{return !!(d&&S.drules&&S.drules[d])}catch(e){return false}};
+const scopeOf=(k,d)=>{const v=rulesFor(d)[k+'@'];return v==='within'||v==='across'?v:'both'};
+const ruleOn=(k,d)=>rulesFor(d)[k]!==false;
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -71,11 +74,11 @@ function patternsFor(a,lv,results){
       let j=i+1;while(j+1<seg.length&&Math.sign(seg[j+1].z-seg[j].z)===d)j++;
       if(j-i+1>=7)push('trend',d,seg.slice(i,j+1),seg);i=d?j:j+1}
   });
-  return out.filter(p=>ruleOn(p.kind==='shift'?'S6':'T7'));
+  return out.filter(p=>ruleOn(p.kind==='shift'?'S6':'T7',a.dept));
 }
 function evaluate(a,results){
   const out={}; // resultId -> [{rule,sev}]
-  const add=(r,rule)=>{if(!ruleOn(rule))return;const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
+  const D=a.dept,add=(r,rule)=>{if(!ruleOn(rule,D))return;const o=out[r.id]||(out[r.id]=[]);if(!o.some(x=>x.rule===rule))o.push({rule,sev:RULES[rule].sev})};
   const rs=results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:x.lv-y.lv);
   const segs={};
   rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
@@ -84,7 +87,7 @@ function evaluate(a,results){
     const byLv={};seg.forEach(p=>(byLv[p.r.lv]||(byLv[p.r.lv]=[])).push(p));
     const byDate={};seg.forEach(p=>(byDate[p.r.date]||(byDate[p.r.date]=[])).push(p));
     const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
-    const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k)!=='across',ac=k=>multi&&scopeOf(k)!=='within';
+    const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k,D)!=='across',ac=k=>multi&&scopeOf(k,D)!=='within';
     Object.values(byLv).forEach(arr=>{
       if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
       if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');

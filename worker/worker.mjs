@@ -45,7 +45,7 @@ export function applyRules(R,C,caller,pwset){
   }
   let out;
   if(caller.role==='admin')out={...C,users,requests:unionReq(R.requests,C.requests)};
-  else if(caller.role==='sup')out={...C,users,requests:R.requests||[],rules:R.rules,rulesAt:R.rulesAt,perms:R.perms,permsAt:R.permsAt,tomb:unionBy(R.tomb,C.tomb,x=>x)};
+  else if(caller.role==='sup')out={...C,users,requests:R.requests||[],rules:R.rules,rulesAt:R.rulesAt,drules:R.drules,drulesAt:R.drulesAt,perms:R.perms,permsAt:R.permsAt,tomb:unionBy(R.tomb,C.tomb,x=>x)};
   else out={...R,users,results:unionBy(R.results,C.results,x=>x.id),skips:unionBy(R.skips,C.skips,x=>x.aid+'|'+x.date),audit:unionBy(R.audit,C.audit,x=>x.id)};
   delete out.tab;return out;
 }

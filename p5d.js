@@ -53,10 +53,10 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
-  const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
+  const ADMIN=new Set(['csubadd','csubno','rcustom','rreset','nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMONLY=new Set(['rcustom','rreset','deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -129,7 +129,7 @@ document.addEventListener('click',e=>{
    case 'papply':{const card=el.closest('.panelcard');let any=false;
      DA().filter(a=>a.panel===el.dataset.p&&(card.dataset.g==null||(instOf(a)||'No analyser')===card.dataset.g)).forEach(a=>a.targets[0].levels.slice(0,a.nlev).forEach((l,i)=>{const m=card.querySelector(`[data-pm="${i}"]`),lo=card.querySelector(`[data-pl="${i}"]`);const pe=card.querySelector(`[data-pe="${i}"]`);if(m&&m.value.trim()){l.material=m.value.trim();l.lot=lo?lo.value.trim():'';if(pe&&pe.value)l.exp=pe.value;any=true}}));
      if(!any){toast('Enter at least one QC material first.');return}break}
-   case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
+   case 'closesetup':{if(st.adding){const id=st.cur;tomb(id,...S.analytes.filter(a=>a.dept===id).map(a=>a.id));S.analytes=S.analytes.filter(a=>a.dept!==id);S.depts=S.depts.filter(d=>d.id!==id);if(S.drules)delete S.drules[id];const pv=st.prevCur;st.adding=false;st.cur='';if(pv)loadCtx(pv);toast('Department not added.')}UI.editing=false;break}
    case 'newlab':UI.setupNew=true;break;
    case 'svcopen':e.preventDefault();UI.auth='conn';UI.ghMsg='';UI.ghDraft=null;break;
    case 'reqopen':e.preventDefault();UI.auth='request';UI.authMsg='';UI.reqDone=false;break;
@@ -183,6 +183,14 @@ document.addEventListener('click',e=>{
    case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
+   case 'rcustom':{const D=rdeptSel();if(!D||!isAdmin())break;S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[D]=JSON.parse(JSON.stringify(S.rules||{}));S.drulesAt[D]=nowIso();audit('Department rules set',rdeptName(D)+' now has its own Westgard rules, copied from the laboratory rules',null,[D]);toast(rdeptName(D)+' now has its own rules.');break}
+   case 'rreset':{const D=rdeptSel();if(!D||!isAdmin())break;S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[D]=null;S.drulesAt[D]=nowIso();audit('Department rules removed',rdeptName(D)+' follows the laboratory Westgard rules again',null,[D]);toast(rdeptName(D)+' follows the laboratory rules again.');break}
+   case 'csubadd':{const nm=((document.getElementById('csub-name')||{}).value||'').trim().replace(/\s+/g,' '),er=document.getElementById('csub-err');
+     const bad=m=>{if(er){er.textContent=m;er.hidden=false}return true};
+     if(!nm){bad('Enter a name for the sub-department.');return}
+     if(subList(st.dept).some(x=>x.toLowerCase()===nm.toLowerCase())){st.sub=subList(st.dept).find(x=>x.toLowerCase()===nm.toLowerCase());st.selFor='';UI.csub=false;toast(nm+' already exists. It is selected.');break}
+     st.sub=nm;st.selFor='';UI.csub=false;toast('Sub-department "'+nm+'" added. Create its panels in the next step.');break}
+   case 'csubno':UI.csub=false;break;
    case 'donetoggle':UI.doneOpen=!UI.doneOpen;break;
    case 'obsave':saveOther();break;
    case 'obsaveone':saveOther(id);break;
@@ -197,6 +205,12 @@ document.addEventListener('click',e=>{
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
    case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
+   case 'tedit':UI.modal={aid:id,tedit:+el.dataset.i};UI.thOpen=id;break;
+   case 'teditsave':if(saveTargetEdit())return;break;
+   case 'tdel':UI.tdel={aid:id,i:+el.dataset.i};UI.thOpen=id;break;
+   case 'tdelno':UI.tdel=null;break;
+   case 'tdelok':{const a=anOf(id),i=+el.dataset.i,t=a&&a.targets[i];UI.tdel=null;if(!a||!t||i===0)break;
+     a.targets.splice(i,1);audit('Target change deleted',a.name+': '+(t.type||'Target change')+' effective '+fmtDate(t.from)+' ('+t.levels.slice(0,a.nlev).map(l=>[l.material,l.lot,l.mean,l.sd].join('/')).join(' | ')+')',null,[a.dept]);UI.thOpen=id;toast('Lot change deleted. Earlier targets now apply from that date.');break}
    case 'addopen':{const f=DA().find(x=>x.panel===el.dataset.p);UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev};break}
    case 'sugg':{const rp=panelsNow().find(p=>p.name===el.dataset.p),it=rp.items.find(i=>i.name===el.dataset.n),f=DA().find(x=>x.panel===el.dataset.p);
      UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev,name:it.name,unit:st.units[it.name]!=null?st.units[it.name]:it.unit};break}
@@ -245,8 +259,9 @@ document.addEventListener('change',e=>{
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
   if(t.id==='af-to'){AF.to=t.value;AF.limit=100;return render()}
-  if(d.rscope){if(!isAdmin())return;S.rules=S.rules||{};const v=t.value;if(v==='within'||v==='across')S.rules[d.rscope+'@']=v;else delete S.rules[d.rscope+'@'];S.rulesAt=nowIso();audit('Westgard rule scope changed',RULES[d.rscope].name+': '+SCOPE_TXT[scopeOf(d.rscope)],null,[]);save();return render()}
-  if(d.rulet){if(!isAdmin())return;S.rules=S.rules||{};const on=t.checked;if(on)delete S.rules[d.rulet];else S.rules[d.rulet]=false;S.rulesAt=nowIso();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name,null,[]);save();return render()}
+  if(d.rscope){if(!isAdmin())return;const tg=rdTarget();if(!tg)return render();const v=t.value;if(v==='within'||v==='across')tg.obj[d.rscope+'@']=v;else delete tg.obj[d.rscope+'@'];tg.stamp();audit('Westgard rule scope changed',RULES[d.rscope].name+': '+SCOPE_TXT[v==='within'||v==='across'?v:'both']+' ('+tg.label+')',null,tg.depts);save();return render()}
+  if(d.rulet){if(!isAdmin())return;const tg=rdTarget();if(!tg)return render();const on=t.checked;if(on)delete tg.obj[d.rulet];else tg.obj[d.rulet]=false;tg.stamp();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name+' ('+tg.label+')',null,tg.depts);save();return render()}
+  if(t.id==='rdept'){UI.rdept=t.value;return render()}
   if((d.udept||d.urole)&&!isAdmin())return;
   if(d.path==='dept'&&!isAdmin())return;
   if(d.udept){const [uid_,did]=d.udept.split(':'),u=S.users.find(x=>x.id===uid_);if(!u)return;
@@ -256,7 +271,7 @@ document.addEventListener('change',e=>{
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
-  if(t.id==='e-matlib'||t.id==='m-matlib'){const pf=t.id==='e-matlib'?'e':'m',ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
+  if(t.id==='e-matlib'||t.id==='m-matlib'||t.id==='t-matlib'){const pf=t.id[0],ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
     if(ml&&a){const k=Math.min(a.nlev,ml.levels.length),set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};
       for(let i=0;i<k;i++){set(pf+'-mat-'+i,ml.levels[i].material||'');set(pf+'-lot-'+i,ml.levels[i].lot||'');set(pf+'-exp-'+i,ml.levels[i].exp||'')}
       toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+(ml.levels.length<a.nlev?'. This analyte has more levels, fill in the rest by hand.':'.'))}
@@ -269,7 +284,8 @@ document.addEventListener('change',e=>{
   if(d.rnp){const oldN=d.rnp,v=t.value.trim(),cp=st.cpanels.find(c=>c.name===d.rnp);
     if(!v||(v!==d.rnp&&panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===v.toLowerCase()))){toast(v?'A panel with that name already exists.':'Panel name cannot be empty.');return render()}
     DA().forEach(a=>{if(a.panel===d.rnp)a.panel=v});cp.name=v;save();document.querySelectorAll('[data-rnp]').forEach(x=>{if(x.getAttribute('data-rnp')===oldN){x.setAttribute('data-rnp',v);x.value=v}});document.querySelectorAll('[data-p]').forEach(x=>{if(x.getAttribute('data-p')===oldN)x.setAttribute('data-p',v)});return}
-  if(d.path){st[d.path]=t.value;
+  if(d.path==='sub'&&t.value==='__new'){UI.csub=true;return render()}
+  if(d.path){UI.csub=false;st[d.path]=t.value;
     if(d.path==='dept'){st.sub=Object.keys(CAT[t.value].subs)[0];st.analyser='';st.analysers=[];st.amods={};st.selFor=''}
     if(d.path==='sub')st.selFor='';
     save();return render()}
@@ -309,7 +325,7 @@ document.addEventListener('change',e=>{
   if(t.id==='win'){UI.win=+t.value;return render()}
   if(t.id==='restore'&&t.files[0]){const fr=new FileReader();fr.onload=()=>{try{const o=JSON.parse(fr.result);if(!o||!Array.isArray(o.analytes)||!o.setup)throw 0;const kU=S.users,kA=S.audit;S=norm(o);if(!S.users.length)S.users=kU;if(!S.audit.length)S.audit=kA;UI.editing=false;CU=S.users.find(u=>u.id===(SESS&&SESS.uid)&&u.active!==false)||null;if(!CU){SESS=null;writeSess()}else audit('Backup restored','Data restored from a backup file');save();render();toast('Backup restored.')}catch(x){toast('That file is not a valid QC backup.')}};fr.readAsText(t.files[0])}
 });
-document.addEventListener('toggle',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-more'))UI.moreOpen=e.target.open},true);
+document.addEventListener('toggle',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-more'))UI.moreOpen=e.target.open;if(e.target.hasAttribute&&e.target.hasAttribute('data-thopen')){const id=e.target.getAttribute('data-thopen');if(e.target.open)UI.thOpen=id;else if(UI.thOpen===id)UI.thOpen=null}},true);
 /* chart tooltips */
 document.addEventListener('pointerover',e=>{
   const h=e.target.closest&&e.target.closest('.hit');if(!h)return;

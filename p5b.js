@@ -76,6 +76,7 @@ function renderCharts(){
     <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
    ${charts}
+   ${targetHistory(a)}
    <div class="panel"><h3 style="margin-bottom:8px">Recent results</h3><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Level</th><th>Value</th><th>SD from mean</th><th>Status</th><th>Comment</th><th>Entered by</th><th>Entered</th></tr></thead><tbody>
    ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${levelName(r.lv)}</td><td class="mono">${fmt(r.value,dp+1)}</td><td class="mono">${zOf(a,r).toFixed(2)}</td><td>${chipFor(r,flags)}</td><td class="small">${r.ov?esc(r.ov.comment):''}</td><td>${esc(r.byName||'–')}</td><td class="small">${r.at?fmtTs(r.at):'–'}${r.upd?'<br>edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at)+(r.upd.reason?'<br><i>Reason: '+esc(r.upd.reason)+'</i>':''):''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</tbody></table></div></div></div>`;
 }
@@ -84,6 +85,7 @@ const CHG=['New control lot','New reagent lot','New calibrator lot','After recal
 function renderModal(){
   const m=UI.modal;if(!m)return '';
   if(m.acct)return renderAcctModal();
+  if(m.tedit!==undefined)return renderTargetEditModal();
   if(m.add)return renderAddModal();
   if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
@@ -120,4 +122,51 @@ function saveLot(){
   a.targets=a.targets.filter(x=>x.from!==date);a.targets.push(t);a.targets.sort((x,y)=>x.from<y.from?-1:1);
   audit('Targets changed',a.name+' from '+fmtDate(date)+': '+t.type+'. '+note,null,a.dept);
   UI.modal=null;save();toast('New targets saved from '+fmtDate(date)+'.');
+}
+
+/* ===== History of lot changes and target adjustments: edit or delete ===== */
+function targetHistory(a){
+  const dp=decs(a),can=perm('e_lot');
+  if(a.targets.length<2&&!can)return '';
+  const rows=a.targets.map((t,i)=>{
+    const first=i===0,c=UI.tdel&&UI.tdel.aid===a.id&&UI.tdel.i===i;
+    const lv=t.levels.slice(0,a.nlev).map((l,k)=>levelName(k)+': '+esc(l.material||'–')+(l.lot?' · Lot '+esc(l.lot):'')+(l.exp?' · exp '+fmtDate(l.exp):'')+' · mean '+fmt(l.mean,dp+1)+' · SD '+fmt(l.sd,dp+1)).join('<br>');
+    return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${first?'Starting targets':esc(t.type||'Target change')}</b> <span class="small muted">${first&&!t.from?'from the first QC':'effective '+fmtDate(t.from)}${t.byName?' · '+esc(t.byName):''}${t.at?' · '+fmtTs(t.at):''}</span>
+      <div class="small" style="margin-top:6px">${lv}</div>${t.comment&&!first?`<div class="small" style="margin-top:6px"><b>Comment:</b> ${esc(t.comment)}</div>`:''}${t.edited?`<div class="small muted" style="margin-top:4px">Edited by ${esc(t.edited.byName||'')} · ${fmtTs(t.edited.at)}</div>`:''}</div>
+      ${can?`<div class="row" style="gap:6px;flex-wrap:nowrap">${first?'<span class="small muted">Edit under Setup</span>':c?`<span class="small">Delete this change? Results from ${fmtDate(t.from)} will use the earlier targets.</span><button class="btn sm danger" data-act="tdelok" data-id="${a.id}" data-i="${i}">Yes, delete</button><button class="btn sm" data-act="tdelno">Cancel</button>`:`<button class="btn sm" data-act="tedit" data-id="${a.id}" data-i="${i}">Edit</button><button class="btn sm danger" data-act="tdel" data-id="${a.id}" data-i="${i}">Delete</button>`}</div>`:''}</div></div>`}).join('');
+  return `<details class="panel" style="padding:0"${UI.thOpen===a.id?' open':''} data-thopen="${a.id}"><summary style="padding:12px 16px;cursor:pointer"><b>Lot changes and target adjustments (${a.targets.length-1})</b> <span class="muted small">Review, edit or delete earlier changes</span></summary><div class="stack" style="padding:0 16px 14px">${rows}</div></details>`;
+}
+function renderTargetEditModal(){
+  const m=UI.modal,a=anOf(m.aid),t=a&&a.targets[m.tedit];if(!a||!t){UI.modal=null;return ''}
+  const prev=a.targets[m.tedit-1],next=a.targets[m.tedit+1];
+  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:880px" role="dialog" aria-modal="true" aria-label="Edit lot change" data-stop>
+   <h2>Edit lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules are checked again for the results this change covers.</p>
+   <div class="stack"><div class="grid2"><label class="f">Reason<select id="t-type">${CHG.map(c=>`<option${c===t.type?' selected':''}>${c}</option>`).join('')}${CHG.includes(t.type)||!t.type?'':`<option selected>${esc(t.type)}</option>`}</select></label>
+    <label class="f">Effective from<input type="date" id="t-date" value="${esc(t.from)}" min="${prev?esc(prev.from):''}" max="${next?esc(next.from):todayStr()}"></label></div>
+   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="t-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
+   <div class="scroll"><table class="t"><thead><tr><th>Level</th><th>QC material</th><th>Lot no.</th><th>Expiry date</th><th>Mean</th><th>SD</th></tr></thead><tbody>
+   ${t.levels.slice(0,a.nlev).map((l,i)=>`<tr><td>${levelName(i)}</td><td><input type="text" id="t-mat-${i}" value="${esc(l.material||'')}" style="width:170px" aria-label="${levelName(i)} QC material"></td><td><input type="text" id="t-lot-${i}" value="${esc(l.lot||'')}" style="width:100px" aria-label="${levelName(i)} lot"></td><td><input type="date" id="t-exp-${i}" value="${esc(l.exp||'')}" aria-label="${levelName(i)} expiry"></td><td><input type="number" step="any" id="t-mean-${i}" value="${l.mean!=null?esc(String(l.mean)):''}" style="width:92px" aria-label="${levelName(i)} mean"></td><td><input type="number" step="any" min="0" id="t-sd-${i}" value="${l.sd!=null?esc(String(l.sd)):''}" style="width:80px" aria-label="${levelName(i)} SD"></td></tr>`).join('')}</tbody></table></div>
+   <label class="f">Comment explaining the change (required)<textarea id="t-note" rows="3">${esc(t.comment||'')}</textarea></label>
+   <p id="t-err" class="small" style="color:var(--bad);margin:0" hidden></p>
+   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="mclose">Cancel</button><button class="btn primary" data-act="teditsave">Save changes</button></div></div></div></div>`;
+}
+function saveTargetEdit(){
+  const m=UI.modal,a=anOf(m.aid),t=a&&a.targets[m.tedit],g=id=>document.getElementById(id),err=g('t-err');
+  if(!a||!t)return;
+  const fail=x=>{err.textContent=x;err.hidden=false;return true};
+  const date=g('t-date').value,note=g('t-note').value.trim(),prev=a.targets[m.tedit-1],next=a.targets[m.tedit+1];
+  const levels=[];for(let i=0;i<a.nlev;i++)levels.push({mean:num(g('t-mean-'+i).value),sd:num(g('t-sd-'+i).value),material:g('t-mat-'+i).value.trim(),lot:g('t-lot-'+i).value.trim(),exp:g('t-exp-'+i).value});
+  if(!date)return fail('Choose the date this change is effective from.');
+  if(date>todayStr())return fail('The effective date cannot be in the future.');
+  if(prev&&date<=prev.from)return fail('This change must start after the previous one ('+fmtDate(prev.from)+').');
+  if(next&&date>=next.from)return fail('This change must start before the next one ('+fmtDate(next.from)+'). Edit or delete the later change first.');
+  if(!note)return fail('Add a comment explaining the change.');
+  if(levels.some(l=>!l.material))return fail('Every level needs a QC material name.');
+  if(levels.some(l=>!l.exp))return fail('Every level needs an expiry date.');
+  if(levels.some(l=>l.mean==null||!(l.sd>0)))return fail('Every level needs a mean and an SD above zero.');
+  const was=fmtDate(t.from)+': '+t.levels.slice(0,a.nlev).map(l=>[l.material,l.lot,l.mean,l.sd].join('/')).join(' | ');
+  t.from=date;t.type=g('t-type').value;t.comment=note;t.edited={...stampNow()};
+  levels.forEach((l,i)=>Object.assign(t.levels[i],l));
+  audit('Target change edited',a.name+' (was '+was+') now from '+fmtDate(date)+': '+t.type+'. '+note,null,[a.dept]);
+  UI.modal=null;UI.thOpen=a.id;save();toast('Lot change updated.');
 }
