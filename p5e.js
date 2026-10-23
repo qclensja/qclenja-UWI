@@ -206,6 +206,7 @@ function renderEditModal(){
    <h2>Edit ${esc(a.name)}</h2><p class="muted small" style="margin:4px 0 12px">Correct the name, unit or current QC details. Past QC results are kept and stay with this analyte. This changes the current target from its start date. If a new lot has started, use <b>Lot change</b> on the Charts screen so the old limits are kept for the old results.</p>
    <div class="stack"><div class="grid2"><label class="f">Analyte name<input type="text" id="e-name" value="${esc(a.name)}"></label>
    <label class="f">Unit<input type="text" id="e-unit" list="unitlist" value="${esc(a.unit)}"></label></div>
+   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="e-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
    ${Array.from({length:n},(_,i)=>{const l=t.levels[i]||{};return `<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
      <label class="f" style="flex:2 1 170px">QC material<input type="text" id="e-mat-${i}" value="${esc(l.material||'')}"></label>
      <label class="f" style="flex:1 1 100px">Lot no.<input type="text" id="e-lot-${i}" value="${esc(l.lot||'')}"></label>
