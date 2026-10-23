@@ -29,6 +29,10 @@ function targetIndex(a,date){
   a.targets.forEach((t,i)=>{if(t.from<=date)idx=i});
   return idx;
 }
+/* a lot change or target adjustment only counts for a control level when that level's mean, SD, material or lot changed */
+function lvChanged(a,i,lv){const p=(a.targets[i-1]||{levels:[]}).levels[lv],c=(a.targets[i]||{levels:[]}).levels[lv];if(!p||!c)return p!==c;
+  return p.mean!==c.mean||p.sd!==c.sd||(p.lot||'')!==(c.lot||'')||(p.material||'')!==(c.material||'')}
+function lvEra(a,lv,date){const ti=targetIndex(a,date);let e=0;for(let i=1;i<=ti;i++)if(lvChanged(a,i,lv))e++;return e}
 const targetFor=(a,date)=>a.targets[targetIndex(a,date)];
 const curTarget=a=>a.targets[a.targets.length-1];
 const zOf=(a,r)=>{const t=targetFor(a,r.date).levels[r.lv];return t&&t.sd>0?(r.value-t.mean)/t.sd:0};
@@ -62,7 +66,7 @@ const scopeOf=(k,d)=>{const v=rulesFor(d)[k+'@'];return v==='within'||v==='acros
 const ruleOn=(k,d)=>rulesFor(d)[k]!==false;
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
-  rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
+  rs.forEach(r=>{const k=lvEra(a,lv,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
   const out=[],push=(kind,dir,w,seg)=>out.push({kind,dir,lv,ids:w.map(p=>p.r.id),n:w.length,from:w[0].r.date,to:w[w.length-1].r.date,open:w[w.length-1]===seg[seg.length-1]});
   Object.values(segs).forEach(seg=>{
     let i=0;while(i<seg.length){ // shift: same side of the mean
@@ -88,11 +92,6 @@ function evaluate(a,results){
     const byDate={};seg.forEach(p=>(byDate[p.r.date]||(byDate[p.r.date]=[])).push(p));
     const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
     const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k,D)!=='across',ac=k=>multi&&scopeOf(k,D)!=='within';
-    Object.values(byLv).forEach(arr=>{
-      if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
-      if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
-      if(wi('10x'))runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
-    });
     // across levels, chronological stream of all levels
     if(multi){
       if(ac('4-1s'))runs(seg,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
@@ -106,6 +105,14 @@ function evaluate(a,results){
       }
     });
   });
+  // within each level: a level's own run only restarts when that level's targets changed
+  {const lvSegs={},nl=new Set(rs.map(r=>r.lv)).size>1;rs.forEach(r=>{const k=r.lv+'|'+lvEra(a,r.lv,r.date);(lvSegs[k]||(lvSegs[k]=[])).push({r,z:zOf(a,r)})});
+   const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
+   const wi=k=>!nl||scopeOf(k,D)!=='across';
+   Object.values(lvSegs).forEach(arr=>{
+     if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
+     if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
+     if(wi('10x'))runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x')})}
   const byId={};results.forEach(r=>{if(r.aid===a.id)byId[r.id]=r});
   for(let lv=0;lv<(a.nlev||1);lv++)patternsFor(a,lv,results).forEach(sp=>{
     if(sp.kind==='trend')sp.ids.slice(6).forEach(id=>add(byId[id],'T7'));

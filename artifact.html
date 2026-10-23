@@ -212,6 +212,10 @@ function targetIndex(a,date){
   a.targets.forEach((t,i)=>{if(t.from<=date)idx=i});
   return idx;
 }
+/* a lot change or target adjustment only counts for a control level when that level's mean, SD, material or lot changed */
+function lvChanged(a,i,lv){const p=(a.targets[i-1]||{levels:[]}).levels[lv],c=(a.targets[i]||{levels:[]}).levels[lv];if(!p||!c)return p!==c;
+  return p.mean!==c.mean||p.sd!==c.sd||(p.lot||'')!==(c.lot||'')||(p.material||'')!==(c.material||'')}
+function lvEra(a,lv,date){const ti=targetIndex(a,date);let e=0;for(let i=1;i<=ti;i++)if(lvChanged(a,i,lv))e++;return e}
 const targetFor=(a,date)=>a.targets[targetIndex(a,date)];
 const curTarget=a=>a.targets[a.targets.length-1];
 const zOf=(a,r)=>{const t=targetFor(a,r.date).levels[r.lv];return t&&t.sd>0?(r.value-t.mean)/t.sd:0};
@@ -245,7 +249,7 @@ const scopeOf=(k,d)=>{const v=rulesFor(d)[k+'@'];return v==='within'||v==='acros
 const ruleOn=(k,d)=>rulesFor(d)[k]!==false;
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
-  rs.forEach(r=>{const k=targetIndex(a,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
+  rs.forEach(r=>{const k=lvEra(a,lv,r.date);(segs[k]||(segs[k]=[])).push({r,z:zOf(a,r)})});
   const out=[],push=(kind,dir,w,seg)=>out.push({kind,dir,lv,ids:w.map(p=>p.r.id),n:w.length,from:w[0].r.date,to:w[w.length-1].r.date,open:w[w.length-1]===seg[seg.length-1]});
   Object.values(segs).forEach(seg=>{
     let i=0;while(i<seg.length){ // shift: same side of the mean
@@ -271,11 +275,6 @@ function evaluate(a,results){
     const byDate={};seg.forEach(p=>(byDate[p.r.date]||(byDate[p.r.date]=[])).push(p));
     const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
     const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k,D)!=='across',ac=k=>multi&&scopeOf(k,D)!=='within';
-    Object.values(byLv).forEach(arr=>{
-      if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
-      if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
-      if(wi('10x'))runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
-    });
     // across levels, chronological stream of all levels
     if(multi){
       if(ac('4-1s'))runs(seg,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
@@ -289,6 +288,14 @@ function evaluate(a,results){
       }
     });
   });
+  // within each level: a level's own run only restarts when that level's targets changed
+  {const lvSegs={},nl=new Set(rs.map(r=>r.lv)).size>1;rs.forEach(r=>{const k=r.lv+'|'+lvEra(a,r.lv,r.date);(lvSegs[k]||(lvSegs[k]=[])).push({r,z:zOf(a,r)})});
+   const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
+   const wi=k=>!nl||scopeOf(k,D)!=='across';
+   Object.values(lvSegs).forEach(arr=>{
+     if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
+     if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
+     if(wi('10x'))runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x')})}
   const byId={};results.forEach(r=>{if(r.aid===a.id)byId[r.id]=r});
   for(let lv=0;lv<(a.nlev||1);lv++)patternsFor(a,lv,results).forEach(sp=>{
     if(sp.kind==='trend')sp.ids.slice(6).forEach(id=>add(byId[id],'T7'));
@@ -823,7 +830,7 @@ function ljSVG(a,lv,flags,n,forExport){
   // lot / target change markers
   win.forEach((r,i)=>{
     const ti=targetIndex(a,r.date),pt=i>0?targetIndex(a,win[i-1].date):ti;
-    if(i>0&&ti!==pt){const x=X(i)-step/2,t=a.targets[ti];
+    if(i>0&&ti!==pt&&lvEra(a,lv,r.date)!==lvEra(a,lv,win[i-1].date)){const x=X(i)-step/2,t=a.targets[ti];
       s+=`<line class="lotline" x1="${x}" x2="${x}" y1="${mt}" y2="${mt+ph}"/><text x="${x+4}" y="${mt+11}" style="fill:var(--accent)">${esc((t.levels[lv]&&t.levels[lv].lot)?'Lot '+t.levels[lv].lot:'New targets')}</text>`}
   });
   patternsFor(a,lv,S.results).forEach(sp=>{
@@ -895,7 +902,7 @@ function renderModal(){
    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-act="mclose">Cancel</button><button class="btn primary" data-act="lateok">Save with comment</button></div></div></div>`;
   const a=anOf(m.aid),t=curTarget(a),dp=decs(a);
   return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:880px" role="dialog" aria-modal="true" aria-label="Lot change" data-stop>
-   <h2>Lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules restart from the effective date, so the old lot does not count against the new one.</p>
+   <h2>Lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules restart from the effective date for each level whose mean, SD, material or lot changes, so the old lot does not count against the new one. A level you leave unchanged carries on as before.</p>
    <div class="stack"><div class="grid2"><label class="f">Reason<select id="m-type">${CHG.map(c=>`<option>${c}</option>`).join('')}</select></label>
     <label class="f">Effective from<input type="date" id="m-date" value="${todayStr()}" max="${todayStr()}"></label></div>
    ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="m-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. Enter the new mean and SD below.</span></label>`:''}
@@ -929,7 +936,7 @@ function targetHistory(a){
   if(a.targets.length<2&&!can)return '';
   const rows=a.targets.map((t,i)=>{
     const first=i===0,c=UI.tdel&&UI.tdel.aid===a.id&&UI.tdel.i===i;
-    const lv=t.levels.slice(0,a.nlev).map((l,k)=>levelName(k)+': '+esc(l.material||'–')+(l.lot?' · Lot '+esc(l.lot):'')+(l.exp?' · exp '+fmtDate(l.exp):'')+' · mean '+fmt(l.mean,dp+1)+' · SD '+fmt(l.sd,dp+1)).join('<br>');
+    const lv=t.levels.slice(0,a.nlev).map((l,k)=>levelName(k)+(!first&&lvChanged(a,i,k)?' (changed)':!first?' (unchanged)':'')+': '+esc(l.material||'–')+(l.lot?' · Lot '+esc(l.lot):'')+(l.exp?' · exp '+fmtDate(l.exp):'')+' · mean '+fmt(l.mean,dp+1)+' · SD '+fmt(l.sd,dp+1)).join('<br>');
     return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${first?'Starting targets':esc(t.type||'Target change')}</b> <span class="small muted">${first&&!t.from?'from the first QC':'effective '+fmtDate(t.from)}${t.byName?' · '+esc(t.byName):''}${t.at?' · '+fmtTs(t.at):''}</span>
       <div class="small" style="margin-top:6px">${lv}</div>${t.comment&&!first?`<div class="small" style="margin-top:6px"><b>Comment:</b> ${esc(t.comment)}</div>`:''}${t.edited?`<div class="small muted" style="margin-top:4px">Edited by ${esc(t.edited.byName||'')} · ${fmtTs(t.edited.at)}</div>`:''}</div>
       ${can?`<div class="row" style="gap:6px;flex-wrap:nowrap">${first?'<span class="small muted">Edit under Setup</span>':c?`<span class="small">Delete this change? Results from ${fmtDate(t.from)} will use the earlier targets.</span><button class="btn sm danger" data-act="tdelok" data-id="${a.id}" data-i="${i}">Yes, delete</button><button class="btn sm" data-act="tdelno">Cancel</button>`:`<button class="btn sm" data-act="tedit" data-id="${a.id}" data-i="${i}">Edit</button><button class="btn sm danger" data-act="tdel" data-id="${a.id}" data-i="${i}">Delete</button>`}</div>`:''}</div></div>`}).join('');
