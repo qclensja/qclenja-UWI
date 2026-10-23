@@ -236,6 +236,9 @@ const RULES={
 };
 /* trends and shifts per control level: runs of points that drift or sit on one side of the mean */
 const RORDER=['1-2s','1-3s','2-2s','R-4s','4-1s','10x','T7','S6'];
+const SCOPED=['2-2s','4-1s','10x'];
+const SCOPE_TXT={both:'Within each level or across levels (either one triggers it)',within:'Within each level only (each level on its own)',across:'Across levels only (all levels together, in the order they were run)'};
+const scopeOf=k=>{try{const v=S.rules&&S.rules[k+'@'];return v==='within'||v==='across'?v:'both'}catch(e){return 'both'}};
 const ruleOn=k=>{try{return !S.rules||S.rules[k]!==false}catch(e){return true}};
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
@@ -264,20 +267,21 @@ function evaluate(a,results){
     const byLv={};seg.forEach(p=>(byLv[p.r.lv]||(byLv[p.r.lv]=[])).push(p));
     const byDate={};seg.forEach(p=>(byDate[p.r.date]||(byDate[p.r.date]=[])).push(p));
     const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
+    const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k)!=='across',ac=k=>multi&&scopeOf(k)!=='within';
     Object.values(byLv).forEach(arr=>{
-      runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
-      runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
-      runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
+      if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
+      if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
+      if(wi('10x'))runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
     });
     // across levels, chronological stream of all levels
-    if(Object.keys(byLv).length>1){
-      runs(seg,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
-      runs(seg,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
+    if(multi){
+      if(ac('4-1s'))runs(seg,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
+      if(ac('10x'))runs(seg,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
     }
     Object.values(byDate).forEach(g=>{
       for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++){
         const a1=g[i].z,b1=g[j].z;
-        if(Math.abs(a1)>2&&Math.abs(b1)>2&&Math.sign(a1)===Math.sign(b1)){add(g[i].r,'2-2s');add(g[j].r,'2-2s')}
+        if(ac('2-2s')&&Math.abs(a1)>2&&Math.abs(b1)>2&&Math.sign(a1)===Math.sign(b1)){add(g[i].r,'2-2s');add(g[j].r,'2-2s')}
         if((a1>2&&b1<-2)||(a1<-2&&b1>2)){add(g[i].r,'R-4s');add(g[j].r,'R-4s')}
       }
     });
@@ -1957,6 +1961,7 @@ function renderRules(){
     return `<div class="panelcard" style="${on?'':'opacity:.65'}"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px">
      <div><div class="row" style="gap:8px"><b style="font-size:1.05em">${R.name}</b><span class="chip ${rej?'bad':'warn'}">${rej?'Rejection rule':'Warning rule'}</span><span class="chip ${on?'good':''}">${on?'On':'Off'}</span></div>
      <p class="small" style="margin:6px 0 0;max-width:80ch">${R.desc}</p>
+     ${SCOPED.includes(k)?(adm?`<label class="f" style="margin-top:8px;max-width:560px">How this rule counts controls<select data-rscope="${k}">${Object.entries(SCOPE_TXT).map(([v,t])=>`<option value="${v}"${scopeOf(k)===v?' selected':''}>${t}</option>`).join('')}</select></label>`:`<p class="small" style="margin:6px 0 0"><b>Counts controls:</b> ${SCOPE_TXT[scopeOf(k)]}</p>`)+`<p class="small muted" style="margin:4px 0 0;max-width:80ch">${k==='10x'?'Example: with "across levels", 5 controls above the mean on Level 1 plus 5 on Level 2 count as 10. With "within each level", all 10 must be on one level.':k==='4-1s'?'Example: with "across levels", 2 on Level 1 and 2 on Level 2 beyond 1 SD on the same side count as 4.':'Example: with "across levels", Level 1 and Level 2 in the same run both beyond 2 SD on the same side trigger it. With "within each level", two consecutive runs of the same level must do so.'}</p>`:''}
      <p class="small muted" style="margin:6px 0 0">Flagged ${cnt[k]} time${cnt[k]===1?'':'s'} in the QC points you can see.</p>
      <details style="margin-top:6px"><summary class="small" style="cursor:pointer">What to do when it triggers</summary><ol class="small" style="margin:6px 0 0 18px;padding:0">${R.fix.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></details></div>
      ${adm?`<label class="row" style="gap:8px;flex-wrap:nowrap;white-space:nowrap;font-weight:600"><input type="checkbox" data-rulet="${k}"${on?' checked':''} aria-label="Apply ${esc(R.name)}"> Apply</label>`:''}</div></div>`};
@@ -2330,6 +2335,7 @@ document.addEventListener('change',e=>{
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
   if(t.id==='af-to'){AF.to=t.value;AF.limit=100;return render()}
+  if(d.rscope){if(!isAdmin())return;S.rules=S.rules||{};const v=t.value;if(v==='within'||v==='across')S.rules[d.rscope+'@']=v;else delete S.rules[d.rscope+'@'];S.rulesAt=nowIso();audit('Westgard rule scope changed',RULES[d.rscope].name+': '+SCOPE_TXT[scopeOf(d.rscope)],null,[]);save();return render()}
   if(d.rulet){if(!isAdmin())return;S.rules=S.rules||{};const on=t.checked;if(on)delete S.rules[d.rulet];else S.rules[d.rulet]=false;S.rulesAt=nowIso();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name,null,[]);save();return render()}
   if((d.udept||d.urole)&&!isAdmin())return;
   if(d.path==='dept'&&!isAdmin())return;

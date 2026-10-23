@@ -53,6 +53,9 @@ const RULES={
 };
 /* trends and shifts per control level: runs of points that drift or sit on one side of the mean */
 const RORDER=['1-2s','1-3s','2-2s','R-4s','4-1s','10x','T7','S6'];
+const SCOPED=['2-2s','4-1s','10x'];
+const SCOPE_TXT={both:'Within each level or across levels (either one triggers it)',within:'Within each level only (each level on its own)',across:'Across levels only (all levels together, in the order they were run)'};
+const scopeOf=k=>{try{const v=S.rules&&S.rules[k+'@'];return v==='within'||v==='across'?v:'both'}catch(e){return 'both'}};
 const ruleOn=k=>{try{return !S.rules||S.rules[k]!==false}catch(e){return true}};
 function patternsFor(a,lv,results){
   const rs=results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0),segs={};
@@ -81,20 +84,21 @@ function evaluate(a,results){
     const byLv={};seg.forEach(p=>(byLv[p.r.lv]||(byLv[p.r.lv]=[])).push(p));
     const byDate={};seg.forEach(p=>(byDate[p.r.date]||(byDate[p.r.date]=[])).push(p));
     const runs=(arr,n,test,rule)=>{for(let i=n-1;i<arr.length;i++){const w=arr.slice(i-n+1,i+1);if(w.every(p=>test(p.z,w[0].z)))add(arr[i].r,rule)}};
+    const multi=Object.keys(byLv).length>1,wi=k=>!multi||scopeOf(k)!=='across',ac=k=>multi&&scopeOf(k)!=='within';
     Object.values(byLv).forEach(arr=>{
-      runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
-      runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
-      runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
+      if(wi('2-2s'))runs(arr,2,(z,z0)=>Math.abs(z)>2&&Math.sign(z)===Math.sign(z0),'2-2s');
+      if(wi('4-1s'))runs(arr,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
+      if(wi('10x'))runs(arr,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
     });
     // across levels, chronological stream of all levels
-    if(Object.keys(byLv).length>1){
-      runs(seg,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
-      runs(seg,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
+    if(multi){
+      if(ac('4-1s'))runs(seg,4,(z,z0)=>Math.abs(z)>1&&Math.sign(z)===Math.sign(z0),'4-1s');
+      if(ac('10x'))runs(seg,10,(z,z0)=>z!==0&&Math.sign(z)===Math.sign(z0),'10x');
     }
     Object.values(byDate).forEach(g=>{
       for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++){
         const a1=g[i].z,b1=g[j].z;
-        if(Math.abs(a1)>2&&Math.abs(b1)>2&&Math.sign(a1)===Math.sign(b1)){add(g[i].r,'2-2s');add(g[j].r,'2-2s')}
+        if(ac('2-2s')&&Math.abs(a1)>2&&Math.abs(b1)>2&&Math.sign(a1)===Math.sign(b1)){add(g[i].r,'2-2s');add(g[j].r,'2-2s')}
         if((a1>2&&b1<-2)||(a1<-2&&b1>2)){add(g[i].r,'R-4s');add(g[j].r,'R-4s')}
       }
     });

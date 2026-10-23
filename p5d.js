@@ -245,6 +245,7 @@ document.addEventListener('change',e=>{
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}
   if(t.id==='af-from'){AF.from=t.value;AF.limit=100;return render()}
   if(t.id==='af-to'){AF.to=t.value;AF.limit=100;return render()}
+  if(d.rscope){if(!isAdmin())return;S.rules=S.rules||{};const v=t.value;if(v==='within'||v==='across')S.rules[d.rscope+'@']=v;else delete S.rules[d.rscope+'@'];S.rulesAt=nowIso();audit('Westgard rule scope changed',RULES[d.rscope].name+': '+SCOPE_TXT[scopeOf(d.rscope)],null,[]);save();return render()}
   if(d.rulet){if(!isAdmin())return;S.rules=S.rules||{};const on=t.checked;if(on)delete S.rules[d.rulet];else S.rules[d.rulet]=false;S.rulesAt=nowIso();audit('Westgard rule '+(on?'switched on':'switched off'),RULES[d.rulet].name,null,[]);save();return render()}
   if((d.udept||d.urole)&&!isAdmin())return;
   if(d.path==='dept'&&!isAdmin())return;
