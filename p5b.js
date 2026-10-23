@@ -85,6 +85,7 @@ function renderModal(){
   const m=UI.modal;if(!m)return '';
   if(m.acct)return renderAcctModal();
   if(m.add)return renderAddModal();
+  if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
    <h2>Why is this QC value changing?</h2><p class="muted" style="margin:4px 0 12px">QC entered more than 1 hour ago can only be changed with a comment. It is saved with your name and the time, and the old value is kept in the history.</p>
    <ul class="small" style="margin:0 0 12px;padding-left:18px">${m.late.map(x=>`<li><b>${esc(x.name)}</b> ${levelName(x.lv)}: ${x.old} to <b>${x.nw}</b> <span class="muted">(entered ${fmtTs(x.at)}${x.byName?' by '+esc(x.byName):''})</span></li>`).join('')}</ul>

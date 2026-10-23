@@ -868,6 +868,7 @@ function renderModal(){
   const m=UI.modal;if(!m)return '';
   if(m.acct)return renderAcctModal();
   if(m.add)return renderAddModal();
+  if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
    <h2>Why is this QC value changing?</h2><p class="muted" style="margin:4px 0 12px">QC entered more than 1 hour ago can only be changed with a comment. It is saved with your name and the time, and the old value is kept in the history.</p>
    <ul class="small" style="margin:0 0 12px;padding-left:18px">${m.late.map(x=>`<li><b>${esc(x.name)}</b> ${levelName(x.lv)}: ${x.old} to <b>${x.nw}</b> <span class="muted">(entered ${fmtTs(x.at)}${x.byName?' by '+esc(x.byName):''})</span></li>`).join('')}</ul>
@@ -1030,7 +1031,7 @@ function renderManager(){
      ${pc?`<span class="small">Delete the panel "${esc(pn)}", its ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} QC result${nr===1?'':'s'}? This cannot be undone.</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Yes, delete panel</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`}</div></div>
      ${list.length?`<div class="scroll"><table class="t" style="margin-top:6px"><thead><tr><th>Analyte</th><th>Unit</th>${ctxMulti()?'<th>Analyser · module</th>':''}<th>Schedule</th><th>QC materials · lots</th><th></th></tr></thead><tbody>${list.map(a=>{const t=curTarget(a),c=UI.confirmDel===a.id,n=nRes(a.id);
        return `<tr><td><b>${esc(a.name)}</b></td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
-       <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
+       <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="aedit" data-id="${a.id}" aria-label="Edit ${esc(a.name)}">Edit</button> <button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
      ${sugg.length&&!seenP.has(pn)?`<div class="row" style="margin-top:8px;gap:6px;align-items:center"><span class="small muted">Routine tests not in use:</span>${sugg.map(i=>`<button class="btn sm" data-act="sugg" data-p="${esc(pn)}" data-n="${esc(i.name)}">+ ${esc(i.name)}</button>`).join('')}</div>`:''}</div>`};
   seenP.clear();
   const cards=byAnalyser(DA(),(pn,list)=>{const h=card(pn,list);seenP.add(pn);return h})+(()=>{const empty=names.filter(pn=>!DA().some(a=>a.panel===pn));return empty.length?`<div class="angrp"><div class="angh"><span>Panels with no analytes yet</span></div>${empty.map(pn=>card(pn,[])).join('')}</div>`:''})();
@@ -1163,6 +1164,52 @@ function asgMove(copy){
   ids.forEach(id=>{const a=anOf(id);if(!a)return;a.inst=inst;a.mod=fresh?(UI.asgMod||defMod(a.name,inst)):mod;names.push(a.name)});
   audit('Analytes reassigned',names.join(', ')+' to '+inst+(mod?' · '+mod:'')+(fresh?' (new analyser)':''));
   UI.asg={};UI.asgT='';UI.asgNew='';UI.asgName='';UI.asgMod='';save();render();toast(names.length+' analyte'+(names.length===1?'':'s')+' moved to '+inst+'.');return true;
+}
+
+/* ===== Edit an analyte (fix mistakes made when it was created) ===== */
+function renderEditModal(){
+  const a=anOf(UI.modal.edit);if(!a){UI.modal=null;return ''}
+  const t=curTarget(a),dp=decs(a),n=a.nlev;
+  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:760px" role="dialog" aria-modal="true" aria-label="Edit ${esc(a.name)}" data-stop>
+   <h2>Edit ${esc(a.name)}</h2><p class="muted small" style="margin:4px 0 12px">Correct the name, unit or current QC details. Past QC results are kept and stay with this analyte. This changes the current target from its start date. If a new lot has started, use <b>Lot change</b> on the Charts screen so the old limits are kept for the old results.</p>
+   <div class="stack"><div class="grid2"><label class="f">Analyte name<input type="text" id="e-name" value="${esc(a.name)}"></label>
+   <label class="f">Unit<input type="text" id="e-unit" list="unitlist" value="${esc(a.unit)}"></label></div>
+   ${Array.from({length:n},(_,i)=>{const l=t.levels[i]||{};return `<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
+     <label class="f" style="flex:2 1 170px">QC material<input type="text" id="e-mat-${i}" value="${esc(l.material||'')}"></label>
+     <label class="f" style="flex:1 1 100px">Lot no.<input type="text" id="e-lot-${i}" value="${esc(l.lot||'')}"></label>
+     <label class="f" style="flex:0 0 140px">Expiry date<input type="date" id="e-exp-${i}" value="${esc(l.exp||'')}"></label>
+     <label class="f" style="flex:0 0 92px">Mean<input type="number" step="any" id="e-mean-${i}" value="${l.mean!=null?esc(String(l.mean)):''}"></label>
+     <label class="f" style="flex:0 0 80px">SD<input type="number" step="any" min="0" id="e-sd-${i}" value="${l.sd!=null?esc(String(l.sd)):''}"></label></div>`}).join('')}
+   <p id="e-err" class="small" style="color:var(--bad);margin:0" hidden></p>
+   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="mclose">Cancel</button><button class="btn primary" data-act="aeditsave">Save changes</button></div></div></div></div>`;
+}
+function saveEdit(){
+  const a=anOf(UI.modal.edit),g=id=>document.getElementById(id),v=id=>g(id)?g(id).value:'',err=g('e-err');
+  const fail=t=>{err.textContent=t;err.hidden=false;return true};
+  if(!a)return;
+  const name=v('e-name').trim(),unit=v('e-unit').trim(),t=curTarget(a),levels=[];
+  if(!name)return fail('Enter the analyte name.');
+  if(DA().some(x=>x.id!==a.id&&x.name.toLowerCase()===name.toLowerCase()))return fail(name+' already exists in this department.');
+  for(let i=0;i<a.nlev;i++){
+    const mean=num(v('e-mean-'+i)),sd=num(v('e-sd-'+i)),mat=v('e-mat-'+i).trim();
+    if(!mat)return fail('Every level needs a QC material name ('+levelName(i)+').');
+    if(!v('e-exp-'+i))return fail('Every level needs an expiry date ('+levelName(i)+').');
+    if(mean==null||!(sd>0))return fail('Every level needs a mean and an SD above zero ('+levelName(i)+').');
+    levels.push({mean,sd,material:mat,lot:v('e-lot-'+i).trim(),exp:v('e-exp-'+i)});
+  }
+  const old={name:a.name,unit:a.unit,lv:t.levels.slice(0,a.nlev).map(l=>[l.material,l.lot,l.exp,l.mean,l.sd].join('/'))},ch=[];
+  if(name!==a.name){
+    syncSel();const s=srcOf(a);
+    if(s&&(s.kind==='custom'||s.kind==='padd'))s.it.name=name;
+    else{if(s&&s.kind==='routine')delete S.setup.units[a.name];detachSrc(a);a.name=registerSrc(a.panel,name,unit||a.unit)}
+    ch.push('name '+old.name+' to '+name);a.name=name;
+  }
+  if(unit!==old.unit){setUnit(a,unit);ch.push('unit '+(old.unit||'none')+' to '+(unit||'none'))}
+  levels.forEach((l,i)=>{Object.assign(t.levels[i],l)});
+  if(levels.some((l,i)=>[l.material,l.lot,l.exp,l.mean,l.sd].join('/')!==old.lv[i]))ch.push('QC material, lot, expiry, mean or SD');
+  if(!ch.length){UI.modal=null;render();return}
+  audit('Analyte edited',a.name+': '+ch.join('; '),null,[a.dept]);
+  UI.modal=null;save();toast(a.name+' updated.');
 }
 /* ===== Accounts, sessions and audit trail ===== */
 const IDLE_MS=30*60*1000;
@@ -2089,7 +2136,7 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMIN=new Set(['nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
   const NEED={obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
@@ -2237,6 +2284,8 @@ document.addEventListener('click',e=>{
    case 'sugg':{const rp=panelsNow().find(p=>p.name===el.dataset.p),it=rp.items.find(i=>i.name===el.dataset.n),f=DA().find(x=>x.panel===el.dataset.p);
      UI.modal={add:true,panel:el.dataset.p,n:f?f.nlev:st.nlev,name:it.name,unit:st.units[it.name]!=null?st.units[it.name]:it.unit};break}
    case 'addsave':if(saveAdd())return;break;
+   case 'aedit':UI.modal={edit:id};break;
+   case 'aeditsave':if(saveEdit())return;break;
    case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed.');break;
    case 'arcancel':UI.confirmDel=null;break;
    case 'mnp':{const n=document.getElementById('mnewpanel').value.trim();if(!n)return toast('Give the panel a name.');
