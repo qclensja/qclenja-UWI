@@ -34,7 +34,7 @@ function lvChanged(a,i,lv){const p=(a.targets[i-1]||{levels:[]}).levels[lv],c=(a
   return p.mean!==c.mean||p.sd!==c.sd||(p.lot||'')!==(c.lot||'')||(p.material||'')!==(c.material||'')}
 function lvEra(a,lv,date){const ti=targetIndex(a,date);let e=0;for(let i=1;i<=ti;i++)if(lvChanged(a,i,lv))e++;return e}
 const targetFor=(a,date)=>a.targets[targetIndex(a,date)];
-const curTarget=a=>a.targets[a.targets.length-1];
+const curTarget=a=>targetFor(a,todayStr());
 const zOf=(a,r)=>{const t=targetFor(a,r.date).levels[r.lv];return t&&t.sd>0?(r.value-t.mean)/t.sd:0};
 
 const RULES={

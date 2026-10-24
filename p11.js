@@ -2,7 +2,7 @@
 const blankMatLv=()=>({material:'',lot:'',exp:''});
 function applyMat(m,list,which){
   let n=0;
-  list.forEach(a=>{const t=which==='first'?a.targets[0]:a.targets[a.targets.length-1];
+  list.forEach(a=>{const t=which==='first'?a.targets[0]:curTarget(a);
     m.levels.slice(0,a.nlev).forEach((l,i)=>{const L=t.levels[i];if(!L)return;L.material=l.material||'';L.lot=l.lot||'';L.exp=l.exp||''});n++});
   return n;
 }
