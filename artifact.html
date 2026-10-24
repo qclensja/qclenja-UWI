@@ -649,7 +649,7 @@ function renderSetup(){
      <div class="stack">${byAnalyser(DA(),(p,list,inst)=>{const K=Math.max(...list.map(a=>a.nlev));return `<div class="panelcard" data-g="${esc(inst)}"><h3><span>${esc(p)}</span></h3>
       <div class="small muted" style="margin-top:6px">QC materials for the whole panel</div>
       ${Array.from({length:K},(_,i)=>`<div class="row" style="margin:4px 0;align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span><label class="f" style="flex:2 1 180px">QC material<input type="text" data-pm="${i}" placeholder="e.g. Multiqual Level ${i+1}"></label><label class="f" style="flex:1 1 110px">Lot no.<input type="text" data-pl="${i}"></label><label class="f" style="flex:0 0 140px">Expiry date<input type="date" data-pe="${i}"></label></div>`).join('')}
-      <div class="row" style="margin-bottom:4px"><button class="btn sm" data-act="papply" data-p="${esc(p)}">Apply to panel</button>${(S.materials||[]).length?`<select data-matsel="${esc(p)}" aria-label="Saved QC material" style="width:auto"><option value="">Saved QC material…</option>${matOptions('')}</select><button class="btn sm" data-act="matpanel" data-p="${esc(p)}">Apply saved material</button>`:''}</div>
+      <div class="row" style="margin-bottom:4px"><button class="btn sm" data-act="papply" data-p="${esc(p)}">Apply to panel</button>${matList().length?`<select data-matsel="${esc(p)}" aria-label="Saved QC material" style="width:auto"><option value="">Saved QC material…</option>${matOptions('')}</select><button class="btn sm" data-act="matpanel" data-p="${esc(p)}">Apply saved material</button>`:''}</div>
       ${list.map(a=>{const t=a.targets[0],lo=Math.max(1,minLv(a));return `<div style="border-top:1px solid var(--line);padding:10px 0;margin-top:8px"><div class="row" style="align-items:center">
         <b style="flex:1 1 130px;min-width:0">${esc(a.name)} <span class="muted small">${esc(a.unit)}</span></b>
         <label class="f" style="flex:0 1 120px">Control levels<select data-nlev="${a.id}">${[1,2,3,4,5,6].filter(n=>n>=lo).map(n=>`<option${n===a.nlev?' selected':''}>${n}</option>`).join('')}</select></label></div>
@@ -919,7 +919,7 @@ function renderModal(){
    <h2>Lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules restart from the effective date for each level whose mean, SD, material or lot changes, so the old lot does not count against the new one. A level you leave unchanged carries on as before.</p>
    <div class="stack"><div class="grid2"><label class="f">Reason<select id="m-type">${CHG.map(c=>`<option>${c}</option>`).join('')}</select></label>
     <label class="f">Effective from<input type="date" id="m-date" value="${todayStr()}" max="${todayStr()}"></label></div>
-   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="m-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. Enter the new mean and SD below.</span></label>`:''}
+   ${matList().length?`<label class="f">Use a saved QC material <select id="m-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. Enter the new mean and SD below.</span></label>`:''}
    <div class="scroll"><table class="t"><thead><tr><th>Level</th><th>QC material</th><th>Lot no.</th><th>Expiry date</th><th>Current mean</th><th>Current SD</th><th>New mean</th><th>New SD</th></tr></thead><tbody>
    ${t.levels.slice(0,a.nlev).map((l,i)=>`<tr><td>${levelName(i)}</td><td><input type="text" id="m-mat-${i}" value="${esc(l.material)}" style="width:170px" aria-label="${levelName(i)} QC material"></td><td><input type="text" id="m-lot-${i}" value="${esc(l.lot)}" style="width:100px" aria-label="${levelName(i)} lot"></td><td><input type="date" id="m-exp-${i}" value="${esc(l.exp||'')}" style="width:140px" aria-label="${levelName(i)} expiry date"></td><td class="mono">${fmt(l.mean,dp+1)}</td><td class="mono">${fmt(l.sd,dp+1)}</td><td><input type="number" step="any" id="m-mean-${i}" value="${l.mean==null?'':l.mean}" style="width:100px"></td><td><input type="number" step="any" min="0" id="m-sd-${i}" value="${l.sd==null?'':l.sd}" style="width:90px"></td></tr>`).join('')}</tbody></table></div>
    <label class="f">Comment explaining the change (required)<textarea id="m-note" rows="3" placeholder="e.g. New lot of Bio-Rad Level 1/2 opened. Means set from 20-point lot crossover."></textarea></label>
@@ -963,7 +963,7 @@ function renderTargetEditModal(){
    <h2>Edit lot change or target adjustment</h2><p class="muted" style="margin:4px 0 12px">${esc(a.name)} · ${esc(a.unit)}. Westgard rules are checked again for the results this change covers.</p>
    <div class="stack"><div class="grid2"><label class="f">Reason<select id="t-type">${CHG.map(c=>`<option${c===t.type?' selected':''}>${c}</option>`).join('')}${CHG.includes(t.type)||!t.type?'':`<option selected>${esc(t.type)}</option>`}</select></label>
     <label class="f">Effective from<input type="date" id="t-date" value="${esc(t.from)}" min="${prev?esc(prev.from):''}" max="${next?esc(next.from):todayStr()}"></label></div>
-   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="t-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
+   ${matList().length?`<label class="f">Use a saved QC material <select id="t-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
    <div class="scroll"><table class="t"><thead><tr><th>Level</th><th>QC material</th><th>Lot no.</th><th>Expiry date</th><th>Mean</th><th>SD</th></tr></thead><tbody>
    ${t.levels.slice(0,a.nlev).map((l,i)=>`<tr><td>${levelName(i)}</td><td><input type="text" id="t-mat-${i}" value="${esc(l.material||'')}" style="width:170px" aria-label="${levelName(i)} QC material"></td><td><input type="text" id="t-lot-${i}" value="${esc(l.lot||'')}" style="width:100px" aria-label="${levelName(i)} lot"></td><td><input type="date" id="t-exp-${i}" value="${esc(l.exp||'')}" aria-label="${levelName(i)} expiry"></td><td><input type="number" step="any" id="t-mean-${i}" value="${l.mean!=null?esc(String(l.mean)):''}" style="width:92px" aria-label="${levelName(i)} mean"></td><td><input type="number" step="any" min="0" id="t-sd-${i}" value="${l.sd!=null?esc(String(l.sd)):''}" style="width:80px" aria-label="${levelName(i)} SD"></td></tr>`).join('')}</tbody></table></div>
    <label class="f">Comment explaining the change (required)<textarea id="t-note" rows="3">${esc(t.comment||'')}</textarea></label>
@@ -1184,7 +1184,7 @@ function renderAddModal(){
     <label class="f">Schedule<select id="a-sched" data-mre>${first?`<option value="panel"${d.sched==='panel'?' selected':''}>Same as rest of panel (${esc(scheduleText(first))})</option>`:''}<option value="daily"${d.sched==='daily'?' selected':''}>Every day</option><option value="weekdays"${d.sched==='weekdays'?' selected':''}>Specific days of the week</option><option value="interval"${d.sched==='interval'?' selected':''}>Every N days</option><option value="ondemand"${d.sched==='ondemand'?' selected':''}>On demand (no fixed schedule)</option></select></label></div>
    ${d.sched==='weekdays'?`<div class="days" role="group" aria-label="Days">${[1,2,3,4,5,6,0].map(x=>`<label><input type="checkbox" data-adow="${x}"${dowOn(x)?' checked':''}>${DOW[x]}</label>`).join('')}</div>`:''}
    ${d.sched==='interval'?`<label class="f" style="flex-direction:row;align-items:center;gap:6px">every<input type="number" min="2" max="90" id="a-every" value="${esc(d.every)}" style="width:70px">days, starting<input type="date" id="a-start" value="${esc(d.start)}" style="width:auto"></label>`:''}
-   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="a-matlib" data-mre><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. You still enter the mean and SD.</span></label>`:''}
+   ${matList().length?`<label class="f">Use a saved QC material <select id="a-matlib" data-mre><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. You still enter the mean and SD.</span></label>`:''}
    <div class="small muted">Each level has its own QC material name and lot number.</div>
    ${Array.from({length:n},(_,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
      <label class="f" style="flex:2 1 170px">QC material<input type="text" id="a-mat-${i}" value="${esc((d.mats||[])[i]||'')}" placeholder="Material name"></label>
@@ -1278,7 +1278,7 @@ function renderEditModal(){
    <h2>Edit ${esc(a.name)}</h2><p class="muted small" style="margin:4px 0 12px">Correct the name, unit or current QC details. Past QC results are kept and stay with this analyte. This changes the current target from its start date. If a new lot has started, use <b>Lot change</b> on the Charts screen so the old limits are kept for the old results.</p>
    <div class="stack"><div class="grid2"><label class="f">Analyte name<input type="text" id="e-name" value="${esc(a.name)}"></label>
    <label class="f">Unit<input type="text" id="e-unit" list="unitlist" value="${esc(a.unit)}"></label></div>
-   ${(S.materials||[]).length?`<label class="f">Use a saved QC material <select id="e-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
+   ${matList().length?`<label class="f">Use a saved QC material <select id="e-matlib"><option value="">Choose a QC material already in the system…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level. The mean and SD are not changed.</span></label>`:''}
    ${Array.from({length:n},(_,i)=>{const l=t.levels[i]||{};return `<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
      <label class="f" style="flex:2 1 170px">QC material<input type="text" id="e-mat-${i}" value="${esc(l.material||'')}"></label>
      <label class="f" style="flex:1 1 100px">Lot no.<input type="text" id="e-lot-${i}" value="${esc(l.lot||'')}"></label>
@@ -1719,7 +1719,7 @@ function renderLimits(){
     const t=curTarget(a);
     return `<div class="stack">${intro}<div class="panel stack"><h3>Start collecting for ${esc(a.name)}</h3>
      <p class="muted small" style="margin:0">Enter the QC material and lot you are characterising. For a new lot, use the new lot number. You can change these later while collecting.</p>
-     ${(S.materials||[]).length?`<label class="f" style="margin-top:4px">Use a saved QC material <select id="est-matlib" style="width:auto;min-width:260px"><option value="">Choose a QC material from the QC materials tab…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level.</span></label>`:''}
+     ${matList().length?`<label class="f" style="margin-top:4px">Use a saved QC material <select id="est-matlib" style="width:auto;min-width:260px"><option value="">Choose a QC material from the QC materials tab…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level.</span></label>`:''}
      ${t.levels.slice(0,a.nlev).map((l,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span><label class="f" style="flex:2 1 200px">QC material<input type="text" id="est-m-${i}" value="${esc(l.material)}"></label><label class="f" style="flex:1 1 120px">Lot no.<input type="text" id="est-l-${i}" value="${esc(l.lot)}"></label><label class="f" style="flex:0 0 140px">Expiry date<input type="date" id="est-x-${i}" value="${esc(l.exp||'')}"></label></div>`).join('')}
      <div><button class="btn primary" data-act="eststart">Start collecting</button></div></div>${estPast(mine,null)}</div>`;
   }
@@ -1728,7 +1728,7 @@ function renderLimits(){
   const dates=s.runs.map(r=>r.date).sort(),span=dates.length?(dates[0]===dates[dates.length-1]?fmtDate(dates[0]):fmtDate(dates[0])+' to '+fmtDate(dates[dates.length-1])):'';
   const hdr=`<div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(a.name)} · ${open?'collecting':'applied'}</h3><div class="small muted">Started ${fmtTs(s.created)} by ${esc(s.byName||'–')} · ${s.runs.length} run${s.runs.length===1?'':'s'}${days?' on '+days+' day'+(days===1?'':'s'):''}</div></div>
      <div class="row" style="gap:6px">${open?'<button class="btn sm" data-act="estexp" data-id="'+s.id+'">Export to Excel</button>':'<button class="btn sm" data-act="estexp" data-id="'+s.id+'">Export to Excel</button>'}${UI.estDel===s.id?`<span class="small">Delete this data set?</span><button class="btn sm danger" data-act="estdel" data-id="${s.id}">Delete</button><button class="btn sm" data-act="estdelno">Keep</button>`:`<button class="btn sm" data-act="estdelask" data-id="${s.id}">Delete data set</button>`}</div></div>
-    ${(S.materials||[]).length&&open?`<label class="f" style="margin-top:4px">Use a saved QC material <select id="est-matlib2" style="width:auto;min-width:260px"><option value="">Choose a QC material from the QC materials tab…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level.</span></label>`:''}
+    ${matList().length&&open?`<label class="f" style="margin-top:4px">Use a saved QC material <select id="est-matlib2" style="width:auto;min-width:260px"><option value="">Choose a QC material from the QC materials tab…</option>${matOptions('')}</select><span class="small muted" style="font-weight:400">Fills in the material name, lot number and expiry date for each level.</span></label>`:''}
     ${s.levels.map((l,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span><label class="f" style="flex:2 1 200px">QC material<input type="text" data-emat="${s.id}:${i}" value="${esc(l.material)}"${open?'':' disabled'}></label><label class="f" style="flex:1 1 120px">Lot no.<input type="text" data-elot="${s.id}:${i}" value="${esc(l.lot)}"${open?'':' disabled'}></label><label class="f" style="flex:0 0 140px">Expiry date<input type="date" data-eexp="${s.id}:${i}" value="${esc(l.exp||'')}"${open?'':' disabled'}></label>
       <div style="flex:1 1 180px;padding-bottom:6px"><div class="small muted">${infos[i].st.n} of ${EST_MIN} minimum${infos[i].ready?' · <b style="color:var(--good)">ready</b>':''}</div><div style="height:6px;border-radius:3px;background:var(--grid);overflow:hidden"><div style="height:100%;width:${Math.min(100,infos[i].st.n/EST_MIN*100)}%;background:${infos[i].ready?'var(--good)':'var(--accent)'}"></div></div></div></div>`).join('')}
     ${days&&days<5?`<p class="small" style="margin:0;color:var(--warn)">The runs so far come from ${days} day${days===1?'':'s'}. Collecting over more days (most guidance suggests 5 to 10 or more) gives an SD that reflects normal day-to-day variation.</p>`:''}</div>`;
@@ -1828,7 +1828,7 @@ function estChange(e){
   if(t.id==='est-date'){UI.estDate=t.value;return true}
   if(t.id==='est-date-new'){UI.estNewDate=t.value;return true}
   if(t.id==='est-impfrom'){UI.estImp=t.value;return true}
-  if(t.id==='est-matlib'||t.id==='est-matlib2'){const ml=(S.materials||[]).find(x=>x.id===t.value);
+  if(t.id==='est-matlib'||t.id==='est-matlib2'){const ml=matList().find(x=>x.id===t.value);
     if(ml){if(t.id==='est-matlib'){const a=anOf(UI.estAid),k=Math.min(a?a.nlev:0,ml.levels.length),set=(i,v)=>{const x=document.getElementById(i);if(x)x.value=v};
         for(let i=0;i<k;i++){set('est-m-'+i,ml.levels[i].material||'');set('est-l-'+i,ml.levels[i].lot||'');set('est-x-'+i,ml.levels[i].exp||'')}
         toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+'.');t.value=''}
@@ -2184,6 +2184,10 @@ function renderOtherDay(o,all,yest){
     <div class="row" style="margin-top:12px"><button class="btn primary" data-act="obsave">Save and plot these values${nIn?' ('+nIn+')':''}</button><span class="muted small">Empty boxes are ignored. Values already saved are shown as they are.</span></div></div></div>`;
 }
 /* ===== QC material library: enter a material once, apply it to many tests ===== */
+/* QC materials belong to departments. Admins see all; other users see materials assigned to their departments (unassigned = everyone). */
+const matVis=m=>!CU||CU.role==='admin'||!Array.isArray(CU.depts)||!(m.depts||[]).length||m.depts.some(d=>CU.depts.includes(d));
+const matList=()=>(S.materials||[]).filter(matVis);
+const matDeptTxt=m=>{const ds=(m.depts||[]).map(id=>(S.depts||[]).find(x=>x.id===id)).filter(Boolean);return ds.length?ds.map(d=>d.dept+dsub(d.sub)).join(', '):'All departments'};
 const blankMatLv=()=>({material:'',lot:'',exp:''});
 function applyMat(m,list,which){
   let n=0;
@@ -2193,10 +2197,11 @@ function applyMat(m,list,which){
 }
 function matLine(m){return m.levels.map((l,i)=>levelName(i)+': '+(l.material||'(no name)')+(l.lot?' · Lot '+l.lot:'')+(l.exp?' · exp '+fmtDate(l.exp):'')).join('<br>')}
 function renderMaterials(){
-  const ed=perm('e_materials'),ms=(S.materials||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)),d=ed?UI.mdr:null,ap=ed?UI.mAp:null,mine=VA();
+  const ed=perm('e_materials'),ms=matList().slice().sort((a,b)=>a.name.localeCompare(b.name)),d=ed?UI.mdr:null,ap=ed?UI.mAp:null,mine=VA();
   const form=d?`<div class="panelcard stack"><h3>${d.id?'Edit QC material':'New QC material'}</h3>
     <div class="row"><label class="f" style="flex:2 1 240px">Name of this QC product<input type="text" data-mf="name" value="${esc(d.name)}" placeholder="e.g. Bio-Rad Multiqual"></label>
     <label class="f" style="flex:0 1 140px">Control levels<select data-mn>${[1,2,3,4,5,6].map(n=>`<option${n===d.levels.length?' selected':''}>${n}</option>`).join('')}</select></label></div>
+    ${isAdmin()?`<div><div class="small" style="font-weight:600;margin-bottom:4px">Departments that can use this material</div><div class="row" style="gap:6px 16px">${deptList().map(x=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" data-mdept="${x.id}"${(d.depts||[]).includes(x.id)?' checked':''}>${esc(x.dept+dsub(x.sub))}</label>`).join('')}</div><p class="small muted" style="margin:4px 0 0">Leave all unticked to make it available to every department.</p></div>`:`<p class="small muted" style="margin:0">${d.id?'Available to: '+esc(matDeptTxt(d)):'This material will be assigned to your department'+(Array.isArray(CU&&CU.depts)&&CU.depts.length>1?'s':'')+' automatically.'}</p>`}
     ${d.levels.map((l,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
       <label class="f" style="flex:2 1 170px">Material name<input type="text" data-ml="${i}:material" value="${esc(l.material)}" placeholder="e.g. Multiqual Level ${i+1}"></label>
       <label class="f" style="flex:1 1 100px">Lot no.<input type="text" data-ml="${i}:lot" value="${esc(l.lot)}"></label>
@@ -2211,11 +2216,11 @@ function renderMaterials(){
      <div class="row"><button class="btn primary" data-act="matrun" data-id="${m.id}"${nSel?'':' disabled'}>Apply to ${nSel} test${nSel===1?'':'s'}</button><button class="btn" data-act="matapplycancel">Cancel</button></div></div>`};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h2>QC materials</h2><p class="small muted" style="margin:4px 0 0;max-width:80ch">Enter a QC product once, with its material names, lot numbers and expiry dates, then apply it to as many tests as you like instead of typing it again for each one.</p></div>${d||!ed?'':'<button class="btn primary" data-act="matnew">Add QC material</button>'}</div>
    ${form}
-   ${ms.map(m=>`<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(m.name)}</b><div class="small muted" style="margin-top:4px">${matLine(m).split('<br>').map(esc).join('<br>')}</div></div>
+   ${ms.map(m=>`<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(m.name)}</b> <span class="chip">${esc(matDeptTxt(m))}</span><div class="small muted" style="margin-top:4px">${matLine(m).split('<br>').map(esc).join('<br>')}</div></div>
      ${ed?`<div class="row" style="gap:6px"><button class="btn sm primary" data-act="matapply" data-id="${m.id}">Apply to tests</button><button class="btn sm" data-act="matedit" data-id="${m.id}">Edit</button>${UI.mdel===m.id?`<button class="btn sm danger" data-act="matdelok" data-id="${m.id}">Yes, delete</button><button class="btn sm" data-act="matdelno">Cancel</button>`:`<button class="btn sm danger" data-act="matdel" data-id="${m.id}">Delete</button>`}</div>`:''}</div>
      ${ap&&ap.id===m.id?applyBox(m):''}</div>`).join('')||(d?'':'<p class="small muted" style="margin:0">No QC materials saved yet.</p>')}</div></div>`;
 }
-function matOptions(sel){return (S.materials||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}"${m.id===sel?' selected':''}>${esc(m.name)}</option>`).join('')}
+function matOptions(sel){return matList().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}"${m.id===sel?' selected':''}>${esc(m.name)}</option>`).join('')}
 
 /* ===== Expired QC material: ask for the new lot of the same material, or dismiss with a comment ===== */
 function expiredGroups(){
@@ -2428,25 +2433,27 @@ document.addEventListener('click',e=>{
      S.depts=S.depts.filter(d=>d.id!==id);S.users.forEach(u=>{if(Array.isArray(u.depts)&&u.depts.includes(id)){u.depts=u.depts.filter(x=>x!==id);u.mod=nowIso()}});
      const nx=S.depts.find(d=>d.dept);if(nx){st.cur='';loadCtx(nx.id)}UI.dept='';UI.inst='';UI.mod='';
      audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted.');break}
-   case 'matnew':UI.mdr={id:'',name:'',levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
-   case 'matedit':{const m=(S.materials||[]).find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
+   case 'matnew':UI.mdr={id:'',name:'',depts:[],levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
+   case 'matedit':{const m=matList().find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,depts:(m.depts||[]).slice(),levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
    case 'matcancel':UI.mdr=null;break;
    case 'matsave':{const d=UI.mdr;if(!d)break;const nm=(d.name||'').trim();if(!nm)return toast('Give this QC product a name.');
      if((S.materials||[]).some(x=>x.id!==d.id&&x.name.toLowerCase()===nm.toLowerCase()))return toast('A QC material with that name already exists.');
      if(d.levels.some(l=>!(l.material||'').trim()))return toast('Every level needs a material name.');
      const rec={id:d.id||uid(),name:nm,levels:d.levels.map(l=>({material:l.material.trim(),lot:(l.lot||'').trim(),exp:l.exp||''}))};
-     S.materials=S.materials||[];const i=S.materials.findIndex(x=>x.id===rec.id);if(i>=0)Object.assign(S.materials[i],rec);else S.materials.push(rec);
-     audit(i>=0?'QC material edited':'QC material added',nm,null,[]);UI.mdr=null;toast('QC material saved.');break}
+     S.materials=S.materials||[];const i=S.materials.findIndex(x=>x.id===rec.id);
+     if(isAdmin())rec.depts=(d.depts||[]).slice();else if(i>=0)rec.depts=(S.materials[i].depts||[]).slice();else rec.depts=Array.isArray(CU.depts)?CU.depts.slice():[];
+     if(i>=0)Object.assign(S.materials[i],rec);else S.materials.push(rec);
+     audit(i>=0?'QC material edited':'QC material added',nm+' ('+matDeptTxt(rec)+')',null,rec.depts);UI.mdr=null;toast('QC material saved.');break}
    case 'matdel':UI.mdel=id;break;
    case 'matdelno':UI.mdel=null;break;
-   case 'matdelok':{const m=(S.materials||[]).find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
+   case 'matdelok':{const m=matList().find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
    case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
    case 'matapplycancel':UI.mAp=null;break;
    case 'matselall':if(UI.mAp){VA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
    case 'matselnone':if(UI.mAp)UI.mAp.sel={};break;
-   case 'matrun':{const m=(S.materials||[]).find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=VA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
+   case 'matrun':{const m=matList().find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=VA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
      const n=applyMat(m,list,'cur');audit('QC material applied',m.name+' to '+n+' test'+(n===1?'':'s')+': '+list.slice(0,8).map(a=>a.name).join(', ')+(list.length>8?' and more':''));UI.mAp=null;toast(m.name+' applied to '+n+' test'+(n===1?'':'s')+'.');break}
-   case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
+   case 'matpanel':{const m=matList().find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'rcustom':{const D=rdeptSel();if(!D||!isAdmin())break;S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[D]=JSON.parse(JSON.stringify(S.rules||{}));S.drulesAt[D]=nowIso();audit('Department rules set',rdeptName(D)+' now has its own Westgard rules, copied from the laboratory rules',null,[D]);toast(rdeptName(D)+' now has its own rules.');break}
@@ -2534,7 +2541,8 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined){if(!perm('e_materials'))return;
+  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined||d.mdept!==undefined){if(!perm('e_materials'))return;
+    if(d.mdept!==undefined&&UI.mdr&&isAdmin()){const a=UI.mdr.depts||(UI.mdr.depts=[]);UI.mdr.depts=t.checked?[...new Set([...a,d.mdept])]:a.filter(x=>x!==d.mdept);return}
     if(d.mf!==undefined&&UI.mdr)UI.mdr[d.mf]=t.value;
     else if(d.mn!==undefined&&UI.mdr){const n=+t.value;while(UI.mdr.levels.length<n)UI.mdr.levels.push(blankMatLv());UI.mdr.levels.length=n;return render()}
     else if(d.ml!==undefined&&UI.mdr){const [i,f]=d.ml.split(':');UI.mdr.levels[+i][f]=t.value}
@@ -2563,13 +2571,13 @@ document.addEventListener('change',e=>{
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
-  if(t.id==='e-matlib'||t.id==='m-matlib'||t.id==='t-matlib'){const pf=t.id[0],ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
+  if(t.id==='e-matlib'||t.id==='m-matlib'||t.id==='t-matlib'){const pf=t.id[0],ml=matList().find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
     if(ml&&a){const k=Math.min(a.nlev,ml.levels.length),set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};
       for(let i=0;i<k;i++){set(pf+'-mat-'+i,ml.levels[i].material||'');set(pf+'-lot-'+i,ml.levels[i].lot||'');set(pf+'-exp-'+i,ml.levels[i].exp||'')}
       toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+(ml.levels.length<a.nlev?'. This analyte has more levels, fill in the rest by hand.':'.'))}
     t.value='';return}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
-    if(t.id==='a-matlib'&&t.value){const ml=(S.materials||[]).find(x=>x.id===t.value);if(ml){UI.modal.n=ml.levels.length;ml.levels.forEach((l,i)=>{dr.mats[i]=l.material||'';dr.lots[i]=l.lot||'';dr.exps[i]=l.exp||''});toast(ml.name+' filled in. Enter the mean and SD for each level.')}}
+    if(t.id==='a-matlib'&&t.value){const ml=matList().find(x=>x.id===t.value);if(ml){UI.modal.n=ml.levels.length;ml.levels.forEach((l,i)=>{dr.mats[i]=l.material||'';dr.lots[i]=l.lot||'';dr.exps[i]=l.exp||''});toast(ml.name+' filled in. Enter the mean and SD for each level.')}}
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
   if(d.aunit){setUnit(anOf(d.aunit),t.value.trim());save();return}

@@ -164,25 +164,27 @@ document.addEventListener('click',e=>{
      S.depts=S.depts.filter(d=>d.id!==id);S.users.forEach(u=>{if(Array.isArray(u.depts)&&u.depts.includes(id)){u.depts=u.depts.filter(x=>x!==id);u.mod=nowIso()}});
      const nx=S.depts.find(d=>d.dept);if(nx){st.cur='';loadCtx(nx.id)}UI.dept='';UI.inst='';UI.mod='';
      audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted.');break}
-   case 'matnew':UI.mdr={id:'',name:'',levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
-   case 'matedit':{const m=(S.materials||[]).find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
+   case 'matnew':UI.mdr={id:'',name:'',depts:[],levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
+   case 'matedit':{const m=matList().find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,depts:(m.depts||[]).slice(),levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
    case 'matcancel':UI.mdr=null;break;
    case 'matsave':{const d=UI.mdr;if(!d)break;const nm=(d.name||'').trim();if(!nm)return toast('Give this QC product a name.');
      if((S.materials||[]).some(x=>x.id!==d.id&&x.name.toLowerCase()===nm.toLowerCase()))return toast('A QC material with that name already exists.');
      if(d.levels.some(l=>!(l.material||'').trim()))return toast('Every level needs a material name.');
      const rec={id:d.id||uid(),name:nm,levels:d.levels.map(l=>({material:l.material.trim(),lot:(l.lot||'').trim(),exp:l.exp||''}))};
-     S.materials=S.materials||[];const i=S.materials.findIndex(x=>x.id===rec.id);if(i>=0)Object.assign(S.materials[i],rec);else S.materials.push(rec);
-     audit(i>=0?'QC material edited':'QC material added',nm,null,[]);UI.mdr=null;toast('QC material saved.');break}
+     S.materials=S.materials||[];const i=S.materials.findIndex(x=>x.id===rec.id);
+     if(isAdmin())rec.depts=(d.depts||[]).slice();else if(i>=0)rec.depts=(S.materials[i].depts||[]).slice();else rec.depts=Array.isArray(CU.depts)?CU.depts.slice():[];
+     if(i>=0)Object.assign(S.materials[i],rec);else S.materials.push(rec);
+     audit(i>=0?'QC material edited':'QC material added',nm+' ('+matDeptTxt(rec)+')',null,rec.depts);UI.mdr=null;toast('QC material saved.');break}
    case 'matdel':UI.mdel=id;break;
    case 'matdelno':UI.mdel=null;break;
-   case 'matdelok':{const m=(S.materials||[]).find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
+   case 'matdelok':{const m=matList().find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
    case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
    case 'matapplycancel':UI.mAp=null;break;
    case 'matselall':if(UI.mAp){VA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
    case 'matselnone':if(UI.mAp)UI.mAp.sel={};break;
-   case 'matrun':{const m=(S.materials||[]).find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=VA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
+   case 'matrun':{const m=matList().find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=VA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
      const n=applyMat(m,list,'cur');audit('QC material applied',m.name+' to '+n+' test'+(n===1?'':'s')+': '+list.slice(0,8).map(a=>a.name).join(', ')+(list.length>8?' and more':''));UI.mAp=null;toast(m.name+' applied to '+n+' test'+(n===1?'':'s')+'.');break}
-   case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
+   case 'matpanel':{const m=matList().find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
    case 'resmore':UI.resLimit=(UI.resLimit||15)+30;break;
    case 'rcustom':{const D=rdeptSel();if(!D||!isAdmin())break;S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[D]=JSON.parse(JSON.stringify(S.rules||{}));S.drulesAt[D]=nowIso();audit('Department rules set',rdeptName(D)+' now has its own Westgard rules, copied from the laboratory rules',null,[D]);toast(rdeptName(D)+' now has its own rules.');break}
@@ -270,7 +272,8 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined){if(!perm('e_materials'))return;
+  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined||d.mdept!==undefined){if(!perm('e_materials'))return;
+    if(d.mdept!==undefined&&UI.mdr&&isAdmin()){const a=UI.mdr.depts||(UI.mdr.depts=[]);UI.mdr.depts=t.checked?[...new Set([...a,d.mdept])]:a.filter(x=>x!==d.mdept);return}
     if(d.mf!==undefined&&UI.mdr)UI.mdr[d.mf]=t.value;
     else if(d.mn!==undefined&&UI.mdr){const n=+t.value;while(UI.mdr.levels.length<n)UI.mdr.levels.push(blankMatLv());UI.mdr.levels.length=n;return render()}
     else if(d.ml!==undefined&&UI.mdr){const [i,f]=d.ml.split(':');UI.mdr.levels[+i][f]=t.value}
@@ -299,13 +302,13 @@ document.addEventListener('change',e=>{
   if(d.urole){const u=S.users.find(x=>x.id===d.urole);if(!u)return;
     if(u.role==='admin'&&t.value!=='admin'&&nAdmins()<=1){toast('There must be at least one active administrator.');return render()}
     audit('Role changed',u.name+': '+roleName(u.role).toLowerCase()+' to '+roleName(t.value).toLowerCase());u.role=t.value;u.mod=nowIso();save();return render()}
-  if(t.id==='e-matlib'||t.id==='m-matlib'||t.id==='t-matlib'){const pf=t.id[0],ml=(S.materials||[]).find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
+  if(t.id==='e-matlib'||t.id==='m-matlib'||t.id==='t-matlib'){const pf=t.id[0],ml=matList().find(x=>x.id===t.value),a=UI.modal&&(pf==='e'?UI.modal.edit:UI.modal.aid)?anOf(pf==='e'?UI.modal.edit:UI.modal.aid):null;
     if(ml&&a){const k=Math.min(a.nlev,ml.levels.length),set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};
       for(let i=0;i<k;i++){set(pf+'-mat-'+i,ml.levels[i].material||'');set(pf+'-lot-'+i,ml.levels[i].lot||'');set(pf+'-exp-'+i,ml.levels[i].exp||'')}
       toast(ml.name+' filled in for '+k+' level'+(k===1?'':'s')+(ml.levels.length<a.nlev?'. This analyte has more levels, fill in the rest by hand.':'.'))}
     t.value='';return}
   if(d.mre!==undefined&&UI.modal&&UI.modal.add){const dr=readAdd();UI.modal.d=dr;if(t.id==='a-n')UI.modal.n=+t.value;
-    if(t.id==='a-matlib'&&t.value){const ml=(S.materials||[]).find(x=>x.id===t.value);if(ml){UI.modal.n=ml.levels.length;ml.levels.forEach((l,i)=>{dr.mats[i]=l.material||'';dr.lots[i]=l.lot||'';dr.exps[i]=l.exp||''});toast(ml.name+' filled in. Enter the mean and SD for each level.')}}
+    if(t.id==='a-matlib'&&t.value){const ml=matList().find(x=>x.id===t.value);if(ml){UI.modal.n=ml.levels.length;ml.levels.forEach((l,i)=>{dr.mats[i]=l.material||'';dr.lots[i]=l.lot||'';dr.exps[i]=l.exp||''});toast(ml.name+' filled in. Enter the mean and SD for each level.')}}
     if(t.id==='a-pick'&&t.value){const [pp,nn]=t.value.split('|'),it=panelsNow().find(p=>p.name===pp).items.find(i=>i.name===nn);dr.name=it.name;dr.unit=st.units[it.name]!=null?st.units[it.name]:it.unit}
     return render()}
   if(d.aunit){setUnit(anOf(d.aunit),t.value.trim());save();return}

@@ -1,4 +1,8 @@
 /* ===== QC material library: enter a material once, apply it to many tests ===== */
+/* QC materials belong to departments. Admins see all; other users see materials assigned to their departments (unassigned = everyone). */
+const matVis=m=>!CU||CU.role==='admin'||!Array.isArray(CU.depts)||!(m.depts||[]).length||m.depts.some(d=>CU.depts.includes(d));
+const matList=()=>(S.materials||[]).filter(matVis);
+const matDeptTxt=m=>{const ds=(m.depts||[]).map(id=>(S.depts||[]).find(x=>x.id===id)).filter(Boolean);return ds.length?ds.map(d=>d.dept+dsub(d.sub)).join(', '):'All departments'};
 const blankMatLv=()=>({material:'',lot:'',exp:''});
 function applyMat(m,list,which){
   let n=0;
@@ -8,10 +12,11 @@ function applyMat(m,list,which){
 }
 function matLine(m){return m.levels.map((l,i)=>levelName(i)+': '+(l.material||'(no name)')+(l.lot?' · Lot '+l.lot:'')+(l.exp?' · exp '+fmtDate(l.exp):'')).join('<br>')}
 function renderMaterials(){
-  const ed=perm('e_materials'),ms=(S.materials||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)),d=ed?UI.mdr:null,ap=ed?UI.mAp:null,mine=VA();
+  const ed=perm('e_materials'),ms=matList().slice().sort((a,b)=>a.name.localeCompare(b.name)),d=ed?UI.mdr:null,ap=ed?UI.mAp:null,mine=VA();
   const form=d?`<div class="panelcard stack"><h3>${d.id?'Edit QC material':'New QC material'}</h3>
     <div class="row"><label class="f" style="flex:2 1 240px">Name of this QC product<input type="text" data-mf="name" value="${esc(d.name)}" placeholder="e.g. Bio-Rad Multiqual"></label>
     <label class="f" style="flex:0 1 140px">Control levels<select data-mn>${[1,2,3,4,5,6].map(n=>`<option${n===d.levels.length?' selected':''}>${n}</option>`).join('')}</select></label></div>
+    ${isAdmin()?`<div><div class="small" style="font-weight:600;margin-bottom:4px">Departments that can use this material</div><div class="row" style="gap:6px 16px">${deptList().map(x=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" data-mdept="${x.id}"${(d.depts||[]).includes(x.id)?' checked':''}>${esc(x.dept+dsub(x.sub))}</label>`).join('')}</div><p class="small muted" style="margin:4px 0 0">Leave all unticked to make it available to every department.</p></div>`:`<p class="small muted" style="margin:0">${d.id?'Available to: '+esc(matDeptTxt(d)):'This material will be assigned to your department'+(Array.isArray(CU&&CU.depts)&&CU.depts.length>1?'s':'')+' automatically.'}</p>`}
     ${d.levels.map((l,i)=>`<div class="row" style="align-items:flex-end"><span class="small" style="width:56px;padding-bottom:9px">${levelName(i)}</span>
       <label class="f" style="flex:2 1 170px">Material name<input type="text" data-ml="${i}:material" value="${esc(l.material)}" placeholder="e.g. Multiqual Level ${i+1}"></label>
       <label class="f" style="flex:1 1 100px">Lot no.<input type="text" data-ml="${i}:lot" value="${esc(l.lot)}"></label>
@@ -26,11 +31,11 @@ function renderMaterials(){
      <div class="row"><button class="btn primary" data-act="matrun" data-id="${m.id}"${nSel?'':' disabled'}>Apply to ${nSel} test${nSel===1?'':'s'}</button><button class="btn" data-act="matapplycancel">Cancel</button></div></div>`};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h2>QC materials</h2><p class="small muted" style="margin:4px 0 0;max-width:80ch">Enter a QC product once, with its material names, lot numbers and expiry dates, then apply it to as many tests as you like instead of typing it again for each one.</p></div>${d||!ed?'':'<button class="btn primary" data-act="matnew">Add QC material</button>'}</div>
    ${form}
-   ${ms.map(m=>`<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(m.name)}</b><div class="small muted" style="margin-top:4px">${matLine(m).split('<br>').map(esc).join('<br>')}</div></div>
+   ${ms.map(m=>`<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(m.name)}</b> <span class="chip">${esc(matDeptTxt(m))}</span><div class="small muted" style="margin-top:4px">${matLine(m).split('<br>').map(esc).join('<br>')}</div></div>
      ${ed?`<div class="row" style="gap:6px"><button class="btn sm primary" data-act="matapply" data-id="${m.id}">Apply to tests</button><button class="btn sm" data-act="matedit" data-id="${m.id}">Edit</button>${UI.mdel===m.id?`<button class="btn sm danger" data-act="matdelok" data-id="${m.id}">Yes, delete</button><button class="btn sm" data-act="matdelno">Cancel</button>`:`<button class="btn sm danger" data-act="matdel" data-id="${m.id}">Delete</button>`}</div>`:''}</div>
      ${ap&&ap.id===m.id?applyBox(m):''}</div>`).join('')||(d?'':'<p class="small muted" style="margin:0">No QC materials saved yet.</p>')}</div></div>`;
 }
-function matOptions(sel){return (S.materials||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}"${m.id===sel?' selected':''}>${esc(m.name)}</option>`).join('')}
+function matOptions(sel){return matList().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${m.id}"${m.id===sel?' selected':''}>${esc(m.name)}</option>`).join('')}
 
 /* ===== Expired QC material: ask for the new lot of the same material, or dismiss with a comment ===== */
 function expiredGroups(){
