@@ -23,9 +23,10 @@ function renderSetupHome(){
 }
 const app=document.getElementById('app');
 function stashDrafts(){UI.draft=UI.draft||{};document.querySelectorAll('[data-in]').forEach(i=>{const k=UI.date+':'+i.dataset.in;if(i.value!=='')UI.draft[k]=i.value;else delete UI.draft[k]})}
+const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved.</footer>';
 function render(){
   const y=window.scrollY;stashDrafts();
-  const gate=authGate();if(gate){app.innerHTML=gate;window.scrollTo(0,0);return}
+  const gate=authGate();if(gate){app.innerHTML=gate+FOOT;window.scrollTo(0,0);return}
   let h='';
   const setupOn=!S.setup.done||UI.editing;
   const un=S.setup.done?unresolved(allFlags()).length:0;
@@ -37,7 +38,7 @@ function render(){
     h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():setupView();
   }else h+=renderSetup();
   h+=renderModal();
-  app.innerHTML=h;
+  app.innerHTML=h+FOOT;
   if(UI.draft)document.querySelectorAll('[data-in]').forEach(i=>{const v=UI.draft[UI.date+':'+i.dataset.in];if(v!==undefined)i.value=v});
   window.scrollTo(0,y);
 }
@@ -201,7 +202,11 @@ document.addEventListener('click',e=>{
    case 'skipok':{const a=anOf(id);S.skips=S.skips.filter(s=>!(s.aid===id&&s.date===UI.date));const rsn=document.getElementById('skr-'+id).value.trim();S.skips.push({aid:id,date:UI.date,reason:rsn,...stampNow()});audit('Marked not performed',a.name+' on '+fmtDate(UI.date)+(rsn?': '+rsn:''));UI.skipOpen=null;save();toast(a.name+' marked as not performed on '+fmtDate(UI.date)+'.');break}
    case 'unskip':audit('Not performed undone',(anOf(id)||{}).name+' on '+fmtDate(UI.date));S.skips=S.skips.filter(s=>!(s.aid===id&&s.date===UI.date));break;
    case 'override':{const c=document.getElementById('ov-'+id).value.trim();if(!c){toast('Write a comment before overriding.');return}
-     const r=S.results.find(x=>x.id===id);r.ov={comment:c,...stampNow()};audit('Override',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+': '+c);save();toast('Override recorded with your comment.');break}
+     const r=S.results.find(x=>x.id===id),st0=stampNow();r.ov={comment:c,...st0};
+     // a trend or shift covers a whole run of points: dismissing one dismisses the rest of that run
+     const an=anOf(r.aid),fl0=allFlags();let extra=0;
+     if(an)patternsFor(an,r.lv,S.results).forEach(p=>{if(!patFlagged(p).includes(r.id))return;r.ov.pattern=p.kind;patFlagged(p).forEach(pid=>{const q=S.results.find(x=>x.id===pid);if(q&&!q.ov&&(fl0[q.id]||[]).every(x=>x.sev!=='reject')){q.ov={comment:c,pattern:p.kind,...st0};extra++}})});
+     audit('Override',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(extra?' (and '+extra+' more point'+(extra>1?'s':'')+' in the same trend or shift)':'')+': '+c);save();toast('Override recorded with your comment.');break}
    case 'povr':{const k=el.dataset.k,box=[...document.querySelectorAll('[data-pk]')].find(x=>x.getAttribute('data-pk')===k),c=(box&&box.value||'').trim();
      if(!c){toast('Write a comment before overriding.');return}
      const {a,lv,p}=patternFind(k);if(!p)break;const fl=allFlags();let n=0;

@@ -37,8 +37,8 @@ function alertCard(r,flags,full){
    <details${full?' open':''} style="margin-top:8px"><summary><b>Suggested actions</b></summary><ul>${fixes.map(x=>`<li>${x}</li>`).join('')}</ul></details>
    ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> ${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button>`:''}</p>`
    :!perm('e_override')?`<p class="small muted" style="margin:8px 0 0">${isAdmin()?'':'Your access level can view this alert but not resolve it.'}</p>`
-   :`<div class="row" style="margin-top:10px"><label class="f" style="flex:1 1 260px">${rej?'Override comment (required to accept this result)':'Note (optional)'}<textarea id="ov-${r.id}" rows="2" placeholder="e.g. Repeated with fresh vial, in control. Calibration done."></textarea></label>
-    ${rej?`<button class="btn danger" data-act="override" data-id="${r.id}">Override with comment</button>`:''}${isAdmin()?`<button class="btn sm" data-act="delres" data-id="${r.id}">Delete result</button>`:''}</div>`}</div>`;
+   :`<div class="row" style="margin-top:10px"><label class="f" style="flex:1 1 260px">${rej?'Override comment (required to accept this result)':'Comment (required to dismiss this warning)'}<textarea id="ov-${r.id}" rows="2" placeholder="e.g. Repeated with fresh vial, in control. Calibration done."></textarea></label>
+    ${rej?`<button class="btn danger" data-act="override" data-id="${r.id}">Override with comment</button>`:`<button class="btn" data-act="override" data-id="${r.id}">Dismiss with comment</button>`}${isAdmin()?`<button class="btn sm" data-act="delres" data-id="${r.id}">Delete result</button>`:''}</div>`}</div>`;
 }
 function unresolved(flags){return VR().filter(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1)}
 function expAlerts(){
