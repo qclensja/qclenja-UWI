@@ -70,6 +70,10 @@ const CAT={
  'Other / Custom':{analysers:['Other'],subs:{'Custom':[]}}
 };
 const DEPTS=Object.keys(CAT);
+const catOf=d=>CAT[d]||CAT['Other / Custom'];
+const isBuiltin=d=>!!CAT[d]&&d!=='Other / Custom';
+const dsub=s=>s?' · '+s:'';
+const defSub=d=>isBuiltin(d)?Object.keys(CAT[d].subs)[0]:'';
 /* modules installed on a analyser; the user can tick the ones fitted and add their own */
 const AMODS={
  'Roche cobas pro':['ISE','c 503','c 703','e 801'],

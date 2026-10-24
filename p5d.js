@@ -4,9 +4,9 @@ function renderSetupHome(){
   if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
   const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results?</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&!isBuiltin(st.dept)?(UI.drn?`<label class="f" style="flex:1 1 200px">Department name<input type="text" id="drn-name" maxlength="40" value="${esc(st.dept==='Other / Custom'?'':st.dept)}"></label><button class="btn primary" data-act="drnsave">Save name</button><button class="btn" data-act="drncancel">Cancel</button>`:'<button class="btn" data-act="drnstart">Rename department</button>'):''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results?</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
-   <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b> · ${esc(st.sub)}</div>
+   <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b>${esc(dsub(st.sub))}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
    <div class="small muted" style="margin-top:12px">Analysers and modules in ${esc(st.dept)}</div>${analyserEditor()}
    <div class="row" style="align-items:flex-end;margin-top:8px"><label class="f" style="flex:1 1 220px">New analyser<select data-path="analyser" data-r>${anOptions(st.dept,st.sub,st.analyser)}</select></label>
@@ -16,7 +16,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderMaterials()}${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -27,15 +27,16 @@ const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved.</f
 function render(){
   const y=window.scrollY;stashDrafts();
   const gate=authGate();if(gate){app.innerHTML=gate+FOOT;window.scrollTo(0,0);return}
+  if(CU&&S.setup.done&&!UI.expAsked&&!UI.modal&&perm('e_lot')){UI.expAsked=true;if(expiredGroups().length)UI.modal={exp:true}}
   let h='';
   const setupOn=!S.setup.done||UI.editing;
   const un=S.setup.done?unresolved(allFlags()).length:0;
-  h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():S.setup.sub+' · '+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
+  h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():(S.setup.sub?S.setup.sub+' · ':'')+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
+    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['materials','QC materials'],['limits','Establish limits'],['rules','Westgard rules']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():setupView();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():S.tab==='materials'?renderMaterials():setupView();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h+FOOT;
@@ -54,10 +55,10 @@ document.addEventListener('click',e=>{
   if(act==='mclose'&&el.classList.contains('modalbg')&&e.target!==el)return;
   const PUBLIC=new Set(['newlab','forgot','backlogin','copyrec','recdone','ghopen','svcopen','reqopen']);
   if(!CU&&!PUBLIC.has(act))return;
-  const ADMIN=new Set(['csubadd','csubno','rcustom','rreset','nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matnew','matedit','matcancel','matsave','matdel','matdelno','matdelok','matapply','matapplycancel','matselall','matselnone','matrun','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
+  const ADMIN=new Set(['csubadd','csubno','cdeptadd','cdeptno','drnstart','drncancel','drnsave','rcustom','rreset','nlev','back','next','panelall','cpnew','cpadd','cpall','cprem','cpdel','edit','closesetup','papply','addopen','sugg','addsave','aedit','aeditsave','arem','arcancel','mnp','pdel','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','xaudit','auditmore','newrec','deldept','deldeptno','deldeptok','matpanel','ainstadd','anren','anrencancel','anrensave','ainstdel','adddept','asgall','asgmove','asgcopy','ghsync','ghoff','rulet','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','udel','udelno','udelok','uedit','ueditno','uemailpw']);
   const ADMONLY=new Set(['rcustom','rreset','deldept','deldeptno','deldeptok','uemailpw','uedit','ueditno','udel','udelno','udelok','rqapprove','rqreject','rqconfirm','rqcancel','credok','copycred','svcdisc','svccopy','backup','reset1','reset0','reset2','delres','genpw','utoggle','ureset','ucancel','newrec','adddept','ghsync','ghoff','rulet']);
   if(ADMIN.has(act)&&!(isAdmin()||(perm('e_setup')&&!ADMONLY.has(act)&&(act!=='closesetup'||!S.setup.adding))))return;
-  const NEED={povr:'e_override',punover:'e_override',tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
+  const NEED={expopen:'e_lot',expapply:'e_lot',expdis:'e_lot',matnew:'e_materials',matedit:'e_materials',matcancel:'e_materials',matsave:'e_materials',matdel:'e_materials',matdelno:'e_materials',matdelok:'e_materials',matapply:'e_materials',matapplycancel:'e_materials',matselall:'e_materials',matselnone:'e_materials',matrun:'e_materials',povr:'e_override',punover:'e_override',tedit:'e_lot',teditsave:'e_lot',tdel:'e_lot',tdelno:'e_lot',tdelok:'e_lot',obsave:'e_other',obsaveone:'e_other',obmode:'e_other',saveqc:'e_qc',saveone:'e_qc',skip:'e_qc',skipok:'e_qc',unskip:'e_qc',override:'e_override',unoverride:'e_override',lot:'e_lot',msave:'e_lot',estapply:'e_limits',xl:'e_export'};
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
@@ -107,13 +108,13 @@ document.addEventListener('click',e=>{
      if(moved.length)toast(moved.length+' analyte'+(moved.length>1?'s':'')+' moved to '+(st.analysers[0]||'no analyser')+'. Check step 3.');break}
    case 'back':st.step--;break;
    case 'next':
-     if(st.step===1&&st.adding&&(S.depts||[]).some(d=>d.id!==st.cur&&d.dept===st.dept&&d.sub===st.sub))return toast(st.dept+' · '+st.sub+' is already set up. Choose another department or sub-department.');
+     if(st.step===1&&st.adding&&(S.depts||[]).some(d=>d.id!==st.cur&&d.dept===st.dept&&d.sub===st.sub))return toast(st.dept+dsub(st.sub)+' is already set up. Choose another department or sub-department.');
      if(st.step===2){
        const keep=new Set(chosenList().map(c=>c.name)),drop=DA().filter(a=>!keep.has(a.name)&&S.results.some(r=>r.aid===a.id));
        if(drop.length){const key=drop.map(a=>a.id).join();if(UI.dropOK!==key){UI.dropOK=key;return toast('Removing '+drop.map(a=>a.name).join(', ')+' deletes its saved QC results. Press Next again to confirm.')}}
        UI.dropOK=null;buildAnalytes();
      }
-     if(st.step===4){st.done=true;if(st.adding){st.adding=false;audit('Department added',st.dept+' · '+st.sub+' · '+analyserName()+' · '+DA().length+' analytes');UI.editing=false;S.tab='setup';save();render();window.scrollTo(0,0);return toast(st.dept+' added.')}audit('Setup saved',st.dept+' · '+st.sub+' · '+analyserName()+' · '+DA().length+' analytes');UI.editing=false;S.tab=S.tab==='setup'?'setup':'today';save();render();window.scrollTo(0,0);return toast('Setup saved.')}
+     if(st.step===4){st.done=true;if(st.adding){st.adding=false;audit('Department added',st.dept+dsub(st.sub)+' · '+analyserName()+' · '+DA().length+' analytes');UI.editing=false;S.tab='setup';save();render();window.scrollTo(0,0);return toast(st.dept+' added.')}audit('Setup saved',st.dept+' · '+st.sub+' · '+analyserName()+' · '+DA().length+' analytes');UI.editing=false;S.tab=S.tab==='setup'?'setup':'today';save();render();window.scrollTo(0,0);return toast('Setup saved.')}
      st.step++;break;
    case 'panelall':{const p=panelsNow().find(x=>x.name===el.dataset.p),s=st.sel[p.name]||(st.sel[p.name]={}),all=p.items.every(i=>s[i.name]||isAdded(i.name));p.items.forEach(i=>s[i.name]=(all&&!isAdded(i.name))?0:1);break}
    case 'cpnew':{const n=document.getElementById('newpanel').value.trim();if(!n)return toast('Give the panel a name.');
@@ -177,9 +178,9 @@ document.addEventListener('click',e=>{
    case 'matdelok':{const m=(S.materials||[]).find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
    case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
    case 'matapplycancel':UI.mAp=null;break;
-   case 'matselall':if(UI.mAp){DA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
+   case 'matselall':if(UI.mAp){VA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
    case 'matselnone':if(UI.mAp)UI.mAp.sel={};break;
-   case 'matrun':{const m=(S.materials||[]).find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=DA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
+   case 'matrun':{const m=(S.materials||[]).find(x=>x.id===id),ap=UI.mAp;if(!m||!ap)break;const list=VA().filter(a=>ap.sel[a.id]);if(!list.length)return toast('Tick at least one test.');
      const n=applyMat(m,list,'cur');audit('QC material applied',m.name+' to '+n+' test'+(n===1?'':'s')+': '+list.slice(0,8).map(a=>a.name).join(', ')+(list.length>8?' and more':''));UI.mAp=null;toast(m.name+' applied to '+n+' test'+(n===1?'':'s')+'.');break}
    case 'matpanel':{const m=(S.materials||[]).find(x=>x.id===(document.querySelector('[data-matsel="'+el.dataset.p+'"]')||{}).value),p=el.dataset.p;if(!m)return toast('Choose a saved QC material first.');
      const list=DA().filter(a=>a.panel===p);const n=applyMat(m,list,'first');audit('QC material applied',m.name+' to panel '+p+' ('+n+' tests)');toast(m.name+' applied to '+n+' tests.');break}
@@ -192,6 +193,17 @@ document.addEventListener('click',e=>{
      if(subList(st.dept).some(x=>x.toLowerCase()===nm.toLowerCase())){st.sub=subList(st.dept).find(x=>x.toLowerCase()===nm.toLowerCase());st.selFor='';UI.csub=false;toast(nm+' already exists. It is selected.');break}
      st.sub=nm;st.selFor='';UI.csub=false;toast('Sub-department "'+nm+'" added. Create its panels in the next step.');break}
    case 'csubno':UI.csub=false;break;
+   case 'cdeptadd':{const nm=((document.getElementById('cdept-name')||{}).value||'').trim().replace(/\s+/g,' '),er=document.getElementById('cdept-err');
+     if(!nm){if(er){er.textContent='Enter a name for the department.';er.hidden=false}return}
+     const have=deptChoices().find(x=>x.toLowerCase()===nm.toLowerCase());
+     st.dept=have||nm;st.sub=defSub(st.dept);st.analyser='';st.analysers=[];st.amods={};st.selFor='';UI.cdept=false;toast('Department "'+st.dept+'" selected.');break}
+   case 'cdeptno':UI.cdept=false;break;
+   case 'drnstart':UI.drn=true;break;
+   case 'drncancel':UI.drn=false;break;
+   case 'drnsave':{if(!isAdmin())return;const nm=((document.getElementById('drn-name')||{}).value||'').trim().replace(/\s+/g,' ');
+     if(!nm)return toast('Enter a name for the department.');
+     if(deptList().some(d=>d.id!==st.cur&&d.dept.toLowerCase()===nm.toLowerCase()&&(d.sub||'')===(st.sub||'')))return toast('Another department already has that name.');
+     const old=st.dept;st.dept=nm;syncCtx();audit('Department renamed',old+' to '+nm,null,[st.cur]);UI.drn=false;toast('Department renamed to '+nm+'.');break}
    case 'donetoggle':UI.doneOpen=!UI.doneOpen;break;
    case 'obsave':saveOther();break;
    case 'obsaveone':saveOther(id);break;
@@ -218,6 +230,9 @@ document.addEventListener('click',e=>{
    case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
    case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
+   case 'expopen':UI.modal={exp:true};break;
+   case 'expapply':if(expApply(+el.dataset.g))return;break;
+   case 'expdis':if(expDismiss(+el.dataset.g))return;break;
    case 'tedit':UI.modal={aid:id,tedit:+el.dataset.i};UI.thOpen=id;break;
    case 'teditsave':if(saveTargetEdit())return;break;
    case 'tdel':UI.tdel={aid:id,i:+el.dataset.i};UI.thOpen=id;break;
@@ -255,7 +270,7 @@ document.addEventListener('change',e=>{
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;
-  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined){if(!perm('e_setup'))return;
+  if(d.mf!==undefined||d.mn!==undefined||d.ml!==undefined||d.masel!==undefined){if(!perm('e_materials'))return;
     if(d.mf!==undefined&&UI.mdr)UI.mdr[d.mf]=t.value;
     else if(d.mn!==undefined&&UI.mdr){const n=+t.value;while(UI.mdr.levels.length<n)UI.mdr.levels.push(blankMatLv());UI.mdr.levels.length=n;return render()}
     else if(d.ml!==undefined&&UI.mdr){const [i,f]=d.ml.split(':');UI.mdr.levels[+i][f]=t.value}
@@ -298,8 +313,10 @@ document.addEventListener('change',e=>{
     if(!v||(v!==d.rnp&&panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===v.toLowerCase()))){toast(v?'A panel with that name already exists.':'Panel name cannot be empty.');return render()}
     DA().forEach(a=>{if(a.panel===d.rnp)a.panel=v});cp.name=v;save();document.querySelectorAll('[data-rnp]').forEach(x=>{if(x.getAttribute('data-rnp')===oldN){x.setAttribute('data-rnp',v);x.value=v}});document.querySelectorAll('[data-p]').forEach(x=>{if(x.getAttribute('data-p')===oldN)x.setAttribute('data-p',v)});return}
   if(d.path==='sub'&&t.value==='__new'){UI.csub=true;return render()}
+  if(d.path==='sub'&&t.value==='__none'){UI.csub=false;st.sub='';st.selFor='';save();return render()}
+  if(d.path==='dept'&&t.value==='__newdept'){UI.cdept=true;return render()}
   if(d.path){UI.csub=false;st[d.path]=t.value;
-    if(d.path==='dept'){st.sub=Object.keys(CAT[t.value].subs)[0];st.analyser='';st.analysers=[];st.amods={};st.selFor=''}
+    if(d.path==='dept'){UI.cdept=false;st.sub=defSub(t.value);st.analyser='';st.analysers=[];st.amods={};st.selFor=''}
     if(d.path==='sub')st.selFor='';
     save();return render()}
   if(d.an){const [p,n]=d.an.split('|');(st.sel[p]||(st.sel[p]={}))[n]=t.checked?1:0;save();return render()}

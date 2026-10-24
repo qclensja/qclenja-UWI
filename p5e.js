@@ -71,7 +71,7 @@ function renderManager(){
   return `<div class="panel stack"><div><h3>Panels and analytes</h3><p class="small muted" style="margin:4px 0 0">Add new analytes to a panel, move analytes in from other panels, change a unit, rename or delete a custom panel, or start a new panel. New analytes start QC from today and existing results are not changed.</p></div>
    <datalist id="unitlist">${UNITS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist>
    <div class="stack">${cards}</div>
-   ${more.length?`<details data-more${UI.moreOpen?' open':''}><summary style="cursor:pointer"><b>More routine panels for ${esc(st.sub)} (${more.length})</b></summary><div class="stack" style="margin-top:10px">${more.map(p=>`<div class="panelcard"><h3>${esc(p.name)}</h3><div class="row" style="margin-top:8px;gap:6px">${p.items.map(i=>`<button class="btn sm" data-act="sugg" data-p="${esc(p.name)}" data-n="${esc(i.name)}">+ ${esc(i.name)}</button>`).join('')}</div></div>`).join('')}</div></details>`:''}
+   ${more.length?`<details data-more${UI.moreOpen?' open':''}><summary style="cursor:pointer"><b>More routine panels for ${esc(st.sub||st.dept)} (${more.length})</b></summary><div class="stack" style="margin-top:10px">${more.map(p=>`<div class="panelcard"><h3>${esc(p.name)}</h3><div class="row" style="margin-top:8px;gap:6px">${p.items.map(i=>`<button class="btn sm" data-act="sugg" data-p="${esc(p.name)}" data-n="${esc(i.name)}">+ ${esc(i.name)}</button>`).join('')}</div></div>`).join('')}</div></details>`:''}
    <div class="row"><label class="f" style="flex:1 1 220px">New custom panel<input type="text" id="mnewpanel" placeholder="e.g. Special tests"></label><button class="btn" data-act="mnp">Create panel</button></div></div>`;
 }
 /* ----- add analyte modal ----- */

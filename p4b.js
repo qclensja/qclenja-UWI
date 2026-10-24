@@ -1,6 +1,12 @@
 /* ===== Setup wizard ===== */
 const STEPS=['Department & analyser','Analytes','Schedule & analyser','Control targets'];
 /* sub-departments: the built-in ones, plus custom ones any department of this type already uses */
+function deptChoices(){
+  const out=DEPTS.filter(d=>d!=='Other / Custom');
+  (S.depts||[]).forEach(r=>{if(r.dept&&!out.includes(r.dept)&&r.dept!=='Other / Custom')out.push(r.dept)});
+  if(S.setup.dept&&!out.includes(S.setup.dept)&&S.setup.dept!=='Other / Custom')out.push(S.setup.dept);
+  out.push('Other / Custom');return out;
+}
 function subList(dept){
   const base=Object.keys((CAT[dept]||{subs:{}}).subs),out=base.slice();
   const add=n=>{if(n&&!out.some(x=>x.toLowerCase()===String(n).toLowerCase()))out.push(n)};
@@ -89,11 +95,12 @@ function renderSetup(){
   const steps=`<div class="steps">${STEPS.map((n,i)=>`<span class="${i+1===step?'on':i+1<step?'done':''}">${i+1}. ${n}</span>`).join('')}</div>`;
   let body='',next='Next',canNext=true;
   if(step===1){
-    const d=CAT[st.dept];
+    const d=catOf(st.dept);
     body=`<div class="grid2">
      <label class="f">Laboratory name (optional)<input type="text" data-path="lab" value="${esc(st.lab)}" placeholder="e.g. Main Laboratory"></label>
-     <label class="f">Department<select data-path="dept" data-r>${DEPTS.map(x=>`<option${x===st.dept?' selected':''}>${x}</option>`).join('')}</select></label>
-     <div class="f">Sub-department<select data-path="sub" data-r aria-label="Sub-department">${subList(st.dept).map(x=>`<option${x===st.sub?' selected':''}>${esc(x)}</option>`).join('')}<option value="__new">+ Add a custom sub-department…</option></select>
+     <div class="f">Department<select data-path="dept" data-r aria-label="Department">${deptChoices().map(x=>`<option${x===st.dept?' selected':''}>${esc(x)}</option>`).join('')}<option value="__newdept">+ Custom department (choose its name)…</option></select>
+      ${UI.cdept?`<div class="row" style="align-items:flex-end;margin-top:6px"><label class="f" style="flex:1 1 200px">Department name<input type="text" id="cdept-name" maxlength="40" placeholder="e.g. Point of Care Testing"></label><button type="button" class="btn primary" data-act="cdeptadd">Use this department</button><button type="button" class="btn" data-act="cdeptno">Cancel</button></div><span id="cdept-err" class="small" style="color:var(--bad)" hidden></span>`:''}</div>
+     <div class="f">Sub-department<select data-path="sub" data-r aria-label="Sub-department"><option value="__none"${st.sub?'':' selected'}>(None)</option>${subList(st.dept).map(x=>`<option${x===st.sub?' selected':''}>${esc(x)}</option>`).join('')}<option value="__new">+ Add a custom sub-department…</option></select>
       ${UI.csub?`<div class="row" style="align-items:flex-end;margin-top:6px"><label class="f" style="flex:1 1 200px">New sub-department name<input type="text" id="csub-name" maxlength="40" placeholder="e.g. Special Chemistry"></label><button type="button" class="btn primary" data-act="csubadd">Use this sub-department</button><button type="button" class="btn" data-act="csubno">Cancel</button></div><span id="csub-err" class="small" style="color:var(--bad)" hidden></span>`:''}</div>
      <div class="f" style="grid-column:1/-1">Analysers in this department${analyserEditor()}
       <div class="row" style="align-items:flex-end;margin-top:8px"><label class="f" style="flex:1 1 220px">Add an analyser<select data-path="analyser" data-r>${anOptions(st.dept,st.sub,st.analyser)}</select></label>
@@ -108,7 +115,7 @@ function renderSetup(){
     ensureSel();
     const ps=panelsNow(),uOf=i=>st.units[i.name]!=null?st.units[i.name]:i.unit;
     const unitIn=(attr,v)=>`<input type="text" class="unitin" list="unitlist" ${attr} value="${esc(v)}" aria-label="Unit" title="Unit">`;
-    body=`${ps.length?'':`<div class="alert warn" style="margin:0 0 10px"><b>${esc(st.sub)}</b> is a custom sub-department, so it has no suggested panels. Create your own panels and tests below.</div>`}<p class="hint">Routine panels for <b>${esc(st.sub)}</b> on the ${esc(analyserName())} are ticked. Untick anything you do not run. Edit a unit if your lab reports it differently (for example mg/dL instead of mmol/L). Changing a unit does not convert existing results or targets. Add your own panels and tests at the bottom.${S.setup.done?' Panels and tests already in use are greyed out and cannot be unticked or deleted here; use Remove under Panels and analytes if you really need to take one out.':''}</p>
+    body=`${ps.length?'':`<div class="alert warn" style="margin:0 0 10px"><b>${esc(st.sub||st.dept)}</b> has no suggested panels. Create your own panels and tests below.</div>`}<p class="hint">Routine panels for <b>${esc(st.sub)}</b> on the ${esc(analyserName())} are ticked. Untick anything you do not run. Edit a unit if your lab reports it differently (for example mg/dL instead of mmol/L). Changing a unit does not convert existing results or targets. Add your own panels and tests at the bottom.${S.setup.done?' Panels and tests already in use are greyed out and cannot be unticked or deleted here; use Remove under Panels and analytes if you really need to take one out.':''}</p>
      <datalist id="unitlist">${UNITS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist>
      <div class="grid2">${ps.map(p=>{const s=st.sel[p.name]||{},nL=p.items.filter(i=>isAdded(i.name)).length,allL=nL===p.items.length&&nL>0;const all=p.items.every(i=>s[i.name]||isAdded(i.name));
       return `<div class="panelcard${allL?' locked':''}"><h3><span>${esc(p.name)} ${p.routine?'<span class="chip acc">Routine</span>':''}${allL?' <span class="chip">Already added</span>':nL?' <span class="chip">'+nL+' already added</span>':''}</span>

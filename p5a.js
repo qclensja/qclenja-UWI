@@ -42,14 +42,14 @@ function alertCard(r,flags,full){
 }
 function unresolved(flags){return VR().filter(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1)}
 function expAlerts(){
-  const out=[];VA().forEach(a=>{const t=curTarget(a);t.levels.slice(0,a.nlev).forEach((l,i)=>{const e=expInfo(l.exp);if(e.st==='expired'||e.st==='soon')out.push({a,i,l,e})})});
+  const out=[];VA().forEach(a=>{const t=curTarget(a);t.levels.slice(0,a.nlev).forEach((l,i)=>{const e=expInfo(l.exp);if(l.expDis&&e.st==='expired')return;if(e.st==='expired'||e.st==='soon')out.push({a,i,l,e})})});
   return out.sort((x,y)=>x.e.days-y.e.days);
 }
 function expBanner(){
   const x=expAlerts();if(!x.length)return '';
   const ex=x.filter(y=>y.e.st==='expired'),so=x.filter(y=>y.e.st==='soon'),line=y=>`${esc(y.a.name)} ${levelName(y.i)} (${esc(y.l.material||'material')}${y.l.lot?' lot '+esc(y.l.lot):''}) ${y.e.st==='expired'?'expired '+fmtDate(y.l.exp):y.e.days===0?'expires today':'expires '+fmtDate(y.l.exp)+' ('+y.e.days+' d)'}`;
   return `<div class="alert${ex.length?'':' warn'}"><b>${ex.length?ex.length+' QC material'+(ex.length>1?'s are':' is')+' past expiry':so.length+' QC material'+(so.length>1?'s expire':' expires')+' within 30 days'}.</b>${ex.length&&so.length?' Another '+so.length+' expire within 30 days.':''}
-   <details style="margin-top:6px"><summary>Show materials</summary><ul>${x.map(y=>`<li>${line(y)}</li>`).join('')}</ul><div class="small muted">Open the analyte on Charts and use Lot change to enter the new material and expiry date.</div></details></div>`;
+   <details style="margin-top:6px"><summary>Show materials</summary><ul>${x.map(y=>`<li>${line(y)}</li>`).join('')}</ul><div class="small muted">Open the analyte on Charts and use Lot change to enter the new material and expiry date.</div>${perm('e_lot')&&x.some(y=>y.e.st==='expired')?'<div style="margin-top:6px"><button class="btn sm" data-act="expopen">Enter the new lot</button></div>':''}</details></div>`;
 }
 const isOD=a=>(a.schedule||{}).type==='ondemand';
 function missedDays(inF){
@@ -82,7 +82,7 @@ function renderToday(){
    ${rep.length?`<div class="stack"><h3>Just saved: ${rep.some(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject'))?'QC violations need attention':'warnings to review'}</h3>${rep.map(r=>alertCard(r,flags,true)).join('')}</div>`:''}
    ${expBanner()}
    ${un.length&&!rep.length?`<div class="alert"><b>${un.length} unresolved QC violation${un.length>1?'s':''}.</b> ${perm('v_alerts')?'<button class="btn sm" data-act="tab" data-t="alerts">Review and override</button>':'Please tell a supervisor.'}</div>`:''}
-   <div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Daily QC</h2><div class="muted">${dl.length>1?esc(dl.map(d=>d.dept).join(', ')):esc(S.setup.dept)+' · '+esc(S.setup.sub)} · ${esc(analyserNameV())}</div></div>
+   <div class="panel"><div class="row" style="justify-content:space-between"><div><h2>Daily QC</h2><div class="muted">${dl.length>1?esc(dl.map(d=>d.dept).join(', ')):esc(S.setup.dept)+esc(dsub(S.setup.sub))} · ${esc(analyserNameV())}</div></div>
     <div class="row">${dl.length>1?`<label class="f">Department<select id="deptf" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${d.id===UI.dept?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}${multiInst()?`<label class="f">Analyser<select id="instf" style="width:auto"><option value="">All analysers</option>${dl.filter(d=>!UI.dept||d.id===UI.dept).flatMap(d=>d.analysers||[]).map(n=>`<option${n===UI.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${modOpts.length?`<label class="f">Module<select id="modf" style="width:auto"><option value="">All modules</option>${modOpts.map(m=>`<option${m===UI.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<button class="btn" data-act="dayprev" aria-label="Previous day" title="Previous day">&#9664;</button><label class="f">QC date<input type="date" id="qcdate" value="${UI.date}" max="${todayStr()}" style="width:auto"></label>
     <button class="btn" data-act="daynext" aria-label="Next day" title="Next day"${UI.date>=todayStr()?' disabled':''}>&#9654;</button><button class="btn" data-act="today">Today</button></div></div>
     <p class="small muted" style="margin:10px 0 0">${due.length} scheduled for ${fmtDate(UI.date)} · ${done} entered or marked not performed${due.length-done>0?` · <b>${due.length-done} waiting</b>`:''}</p></div>

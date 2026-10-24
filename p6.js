@@ -5,9 +5,9 @@ const isAdmin=()=>!!CU&&CU.role==='admin';
 const isSup=()=>!!CU&&CU.role==='sup';
 const PERMDEF=[
  {k:'v_charts',g:'View',l:'Charts',tech:1,sup:1,cons:1},{k:'v_alerts',g:'View',l:'QC alerts',tech:1,sup:1,cons:1},{k:'v_limits',g:'View',l:'Establish limits',tech:1,sup:1,cons:1},{k:'v_rules',g:'View',l:'Westgard rules',tech:1,sup:1,cons:1},
- {k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1,cons:0},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1,cons:1},
+ {k:'v_materials',g:'View',l:'QC materials',tech:1,sup:1,cons:1},{k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1,cons:0},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1,cons:1},
  {k:'e_qc',g:'Edit',l:'Enter and edit QC values, mark QC not performed',tech:1,sup:1,cons:0},{k:'e_other',g:'Edit',l:'Other QC tab: plot QC values for earlier days',tech:1,sup:1,cons:0},{k:'e_override',g:'Edit',l:'Resolve violations with a comment, add notes, reopen violations',tech:1,sup:1,cons:1},
- {k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1,cons:0},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1,cons:0},
+ {k:'e_materials',g:'Edit',l:'QC materials: add, edit, delete and apply to tests',tech:0,sup:1,cons:0},{k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1,cons:0},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1,cons:0},
  {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1,cons:0},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1,cons:1}];
 const perm=k=>{if(!CU)return false;if(CU.role==='admin')return true;const d=PERMDEF.find(x=>x.k===k);if(!d)return false;const r=CU.role==='sup'?'sup':CU.role==='cons'?'cons':'tech',o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
 const permFor=(r,k)=>{const d=PERMDEF.find(x=>x.k===k),o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};

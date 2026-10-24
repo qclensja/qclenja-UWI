@@ -19,7 +19,7 @@ async function buildWorkbook(list){
   const hdr=(row)=>{row.font={bold:true,color:{argb:'FFFFFFFF'}};row.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF0B6E78'}};row.alignment={vertical:'middle',wrapText:true}};
   const sum=wb.addWorksheet(sn('Summary'));
   sum.addRow(['QCLens export']).font={bold:true,size:14};
-  [['Laboratory',S.setup.lab],['Department'+(deptList().length>1?'s':''),deptList().map(d=>d.dept).join(', ')],['Sub-department',deptList().map(d=>d.sub).join(', ')],['Analyser'+(multiInst()?'s':''),analyserName()],['Exported',new Date().toLocaleString()],['Exported by',CU?CU.name:'']].forEach(r=>sum.addRow(r));
+  [['Laboratory',S.setup.lab],['Department'+(deptList().length>1?'s':''),deptList().map(d=>d.dept).join(', ')],['Sub-department',deptList().map(d=>d.sub).filter(Boolean).join(', ')||'None'],['Analyser'+(multiInst()?'s':''),analyserName()],['Exported',new Date().toLocaleString()],['Exported by',CU?CU.name:'']].forEach(r=>sum.addRow(r));
   sum.addRow([]);
   try{const lid=wb.addImage({base64:LOGO,extension:'png'});sum.addImage(lid,{tl:{col:5,row:0},ext:{width:160,height:120}})}catch(e){}
   for(const a of list){
