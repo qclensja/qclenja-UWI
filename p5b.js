@@ -88,6 +88,7 @@ function renderModal(){
   if(m.acct)return renderAcctModal();
   if(m.tedit!==undefined)return renderTargetEditModal();
   if(m.exp)return renderExpModal();
+  if(m.sgrep)return renderSgModal();
   if(m.add)return renderAddModal();
   if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
