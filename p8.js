@@ -90,7 +90,8 @@ function mergeStates(L,R){
   out.materials=by(L.materials,R.materials,(a,b)=>newerMod(a,b)||a);
   out.analytes=by(L.analytes,R.analytes,(a,b)=>newerMod(a,b)||(b.targets.length>a.targets.length?b:a));
   const ok=new Set(out.analytes.map(a=>a.id));
-  out.results=by(L.results,R.results,newer).filter(r=>ok.has(r.aid));
+  const rst=r=>[r.at,(r.upd||{}).at,r.ov&&r.ov.at,r.ovAt].filter(Boolean).sort().pop()||'';
+  out.results=by(L.results,R.results,(a,b)=>rst(b)>rst(a)?b:a).filter(r=>ok.has(r.aid));
   const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}

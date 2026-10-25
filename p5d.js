@@ -228,9 +228,9 @@ document.addEventListener('click',e=>{
      patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&!r.ov&&statusOf(fl,r)==='warn'){r.ov={comment:c,pattern:p.kind,...stampNow()};n++}});
      audit('Override',a.name+' '+levelName(lv)+' '+(p.kind==='trend'?'trend':'shift')+' '+fmtDate(p.from)+' to '+fmtDate(p.to)+': '+c,null,[a.dept]);UI.pOpen=k;save();toast((p.kind==='trend'?'Trend':'Shift')+' overridden with your comment.');break}
    case 'punover':{const k=el.dataset.k,{a,lv,p}=patternFind(k);if(!p)break;
-     patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&r.ov&&r.ov.pattern===p.kind)r.ov=null});
+     patFlagged(p).forEach(id=>{const r=S.results.find(x=>x.id===id);if(r&&r.ov&&r.ov.pattern===p.kind){r.ov=null;r.ovAt=nowIso()}});
      audit('Override removed',a.name+' '+levelName(lv)+' '+(p.kind==='trend'?'trend':'shift')+' '+fmtDate(p.from),null,[a.dept]);break}
-   case 'unoverride':{const r=S.results.find(x=>x.id===id);r.ov=null;audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
+   case 'unoverride':{const r=S.results.find(x=>x.id===id);{r.ov=null;r.ovAt=nowIso()};audit('Override removed',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date));break}
    case 'delres':{tomb(id);const r=S.results.find(x=>x.id===id);if(r)audit('QC result deleted',(anOf(r.aid)||{}).name+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+(r.byName?' (entered by '+r.byName+')':''))}UI.draft={};S.results=S.results.filter(x=>x.id!==id);UI.report=UI.report.filter(x=>x!==id);break;
    case 'lot':UI.modal={aid:id};break;
    case 'expopen':UI.modal={exp:true};break;
