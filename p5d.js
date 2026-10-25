@@ -16,7 +16,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub()+renderBackups():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -62,7 +62,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
@@ -358,7 +358,7 @@ document.addEventListener('change',e=>{
   if(t.id==='qcdate'){UI.date=t.value||todayStr();UI.report=[];UI.skipOpen=null;return render()}
   if(t.id==='cid'){UI.cid=t.value;return render()}
   if(t.id==='win'){UI.win=+t.value;return render()}
-  if(t.id==='restore'&&t.files[0]){const fr=new FileReader();fr.onload=()=>{try{const o=JSON.parse(fr.result);if(!o||!Array.isArray(o.analytes)||!o.setup)throw 0;const kU=S.users,kA=S.audit;S=norm(o);if(!S.users.length)S.users=kU;if(!S.audit.length)S.audit=kA;UI.editing=false;CU=S.users.find(u=>u.id===(SESS&&SESS.uid)&&u.active!==false)||null;if(!CU){SESS=null;writeSess()}else audit('Backup restored','Data restored from a backup file');save();render();toast('Backup restored.')}catch(x){toast('That file is not a valid QC backup.')}};fr.readAsText(t.files[0])}
+  if(t.id==='restore'&&t.files[0]){const fr=new FileReader();fr.onload=()=>{try{restoreData(JSON.parse(fr.result),'a backup file')}catch(x){toast('That file is not a valid QC backup.')}};fr.readAsText(t.files[0])}
 });
 document.addEventListener('toggle',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-more'))UI.moreOpen=e.target.open;if(e.target.hasAttribute&&e.target.hasAttribute('data-thopen')){const id=e.target.getAttribute('data-thopen');if(e.target.open)UI.thOpen=id;else if(UI.thOpen===id)UI.thOpen=null}},true);
 /* chart tooltips */

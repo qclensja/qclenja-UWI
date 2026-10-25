@@ -29,4 +29,21 @@ r=await post('/pull',{u:'tim',hash:'H2'});ok('old pw rejected',r.s===401);
 r=await post('/pull',{u:'jaba',hash:'H1'});sha=r.j.sha;
 r=await post('/push',{u:'jaba',hash:'H1',sha,data:{users:[{...adm,pw:undefined}],tomb:['t1']}});ok('admin deletes user',r.s===200);
 r=await post('/pull',{u:'tim',hash:'H3'});ok('deleted user cannot sign in',r.s===401);
+// ---- backups ----
+r=await post('/backups',{u:'jaba',hash:'H1'});ok('backups list empty',r.s===200&&r.j.list.length===0);
+r=await post('/backup-now',{u:'jaba',hash:'H1'});ok('backup now',r.s===200&&r.j.ok&&r.j.list.length===1&&/^qclens-backup-\d{4}-\d{2}-\d{2}\.json$/.test(r.j.name));
+const bname=r.j.name;
+r=await post('/backup-now',{u:'jaba',hash:'H1'});ok('same day overwrites',r.s===200&&r.j.list.length===1);
+r=await post('/backup-get',{u:'jaba',hash:'H1',name:bname});ok('backup get strips hashes',r.s===200&&r.j.data.users.length===1&&!r.j.data.users[0].pw);
+r=await post('/backup-get',{u:'jaba',hash:'H1',name:'../x.json'});ok('bad name rejected',r.s===400);
+await post('/push',{u:'jaba',hash:'H1',sha:(await post('/pull',{u:'jaba',hash:'H1'})).j.sha,data:{users:[{...adm,pw:undefined},{id:'t9',username:'zed',name:'Z',role:'tech',active:true}]},pwset:[{id:'t9',pw:{salt:'S9',hash:'H9'}}]});
+r=await post('/backups',{u:'zed',hash:'H9'});ok('non-admin refused',r.s===403);
+r=await post('/backups',{u:'jaba',hash:'bad'});ok('bad password refused',r.s===401);
+// retention: seed old files
+const store=srv.store;
+for(let i=1;i<=40;i++){const d='2026-0'+(i<=20?'1':'2')+'-'+String(i<=20?i:i-20).padStart(2,'0');store.files['backups/qclens-backup-'+d+'.json']={content:store.files['backups/'+bname].content,sha:'x'+i}}
+r=await post('/backup-now',{u:'jaba',hash:'H1'});
+const names=Object.keys(store.files).filter(k=>k.startsWith('backups/'));
+ok('retention prunes to ~keep + monthly firsts',r.j.deleted>0&&names.length<=33&&names.includes('backups/qclens-backup-2026-01-01.json')&&names.includes('backups/qclens-backup-2026-02-01.json'));
+ok('newest kept',names.includes('backups/'+bname));
 srv.close();
