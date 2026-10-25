@@ -2,7 +2,7 @@
 const P=(name,r,list)=>({name,routine:!!r,items:list.split(';').map(s=>{const [n,u]=s.split('|');return {name:n.trim(),unit:(u||'').trim()}})});
 const CAT={
  'Clinical Chemistry':{
-  analysers:['Roche cobas pro','Roche cobas c 503','Roche cobas c 311','Roche cobas c 501','Roche cobas c 702','Abbott Alinity c','Abbott ARCHITECT c series','Siemens Atellica CH','Siemens Dimension EXL','Beckman Coulter AU480','Beckman Coulter AU680','Beckman Coulter AU5800','Mindray BS-2000M','Mindray BS-800M','Ortho Clinical Diagnostics VITROS','Randox RX series','Other'],
+  analysers:['Roche Cobas Pro','Roche cobas c 503','Roche cobas c 311','Roche cobas c 501','Roche cobas c 702','Abbott Alinity c','Abbott ARCHITECT c series','Siemens Atellica CH','Siemens Dimension EXL','Beckman Coulter AU480','Beckman Coulter AU680','Beckman Coulter AU5800','Mindray BS-2000M','Mindray BS-800M','Ortho Clinical Diagnostics VITROS','Randox RX series','Other'],
   subs:{
    'Routine Chemistry':[
     P('Renal function',1,'Urea|mmol/L;Creatinine|µmol/L;Uric acid|µmol/L;Sodium|mmol/L;Potassium|mmol/L;Chloride|mmol/L;Bicarbonate|mmol/L'),
@@ -15,7 +15,7 @@ const CAT={
    'Electrolytes / ISE':[P('Electrolytes',1,'Sodium|mmol/L;Potassium|mmol/L;Chloride|mmol/L')],
    'Therapeutic drugs':[P('Drug monitoring',1,'Digoxin|nmol/L;Lithium|mmol/L;Phenytoin|µmol/L;Valproic acid|µmol/L;Paracetamol|µmol/L')]}},
  'Immunochemistry':{
-  analysers:['Roche cobas pro','Roche cobas e 411','Roche cobas e 601','Roche cobas e 801','Abbott Alinity i','Abbott ARCHITECT i series','Siemens Atellica IM','Siemens ADVIA Centaur XP','Siemens ADVIA Centaur XPT','Beckman Coulter Access 2','Beckman Coulter DxI 800','Mindray CL-1200i','Mindray CL-2000i','Snibe MAGLUMI series','DiaSorin LIAISON XL','Ortho VITROS ECi','Other'],
+  analysers:['Roche Cobas Pro','Roche cobas e 411','Roche cobas e 601','Roche cobas e 801','Abbott Alinity i','Abbott ARCHITECT i series','Siemens Atellica IM','Siemens ADVIA Centaur XP','Siemens ADVIA Centaur XPT','Beckman Coulter Access 2','Beckman Coulter DxI 800','Mindray CL-1200i','Mindray CL-2000i','Snibe MAGLUMI series','DiaSorin LIAISON XL','Ortho VITROS ECi','Other'],
   subs:{'Immunoassay / Endocrine':[
     P('Thyroid',1,'TSH|mIU/L;Free T4|pmol/L;Free T3|pmol/L'),
     P('Cardiac biomarkers',1,'Troponin T hs|ng/L;Troponin I|ng/L;NT-proBNP|pg/mL;CK-MB mass|µg/L'),
@@ -76,7 +76,7 @@ const dsub=s=>s?' · '+s:'';
 const defSub=d=>isBuiltin(d)?Object.keys(CAT[d].subs)[0]:'';
 /* modules installed on a analyser; the user can tick the ones fitted and add their own */
 const AMODS={
- 'Roche cobas pro':['ISE','c 503','c 703','e 801'],
+ 'Roche Cobas Pro':['ISE','c 503','c 703','e 801'],
  'Roche cobas c 311':['Photometric','ISE'],'Roche cobas c 501':['Photometric','ISE'],'Roche cobas c 702':['Photometric','ISE'],
  'Beckman Coulter AU480':['Photometric','ISE'],'Beckman Coulter AU680':['Photometric','ISE'],'Beckman Coulter AU5800':['Photometric','ISE'],
  'Radiometer ABL800 FLEX':['Blood gas','Electrolytes','Metabolites','Co-oximetry'],'Radiometer ABL90 FLEX':['Blood gas','Electrolytes','Metabolites','Co-oximetry'],
@@ -106,10 +106,16 @@ const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 const canonS=v=>Array.isArray(v)?'['+v.map(canonS).join(',')+']':v&&typeof v==='object'?'{'+Object.keys(v).filter(k=>k!=='_h'&&k!=='modAt').sort().map(k=>JSON.stringify(k)+':'+canonS(v[k])).join(',')+'}':JSON.stringify(v);
 const shash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36)};
 function initHashes(o){['analytes','depts','est','materials'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
+const ANMIG={'Roche cobas pro':'Roche Cobas Pro'};
+function migAnalysers(o){
+  const fx=n=>ANMIG[n]||n,fixRec=r=>{if(!r)return;if(Array.isArray(r.analysers))r.analysers=r.analysers.map(fx);if(r.analyser)r.analyser=fx(r.analyser);if(r.amods)Object.keys(r.amods).forEach(k=>{if(ANMIG[k]){if(!r.amods[ANMIG[k]])r.amods[ANMIG[k]]=r.amods[k];delete r.amods[k]}})};
+  fixRec(o.setup);(o.depts||[]).forEach(fixRec);(o.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]});
+  (o.trash||[]).forEach(t=>{const d=t.data||{};fixRec(d.dept);(d.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]})});
+}
 function norm(o){
   o.users=o.users||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
-  st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
+  st.amods=st.amods||{};migAnalysers(o);migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
   if(st.custom&&st.custom.length){st.cpanels.push({id:Math.random().toString(36).slice(2,9),name:'Custom analytes',items:st.custom.map(c=>({name:c.name,unit:c.unit||'',on:c.on}))});}
   delete st.custom;

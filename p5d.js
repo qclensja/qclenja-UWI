@@ -286,7 +286,7 @@ document.addEventListener('change',e=>{
     if(t.id==='ob-aid')o.aid=t.value;else if(t.id==='ob-from')o.from=t.value||o.from;else if(t.id==='ob-to')o.to=t.value||o.to;else if(t.id==='ob-sched')o.sched=t.checked;else if(t.id==='ob-day')o.day=t.value||o.day;else if(t.id==='ob-all')o.all=t.checked;
     else if(t.id==='ob-inst'){o.inst=t.value;o.mod=''}else if(t.id==='ob-mod')o.mod=t.value;
     return render()}
-  if(d.perm){if(!isAdmin())return;const [r,k]=d.perm.split(':'),def=PERMDEF.find(x=>x.k===k);if(!def||!(r==='tech'||r==='sup'||r==='cons'))return;S.perms=S.perms||{};S.perms[r]=S.perms[r]||{};S.perms[r][k]=t.checked;S.permsAt=nowIso();audit('Permissions changed',(r==='sup'?'Supervisory technologist':r==='cons'?'Consultant / Resident':'Technologist')+': '+def.l+' '+(t.checked?'allowed':'not allowed'),null,[]);save();return render()}
+  if(d.perm){if(!isAdmin())return;const [r,k]=d.perm.split(':'),def=PERMDEF.find(x=>x.k===k);if(!def||!(r==='tech'||r==='sup'||r==='cons'||r==='qm'))return;S.perms=S.perms||{};S.perms[r]=S.perms[r]||{};S.perms[r][k]=t.checked;S.permsAt=nowIso();audit('Permissions changed',(r==='sup'?'Supervisory technologist':r==='cons'?'Consultant / Resident':'Technologist')+': '+def.l+' '+(t.checked?'allowed':'not allowed'),null,[]);save();return render()}
   if(!perm('e_setup')&&!(t.id==='qcdate'||/^(instf|deptf|modf|cinst|cmod)$/.test(t.id)||t.id==='cid'||t.id==='win'||/^(m-|ac-)/.test(t.id)))return;
   if(t.id==='af-user'){AF.user=t.value;AF.limit=100;return render()}
   if(t.id==='af-act'){AF.act=t.value;AF.limit=100;return render()}

@@ -46,4 +46,10 @@ r=await post('/backup-now',{u:'jaba',hash:'H1'});
 const names=Object.keys(store.files).filter(k=>k.startsWith('backups/'));
 ok('retention prunes to ~keep + monthly firsts',r.j.deleted>0&&names.length<=33&&names.includes('backups/qclens-backup-2026-01-01.json')&&names.includes('backups/qclens-backup-2026-02-01.json'));
 ok('newest kept',names.includes('backups/'+bname));
+// ---- quality manager: can save analyte changes like a supervisor, cannot change roles/rules ----
+await post('/push',{u:'jaba',hash:'H1',sha:(await post('/pull',{u:'jaba',hash:'H1'})).j.sha,data:{users:[{...adm,pw:undefined},{id:'q1',username:'quin',name:'Q',role:'qm',active:true}],analytes:[{id:'an1',name:'X'}]},pwset:[{id:'q1',pw:{salt:'SQ',hash:'HQ'}}]});
+r=await post('/pull',{u:'quin',hash:'HQ'});ok('qm signs in',r.s===200&&r.j.me==='q1');
+r=await post('/push',{u:'quin',hash:'HQ',sha:r.j.sha,data:{users:[{id:'q1',username:'quin',name:'Q',role:'admin',active:true}],analytes:[{id:'an1',name:'X',sigma:{tea:10}}],rules:{'1-3s':false}}});ok('qm push ok',r.s===200);
+r=await post('/pull',{u:'jaba',hash:'H1'});ok('qm analyte edit kept, role/rules not changed',r.j.data.analytes[0].sigma&&r.j.data.analytes[0].sigma.tea===10&&r.j.data.users.find(u=>u.id==='q1').role==='qm'&&!r.j.data.rules);
+r=await post('/backups',{u:'quin',hash:'HQ'});ok('qm cannot use backups',r.s===403);
 srv.close();
