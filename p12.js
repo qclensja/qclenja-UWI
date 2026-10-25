@@ -67,6 +67,17 @@ function cliaRow(a,ed){
    <div class="small muted" style="margin-top:2px">${esc(m.group)} · ${esc(CLIA_DATA.version)}${m.orig&&m.orig!==m.text?' · as published: '+esc(m.orig):''}</div>${m.note?`<div class="small muted" style="margin-top:2px">${esc(m.note)}</div>`:''}</div>
    ${ed?(applied?'<span class="chip">Using the CLIA limit</span>':`<button class="btn sm primary" data-act="sgclia" data-id="${a.id}">Use the CLIA limit</button>`):''}</div></div>`;
 }
+function deptRepPanel(ex,ds){
+  const s=sgState();if(!ex||!ds.length)return '';
+  const sel=s.rdept||'',n=a=>VA().filter(x=>!sel||x.dept===sel).length;
+  return `<div class="panelcard"><b>Reports by department</b>
+   <div class="small muted" style="margin:2px 0 8px">Choose a department and save its sigma metrics or measurement uncertainty reports as one file, using the period chosen below. Each file has a summary followed by a report for each test.</div>
+   <div class="row" style="align-items:flex-end;gap:10px"><label class="f" style="flex:0 1 260px">Department<select data-sgsel="rdept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${sel===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>
+   ${!sel&&ds.length>1?`<label class="small" style="display:flex;gap:6px;align-items:center;font-weight:400;padding-bottom:9px"><input type="checkbox" data-sgsel="rsplit"${s.rsplit?' checked':''}>A separate file for each department</label>`:''}
+   <span class="small muted" style="padding-bottom:10px">${n()} test${n()===1?'':'s'}</span></div>
+   <div class="row" style="gap:6px;margin-top:8px"><span class="small muted" style="align-self:center;width:150px">Sigma metrics</span><button class="btn sm" data-act="sgdrep" data-k="sigpdf">PDF</button><button class="btn sm" data-act="sgdrep" data-k="sigxl">Excel</button></div>
+   <div class="row" style="gap:6px;margin-top:6px"><span class="small muted" style="align-self:center;width:150px">Measurement uncertainty</span><button class="btn sm" data-act="sgdrep" data-k="mupdf">PDF</button><button class="btn sm" data-act="sgdrep" data-k="muxl">Excel</button></div></div>`;
+}
 function cliaPanel(ed,rows){
   const s=sgState(),match=rows.filter(r=>{const m=cliaFor(r.a);return m&&m.usable}).length,st=CLIA_STATE;
   return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div style="flex:1 1 320px"><b>CLIA acceptance limits</b>
@@ -86,6 +97,7 @@ function renderSigma(){
    ${ex&&rows.length?`<div class="row" style="gap:6px"><button class="btn sm" data-act="sgpdfall">Summary and reports (PDF)</button><button class="btn sm" data-act="sgxlall">Summary and reports (Excel)</button><button class="btn sm" data-act="sgmupdfall">Uncertainty only (PDF)</button><button class="btn sm" data-act="sgmuxlall">Uncertainty only (Excel)</button></div>`:''}</div>
    <div class="panelcard" style="background:var(--surface2)"><b>Sigma = (TEa % &minus; |Bias %|) &divide; CV %</b><div class="small muted" style="margin-top:4px">Higher is better. A sigma of 6 or more is world class, 5 to 6 excellent, 4 to 5 good, 3 to 4 marginal, and below 3 not acceptable. Measurement uncertainty is U = k &times; &radic;(CV&sup2; + u<sub>bias</sub>&sup2;), with k = 2 for about 95% confidence.</div></div>
    ${cliaPanel(ed,rows)}
+   ${deptRepPanel(ex,ds)}
    <div class="row" style="align-items:flex-end;gap:10px">
     ${ds.length>1?`<label class="f" style="flex:0 1 200px">Department<select data-sgsel="dept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${s.dept===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>`:''}
     <label class="f" style="flex:0 1 200px">Panel<select data-sgsel="panel"><option value="">All panels</option>${panels.map(p=>`<option${s.panel===p?' selected':''}>${esc(p)}</option>`).join('')}</select></label>
@@ -239,32 +251,33 @@ function sgPdfReport(pdf,rep,first){
 function sgPdfSummary(pdf,rows){
   const W=pdf.W,M=pdf.M;
   pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Sigma metrics summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
-  pdf.para((S.setup.lab||'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
+  pdf.para((S.setup.lab||'')+(sgLabel?'   Department: '+sgLabel:'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
   const s=sgState();pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. Sigma = (TEa % - |Bias %|) / CV %.',{size:8.5,color:'#566a73'});
   pdf.table([{h:'Analyte',w:100},{h:'Panel',w:90},{h:'TEa',w:44,align:'right'},{h:'Lowest sigma',w:56,align:'right'},{h:'Class',w:74},{h:'Error used',w:56,align:'right'},{h:'CV % (worst level)',w:95,align:'right'}],
    rows.map(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null);return [r.a.name,r.a.panel||'',r.set.tea===''?'-':sgTeaTxt(r.set,r.a.unit||'').replace(' (whichever is greater)',' (greater)'),{t:sgf(r.worst,1),bold:true},{t:r.cls?r.cls.name:'Not scored',fill:r.cls?sgMix(r.cls.col):null},used.length?sgf(Math.max(...used),0)+'%':'-',cvs.length?sgf(Math.max(...cvs)):'-']}));
 }
+let sgLabel='';const sgLbl=()=>sgLabel?sgLabel.replace(/[^\w-]+/g,'_')+'-':'';
 const sgFile=a=>'QCLens-sigma-'+a.name.replace(/[^\w-]+/g,'_')+'-'+todayStr();
 async function sgSave(filename,data){
   const dl=await getDl();if(!dl){toast('Saving files is not available in this view. Open the app in claude.ai to export.');return false}
   try{await dl.save({filename,data});return true}catch(e){toast(e&&e.code==='declined'?'Save cancelled.':(e&&e.message)||'Export failed.');return false}
 }
-async function sgExportPdf(list){
+async function sgExportPdf(list,label){sgLabel=label||'';
   const s=sgState(),rows=list.map(a=>sgCalc(a,s.win,s.excl)),pdf=new MiniPdf();
   if(rows.length>1){sgPdfSummary(pdf,rows);rows.filter(r=>r.worst!=null).forEach(r=>sgPdfReport(pdf,sgReport(r),false))}else sgPdfReport(pdf,sgReport(rows[0]),true);
-  const fn=rows.length>1?'QCLens-sigma-summary-'+todayStr()+'.pdf':sgFile(rows[0].a)+'.pdf';
+  const fn=rows.length>1?'QCLens-sigma-summary-'+sgLbl()+todayStr()+'.pdf':sgFile(rows[0].a)+'.pdf';
   if(await sgSave(fn,pdf.bytes('QCLens sigma metrics  ·  '+(S.setup.lab||''))))toast('PDF ready.');
   audit('Sigma report exported',(rows.length>1?rows.length+' analytes':rows[0].a.name)+' (PDF)',null,[...new Set(list.map(a=>a.dept))]);save();
 }
 function sgColName(i){return String.fromCharCode(65+i)}
-async function sgExportXlsx(list){
+async function sgExportXlsx(list,label){sgLabel=label||'';
   if(typeof ExcelJS==='undefined'){toast('Excel export is not available right now. Check your connection.');return}
   const s=sgState(),rows=list.map(a=>sgCalc(a,s.win,s.excl)),wb=new ExcelJS.Workbook();wb.creator='QCLens';wb.created=new Date();
   const hdr=c=>{c.font={bold:true,color:{argb:'FF0D3B6E'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE3F2EF'}};c.alignment={wrapText:true,vertical:'middle'}};
   const argb=h=>'FF'+h.replace('#','').toUpperCase(),light=h=>{h=h.replace('#','');const m=i=>Math.round(parseInt(h.substr(i,2),16)*0.35+255*0.65).toString(16).padStart(2,'0');return 'FF'+(m(0)+m(2)+m(4)).toUpperCase()};
   if(rows.length>1){
     const ws=wb.addWorksheet('Summary');ws.addRow(['Sigma metrics summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
-    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     const h=ws.addRow(['Analyte','Panel','Department','TEa','TEa given as','Lowest sigma','Class','Highest % of TEa used','Highest CV %']);h.eachCell(hdr);
     rows.forEach(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null),d=deptOfA(r.a);
       const row=ws.addRow([r.a.name,r.a.panel||'',(d.dept||'')+dsub(d.sub),r.set.tea===''||r.set.mode==='both'?'':+r.set.tea,r.set.tea===''?'':r.set.mode==='both'?sgTeaTxt(r.set,r.a.unit):r.set.mode==='abs'?(r.a.unit||'units'):'%',r.worst==null?'':+r.worst.toFixed(2),r.cls?r.cls.name:'Not scored',used.length?+(Math.max(...used)/100).toFixed(4):'',cvs.length?+Math.max(...cvs).toFixed(3):'']);
@@ -301,7 +314,7 @@ async function sgExportXlsx(list){
     ws.addRow([]);ws.addRow(['Prepared by: ____________________','Reviewed by: ____________________','Date: ____________']);
     [30,30,12,12,8,13,13,11,11,11,9,9,13,14,10,13,15].forEach((w,i)=>ws.getColumn(i+1).width=w);
   });
-  try{toast('Preparing Excel file…');const buf=await wb.xlsx.writeBuffer(),fn=rows.length>1?'QCLens-sigma-summary-'+todayStr()+'.xlsx':sgFile(rows[0].a)+'.xlsx';
+  try{toast('Preparing Excel file…');const buf=await wb.xlsx.writeBuffer(),fn=rows.length>1?'QCLens-sigma-summary-'+sgLbl()+todayStr()+'.xlsx':sgFile(rows[0].a)+'.xlsx';
     if(await sgSave(fn,buf))toast('Excel file ready.');
     audit('Sigma report exported',(rows.length>1?rows.length+' analytes':rows[0].a.name)+' (Excel)',null,[...new Set(list.map(a=>a.dept))]);save()}catch(e){toast((e&&e.message)||'Export failed.')}
 }
@@ -332,6 +345,16 @@ function sgAct(act,el){
      s.cliaAsk=false;
      if(n)audit('Sigma settings saved','CLIA limits ('+CLIA_DATA.version+') applied to '+n+' test'+(n===1?'':'s')+(only?', only those with no allowable error':''),null,[...new Set(sgAll().map(r=>r.a.dept))]);
      save();toast(n?'CLIA limits applied to '+n+' test'+(n===1?'':'s')+(skip?'. Left '+skip+' with their own goal.':'.'):'No tests to apply. '+(skip?skip+' already have a goal.':'No CLIA limit matches these tests.'));render();return true}
+   case 'sgdrep':{
+     if(!perm('e_export')){toast('Your access level does not include exporting.');return true}
+     const k=el.dataset.k,sel=s.rdept||'',vd=visDepts(),dn=d=>d.dept+dsub(d.sub);
+     const listFor=ids=>{const keep={dept:s.dept,panel:s.panel};s.panel='';const out=[];ids.forEach(i=>{s.dept=i;sgAll().forEach(r=>out.push(r.a))});s.dept=keep.dept;s.panel=keep.panel;return out};
+     const mu=k.startsWith('mu'),fn=mu?(k==='mupdf'?muExportPdf:muExportXlsx):(k==='sigpdf'?sgExportPdf:sgExportXlsx);
+     const keepOk=a=>!mu||sgCalc(a,s.win,s.excl).levels.some(l=>l.Upct!=null);
+     const groups=sel?[[dn(vd.find(d=>d.id===sel)||{dept:'Department'}),listFor([sel])]]:(s.rsplit&&vd.length>1?vd.map(d=>[dn(d),listFor([d.id])]):[[vd.length>1?'All departments':'',listFor(vd.map(d=>d.id))]]);
+     const todo=groups.map(([l,li])=>[l,li.filter(keepOk)]).filter(x=>x[1].length);
+     if(!todo.length){toast('No tests with enough information for this report.');return true}
+     (async()=>{for(const [l,li] of todo)await fn(li,l)})();return true}
    case 'sgcliacheck':cliaRefresh(true);toast('Checking for a newer CLIA table…');return true;
    case 'sgreport':UI.modal={sgrep:id};render();return true;
    case 'sgmureport':UI.modal={sgrep:id,kind:'mu'};render();return true;
@@ -367,7 +390,7 @@ function sgChange(e){
   const s=sgState();
   if(d.sgsel!==undefined){
     sgCaptureDrafts();
-    if(d.sgsel==='excl')s.excl=t.checked;else{s[d.sgsel]=t.value;if(d.sgsel==='dept')s.panel=''}
+    if(d.sgsel==='excl')s.excl=t.checked;else if(d.sgsel==='rsplit')s.rsplit=t.checked;else{s[d.sgsel]=t.value;if(d.sgsel==='dept')s.panel=''}
     render();return true}
   const [id,f]=d.sgf.split(':');(s.draft[id]||(s.draft[id]={}))[f]=t.value;
   if(f==='bsrc'||f==='mode'){sgCaptureDrafts();render()}
@@ -425,25 +448,25 @@ function muPdfReport(pdf,rep,first){
 function muPdfSummary(pdf,reps){
   const W=pdf.W,M=pdf.M,f=sgf,s=sgState();
   pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Measurement uncertainty summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
-  pdf.para((S.setup.lab||'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
+  pdf.para((S.setup.lab||'')+(sgLabel?'   Department: '+sgLabel:'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
   pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. U = k x sqrt(CV^2 + u(bias)^2). Levels with fewer than '+SG_MINN+' QC values use the target CV.',{size:8.5,color:'#566a73'});
   const rows=[];reps.forEach(rep=>rep.levels.forEach((l,i)=>{if(l.U!=null)rows.push([i?'':rep.r.a.name+(rep.r.a.unit?' ('+rep.r.a.unit+')':''),l.name,f(l.tmean,3),f(l.cv)+(l.src==='target'?' (target)':''),f(l.ub),{t:f(l.U),bold:true},f(l.k,0),{t:f(l.Uabs,3),bold:true}])}));
   pdf.table([{h:'Analyte',w:130},{h:'Level',w:50},{h:'Target mean',w:62,align:'right'},{h:'CV %',w:62,align:'right'},{h:'u(bias) %',w:50,align:'right'},{h:'U %',w:46,align:'right'},{h:'k',w:24,align:'right'},{h:'U (units)',w:60,align:'right'}],rows);
 }
-async function muExportPdf(list){
+async function muExportPdf(list,label){sgLabel=label||'';
   const s=sgState(),reps=list.map(a=>muReport(sgCalc(a,s.win,s.excl))),pdf=new MiniPdf();
   if(reps.length>1){muPdfSummary(pdf,reps);reps.forEach(r=>muPdfReport(pdf,r,false))}else muPdfReport(pdf,reps[0],true);
-  const fn=reps.length>1?'QCLens-uncertainty-summary-'+todayStr()+'.pdf':muFile(list[0])+'.pdf';
+  const fn=reps.length>1?'QCLens-uncertainty-summary-'+sgLbl()+todayStr()+'.pdf':muFile(list[0])+'.pdf';
   if(await sgSave(fn,pdf.bytes('QCLens measurement uncertainty  ·  '+(S.setup.lab||''))))toast('PDF ready.');
   audit('Uncertainty report exported',(list.length>1?list.length+' analytes':list[0].name)+' (PDF)',null,[...new Set(list.map(a=>a.dept))]);save();
 }
-async function muExportXlsx(list){
+async function muExportXlsx(list,label){sgLabel=label||'';
   if(typeof ExcelJS==='undefined'){toast('Excel export is not available right now. Check your connection.');return}
   const s=sgState(),reps=list.map(a=>muReport(sgCalc(a,s.win,s.excl))),wb=new ExcelJS.Workbook();wb.creator='QCLens';wb.created=new Date();
   const hdr=c=>{c.font={bold:true,color:{argb:'FF0D3B6E'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE3F2EF'}};c.alignment={wrapText:true,vertical:'middle'}};
   if(reps.length>1){
     const ws=wb.addWorksheet('Summary');ws.addRow(['Measurement uncertainty summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
-    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     ws.addRow(['Analyte','Unit','Level','Target mean','CV %','CV source','u(bias) %','k','U %','U (units)','Lower','Upper']).eachCell(hdr);
     reps.forEach(rep=>rep.levels.forEach(l=>{if(l.U==null)return;const rn=ws.rowCount+1;
       const row=ws.addRow([rep.r.a.name,rep.r.a.unit||'',l.name,l.tmean,+l.cv.toFixed(4),l.src,l.ub,l.k,'','','','']);
@@ -474,7 +497,7 @@ async function muExportXlsx(list){
     ws.addRow([]);ws.addRow(['Prepared by: ____________________','Reviewed by: ____________________','Date: ____________']);
     [34,30,12,8,13,13,13,11,11,10,10,12,12,12].forEach((w,i)=>ws.getColumn(i+1).width=w);
   });
-  try{toast('Preparing Excel file…');const buf=await wb.xlsx.writeBuffer(),fn=reps.length>1?'QCLens-uncertainty-summary-'+todayStr()+'.xlsx':muFile(list[0])+'.xlsx';
+  try{toast('Preparing Excel file…');const buf=await wb.xlsx.writeBuffer(),fn=reps.length>1?'QCLens-uncertainty-summary-'+sgLbl()+todayStr()+'.xlsx':muFile(list[0])+'.xlsx';
     if(await sgSave(fn,buf))toast('Excel file ready.');
     audit('Uncertainty report exported',(list.length>1?list.length+' analytes':list[0].name)+' (Excel)',null,[...new Set(list.map(a=>a.dept))]);save()}catch(e){toast((e&&e.message)||'Export failed.')}
 }
