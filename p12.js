@@ -7,7 +7,8 @@ const SGCLS=[
  {min:3,key:'mg',name:'Marginal',col:'#d9962a',adv:'Marginal. Use the full multirule with as many controls as practical (N=4 to 6), watch closely and work on reducing bias and imprecision.'},
  {min:-1e9,key:'po',name:'Poor',col:'#c0392b',adv:'Not acceptable. QC cannot make up for this. Investigate and reduce bias and imprecision, or review the allowable error goal, before relying on this method.'}];
 const sgClass=s=>s==null||!isFinite(s)?null:SGCLS.find(c=>s>=c.min);
-const sgSet=a=>Object.assign({tea:'',mode:'pct',bias:'',bsrc:'entered',ub:'',k:2},a.sigma||{});
+const sgSet=a=>Object.assign({tea:'',mode:'pct',abs:'',src:'',clia:'',bias:'',bsrc:'entered',ub:'',k:2},a.sigma||{});
+const sgTeaTxt=(set,u)=>set.tea===''||set.tea==null?'not set':set.mode==='abs'?set.tea+' '+(u||'units'):set.mode==='both'?set.tea+' % or '+(set.abs===''?'?':set.abs)+' '+(u||'units')+' (whichever is greater)':set.tea+' %';
 const sgState=()=>UI.sg||(UI.sg={dept:'',panel:'',sort:'high',win:'era',excl:false,open:{},draft:{}});
 const SGWIN={era:'Since the current target started',90:'Last 90 days',180:'Last 180 days',365:'Last 365 days'};
 const sgf=(v,d)=>v==null||!isFinite(v)?'–':(+v).toFixed(d==null?2:d);
@@ -28,7 +29,7 @@ function sgCalc(a,win,excl){
     if(set.bsrc==='qc'){if(n>=SG_MINN&&t.mean)bias=(mo-t.mean)/t.mean*100;else biasNote='needs '+SG_MINN+' QC values'}
     else bias=bias0;
     const bu=bias==null?0:bias;
-    const teaPct=tea==null?null:set.mode==='abs'?(t.mean?tea/Math.abs(t.mean)*100:null):tea;
+    const absV=num(set.abs),teaPct=tea==null?null:set.mode==='abs'?(t.mean?tea/Math.abs(t.mean)*100:null):set.mode==='both'?(t.mean&&absV!=null?Math.max(tea,absV/Math.abs(t.mean)*100):tea):tea;
     const sigma=teaPct!=null&&cv>0?(teaPct-Math.abs(bu))/cv:null;
     const te=cv==null?null:Math.abs(bu)+2*cv,used=teaPct>0&&te!=null?te/teaPct*100:null;
     const Upct=cv==null?null:k*Math.sqrt(cv*cv+ub*ub),Uabs=t.mean&&Upct!=null?Upct/100*Math.abs(t.mean):null;
@@ -57,7 +58,26 @@ function sgBar(levels,w){
 }
 const sgChip=(c,txt)=>c?`<span class="chip" style="border-color:${c.col};color:${c.col};font-weight:600">${esc(txt||c.name)}</span>`:'<span class="chip">Not set</span>';
 
+function cliaRow(a,ed){
+  const m=cliaFor(a),cur=sgSet(a);
+  if(!m)return '<p class="small muted" style="margin:8px 0 0">No CLIA acceptance limit applies to this test. Use the goal your laboratory follows.</p>';
+  if(!m.usable)return `<p class="small muted" style="margin:8px 0 0">CLIA lists ${esc(m.text)} for this analyte. ${esc(m.note)}</p>`;
+  const applied=cur.src&&cur.clia===m.key;
+  return `<div class="panelcard" style="margin-top:10px;border-left:4px solid var(--teal)"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><div><b>CLIA acceptance limit: ${esc(m.text)}</b>
+   <div class="small muted" style="margin-top:2px">${esc(m.group)} · ${esc(CLIA_DATA.version)}${m.orig&&m.orig!==m.text?' · as published: '+esc(m.orig):''}</div>${m.note?`<div class="small muted" style="margin-top:2px">${esc(m.note)}</div>`:''}</div>
+   ${ed?(applied?'<span class="chip">Using the CLIA limit</span>':`<button class="btn sm primary" data-act="sgclia" data-id="${a.id}">Use the CLIA limit</button>`):''}</div></div>`;
+}
+function cliaPanel(ed,rows){
+  const s=sgState(),match=rows.filter(r=>{const m=cliaFor(r.a);return m&&m.usable}).length,st=CLIA_STATE;
+  return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px"><div style="flex:1 1 320px"><b>CLIA acceptance limits</b>
+   <div class="small muted" style="margin-top:2px">${esc(cliaTxt())}. Source: ${esc(CLIA_DATA.source||'')}. ${match} of the ${rows.length} test${rows.length===1?'':'s'} shown ${match===1?'has':'have'} a CLIA limit.</div>
+   <div class="small muted">${esc(st.msg||'Checking for a newer table…')}</div></div>
+   <div class="row" style="gap:6px">${ed&&match?'<button class="btn sm primary" data-act="sgcliaask">Use CLIA limits for these tests</button>':''}<button class="btn sm" data-act="sgcliacheck">Check for a newer table</button></div></div>
+   ${s.cliaAsk&&ed?`<div class="panelcard" style="margin-top:8px"><b>Apply the CLIA limits to ${match} test${match===1?'':'s'}?</b><p class="small muted" style="margin:4px 0 8px">Bias and uncertainty settings are not changed. You can change any test afterwards.</p>
+     <div class="row" style="gap:6px"><button class="btn primary" data-act="sgcliarun" data-m="empty">Only tests with no allowable error set</button><button class="btn" data-act="sgcliarun" data-m="all">All matching tests (replace what is set)</button><button class="btn" data-act="sgcliaask">Cancel</button></div></div>`:''}</div>`;
+}
 function renderSigma(){
+  cliaRefresh();
   const s=sgState(),ed=perm('e_sigma'),ex=perm('e_export'),rows=sgAll(),ds=visDepts(),panels=[...new Set(VA().filter(a=>!s.dept||a.dept===s.dept).map(a=>a.panel))].sort();
   const cnt={};SGCLS.forEach(c=>cnt[c.key]=0);let miss=0;rows.forEach(r=>{if(r.cls)cnt[r.cls.key]++;else miss++});
   const tiles=`<div class="row" style="gap:8px">${SGCLS.map(c=>`<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid ${c.col}"><div class="small muted">${c.min>-1e8?'Sigma ≥ '+c.min:'Sigma < 3'}</div><div style="font-size:22px;font-weight:700">${cnt[c.key]}</div><div class="small">${c.name}</div></div>`).join('')}<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid #8a9aa0"><div class="small muted">No allowable error set</div><div style="font-size:22px;font-weight:700">${miss}</div><div class="small">Not scored</div></div></div>`;
@@ -65,6 +85,7 @@ function renderSigma(){
    <p class="small muted" style="margin:4px 0 0;max-width:90ch">The sigma score says how much room a test has for error. It compares the total allowable error (TEa) with how much error the test actually has, from its bias and its imprecision (CV).</p></div>
    ${ex&&rows.length?`<div class="row" style="gap:6px"><button class="btn sm" data-act="sgpdfall">Summary and reports (PDF)</button><button class="btn sm" data-act="sgxlall">Summary and reports (Excel)</button></div>`:''}</div>
    <div class="panelcard" style="background:var(--surface2)"><b>Sigma = (TEa % &minus; |Bias %|) &divide; CV %</b><div class="small muted" style="margin-top:4px">Higher is better. A sigma of 6 or more is world class, 5 to 6 excellent, 4 to 5 good, 3 to 4 marginal, and below 3 not acceptable. Measurement uncertainty is U = k &times; &radic;(CV&sup2; + u<sub>bias</sub>&sup2;), with k = 2 for about 95% confidence.</div></div>
+   ${cliaPanel(ed,rows)}
    <div class="row" style="align-items:flex-end;gap:10px">
     ${ds.length>1?`<label class="f" style="flex:0 1 200px">Department<select data-sgsel="dept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${s.dept===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>`:''}
     <label class="f" style="flex:0 1 200px">Panel<select data-sgsel="panel"><option value="">All panels</option>${panels.map(p=>`<option${s.panel===p?' selected':''}>${esc(p)}</option>`).join('')}</select></label>
@@ -81,19 +102,20 @@ function renderSigma(){
       <div style="flex:0 0 150px;text-align:right">${r.worst!=null?`<span style="font-size:20px;font-weight:700">${sgf(r.worst,1)}</span> `:''}${sgChip(r.cls)}</div>
       <div style="flex:0 0 120px" class="small muted">${usedMax!=null?'Uses '+sgf(usedMax,0)+'% of TEa':''}</div><span class="muted" aria-hidden="true">${open?'▾':'▸'}</span></div>`;
     const set=ed?`<div class="row" style="align-items:flex-end;gap:10px;margin-top:10px">
-      <label class="f" style="flex:0 1 120px">Allowable error (TEa)<input type="text" inputmode="decimal" data-sgf="${a.id}:tea" value="${esc(v('tea'))}" placeholder="e.g. 6"></label>
-      <label class="f" style="flex:0 1 150px">TEa is given as<select data-sgf="${a.id}:mode"><option value="pct"${v('mode')==='pct'?' selected':''}>% of the result</option><option value="abs"${v('mode')==='abs'?' selected':''}>Units (${esc(a.unit||'result units')})</option></select></label>
+      <label class="f" style="flex:0 1 120px">${v('mode')==='both'?'TEa as %':'Allowable error (TEa)'}<input type="text" inputmode="decimal" data-sgf="${a.id}:tea" value="${esc(v('tea'))}" placeholder="e.g. 6"></label>
+      <label class="f" style="flex:0 1 150px">TEa is given as<select data-sgf="${a.id}:mode"><option value="pct"${v('mode')==='pct'?' selected':''}>% of the result</option><option value="abs"${v('mode')==='abs'?' selected':''}>Units (${esc(a.unit||'result units')})</option><option value="both"${v('mode')==='both'?' selected':''}>Greater of % or units</option></select></label>
+      ${v('mode')==='both'?`<label class="f" style="flex:0 1 130px">Units value (${esc(a.unit||'units')})<input type="text" inputmode="decimal" data-sgf="${a.id}:abs" value="${esc(v('abs'))}" placeholder="e.g. 0.2"></label>`:''}
       <label class="f" style="flex:0 1 230px">Bias comes from<select data-sgf="${a.id}:bsrc"><option value="entered"${v('bsrc')==='entered'?' selected':''}>A value I enter (EQA or peer)</option><option value="qc"${v('bsrc')==='qc'?' selected':''}>My QC data (observed vs target mean)</option></select></label>
       <label class="f" style="flex:0 1 110px">Bias %<input type="text" inputmode="decimal" data-sgf="${a.id}:bias" value="${esc(v('bias'))}" placeholder="0"${v('bsrc')==='qc'?' disabled':''}></label>
       <label class="f" style="flex:0 1 130px">Uncertainty of bias % <input type="text" inputmode="decimal" data-sgf="${a.id}:ub" value="${esc(v('ub'))}" placeholder="0"></label>
       <label class="f" style="flex:0 1 80px">k<input type="text" inputmode="decimal" data-sgf="${a.id}:k" value="${esc(v('k'))}"></label>
-      <button class="btn primary" data-act="sgsave" data-id="${a.id}">Save</button></div>`:`<p class="small muted" style="margin:8px 0 0">TEa ${esc(r.set.tea||'not set')}${r.set.tea?(r.set.mode==='abs'?' '+esc(a.unit||'units'):' %'):''} · Bias ${r.set.bsrc==='qc'?'from QC data':esc(r.set.bias===''?'not entered':r.set.bias+' %')}. Ask someone with edit access to change these.</p>`;
+      <button class="btn primary" data-act="sgsave" data-id="${a.id}">Save</button></div>`:`<p class="small muted" style="margin:8px 0 0">TEa ${esc(sgTeaTxt(r.set,a.unit))}${r.set.src?' ('+esc(r.set.src)+')':''} · Bias ${r.set.bsrc==='qc'?'from QC data':esc(r.set.bias===''?'not entered':r.set.bias+' %')}. Ask someone with edit access to change these.</p>`;
     const tbl=`<div class="scroll" style="margin-top:10px"><table class="t"><thead><tr><th>Level</th><th>Material · lot</th><th>QC values</th><th>CV %</th><th>Bias %</th><th>TEa %</th><th>Sigma</th><th>Room for error</th><th>Error used</th><th>U % (k=${sgf(r.k,0)})</th><th>U (${esc(a.unit||'units')})</th></tr></thead><tbody>
       ${r.levels.map(l=>`<tr><td>${levelName(l.lv)}</td><td class="small">${esc(l.t.material||'–')}${l.t.lot?' · '+esc(l.t.lot):''}</td><td>${l.n}</td><td>${sgf(l.cv)} <span class="small muted">${l.cvSrc}</span></td><td>${l.bias==null?'<span class="small muted">'+esc(l.biasNote||'not entered')+'</span>':sgf(l.bias)}</td><td>${sgf(l.teaPct)}</td><td><b>${sgf(l.sigma,1)}</b></td><td>${sgChip(l.cls)}</td><td>${l.used==null?'–':sgf(l.used,0)+'%'}</td><td>${sgf(l.Upct)}</td><td>${sgf(l.Uabs,3)}</td></tr>`).join('')}</tbody></table></div>
       ${r.levels.some(l=>l.cvSrc==='target')?`<p class="small muted" style="margin:6px 0 0">Levels marked <i>target</i> have fewer than ${SG_MINN} QC values in this period, so the CV comes from the target SD and mean instead.</p>`:''}`;
     const adv=r.cls?`<div class="panelcard" style="margin-top:8px;border-left:4px solid ${r.cls.col}"><b>${r.cls.name} (lowest sigma ${sgf(r.worst,1)})</b><div class="small" style="margin-top:2px">${esc(r.cls.adv)}</div></div>`:'';
     const btns=`<div class="row" style="gap:6px;margin-top:10px"><button class="btn" data-act="sgreport" data-id="${a.id}">View report</button>${ex?`<button class="btn" data-act="sgpdf" data-id="${a.id}">Report (PDF)</button><button class="btn" data-act="sgxl" data-id="${a.id}">Report (Excel)</button>`:''}</div>`;
-    return `<div class="panelcard">${sum}${open?`${set}${tbl}${adv}${btns}`:''}</div>`;
+    return `<div class="panelcard">${sum}${open?`${cliaRow(a,ed)}${set}${tbl}${adv}${btns}`:''}</div>`;
   };
   return `<div class="stack">${head}${rows.length?`<div class="stack">${rows.map(card).join('')}</div>`:'<div class="panel empty">No tests to show.</div>'}${ed&&rows.length?`<p class="small muted">Open a test to set its allowable error. Settings save per test with the Save button. TEa is your laboratory's own goal, for example from CLIA, RCPA, biological variation or your manufacturer.</p>`:''}</div>`;
 }
@@ -103,7 +125,7 @@ function sgReport(r){
   const a=r.a,d=deptOfA(a),set=r.set,u=a.unit||'';
   const meta=[['Laboratory',S.setup.lab||''],['Department',(d.dept||'')+dsub(d.sub)],['Analyser',instLabel(a)],['Panel',a.panel||''],['Analyte',a.name+(u?' ('+u+')':'')],
     ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',SGWIN[r.win]+(r.excl?'; values beyond 3 SD left out':'')]];
-  const settings=[['Total allowable error (TEa)',set.tea===''?'not set':set.tea+(set.mode==='abs'?' '+(u||'units')+' (converted to % at each level\'s target mean)':' %')],
+  const settings=[['Total allowable error (TEa)',sgTeaTxt(set,u)+(set.mode==='abs'||set.mode==='both'?' (converted to % at each level\'s target mean)':'')],['Source of TEa',set.src||'Set by the laboratory'],
     ['Bias',set.bsrc==='qc'?'From QC data: observed mean against target mean':(set.bias===''?'not entered (treated as 0)':set.bias+' % (entered)')],
     ['Uncertainty of bias, u(bias)',(num(set.ub)||0)+' %'],['Coverage factor, k',sgf(r.k,0)+(r.k===2?' (about 95% confidence)':'')]];
   const lv=r.levels.map(l=>({name:levelName(l.lv),mat:(l.t.material||'')+(l.t.lot?' lot '+l.t.lot:''),tmean:l.t.mean,tsd:l.t.sd,n:l.n,omean:l.mo,osd:l.so,cv:l.cv,src:l.cvSrc,bias:l.bias,bu:l.bu,note:l.biasNote,tea:l.teaPct,sigma:l.sigma,cls:l.cls,te:l.te,used:l.used,U:l.Upct,Uabs:l.Uabs}));
@@ -220,7 +242,7 @@ function sgPdfSummary(pdf,rows){
   pdf.para((S.setup.lab||'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
   const s=sgState();pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. Sigma = (TEa % - |Bias %|) / CV %.',{size:8.5,color:'#566a73'});
   pdf.table([{h:'Analyte',w:100},{h:'Panel',w:90},{h:'TEa',w:44,align:'right'},{h:'Lowest sigma',w:56,align:'right'},{h:'Class',w:74},{h:'Error used',w:56,align:'right'},{h:'CV % (worst level)',w:95,align:'right'}],
-   rows.map(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null);return [r.a.name,r.a.panel||'',r.set.tea===''?'-':r.set.tea+(r.set.mode==='abs'?' '+(r.a.unit||''):' %'),{t:sgf(r.worst,1),bold:true},{t:r.cls?r.cls.name:'Not scored',fill:r.cls?sgMix(r.cls.col):null},used.length?sgf(Math.max(...used),0)+'%':'-',cvs.length?sgf(Math.max(...cvs)):'-']}));
+   rows.map(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null);return [r.a.name,r.a.panel||'',r.set.tea===''?'-':sgTeaTxt(r.set,r.a.unit||'').replace(' (whichever is greater)',' (greater)'),{t:sgf(r.worst,1),bold:true},{t:r.cls?r.cls.name:'Not scored',fill:r.cls?sgMix(r.cls.col):null},used.length?sgf(Math.max(...used),0)+'%':'-',cvs.length?sgf(Math.max(...cvs)):'-']}));
 }
 const sgFile=a=>'QCLens-sigma-'+a.name.replace(/[^\w-]+/g,'_')+'-'+todayStr();
 async function sgSave(filename,data){
@@ -245,7 +267,7 @@ async function sgExportXlsx(list){
     ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     const h=ws.addRow(['Analyte','Panel','Department','TEa','TEa given as','Lowest sigma','Class','Highest % of TEa used','Highest CV %']);h.eachCell(hdr);
     rows.forEach(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null),d=deptOfA(r.a);
-      const row=ws.addRow([r.a.name,r.a.panel||'',(d.dept||'')+dsub(d.sub),r.set.tea===''?'':+r.set.tea,r.set.mode==='abs'?(r.a.unit||'units'):'%',r.worst==null?'':+r.worst.toFixed(2),r.cls?r.cls.name:'Not scored',used.length?+(Math.max(...used)/100).toFixed(4):'',cvs.length?+Math.max(...cvs).toFixed(3):'']);
+      const row=ws.addRow([r.a.name,r.a.panel||'',(d.dept||'')+dsub(d.sub),r.set.tea===''||r.set.mode==='both'?'':+r.set.tea,r.set.tea===''?'':r.set.mode==='both'?sgTeaTxt(r.set,r.a.unit):r.set.mode==='abs'?(r.a.unit||'units'):'%',r.worst==null?'':+r.worst.toFixed(2),r.cls?r.cls.name:'Not scored',used.length?+(Math.max(...used)/100).toFixed(4):'',cvs.length?+Math.max(...cvs).toFixed(3):'']);
       row.getCell(8).numFmt='0%';if(r.cls){row.getCell(6).fill=row.getCell(7).fill={type:'pattern',pattern:'solid',fgColor:{argb:light(r.cls.col)}}}});
     [24,22,24,10,12,13,14,18,13].forEach((w,i)=>ws.getColumn(i+1).width=w);ws.views=[{state:'frozen',ySplit:5}];
   }
@@ -256,7 +278,7 @@ async function sgExportXlsx(list){
     rep.meta.forEach(([k,v])=>{const row=ws.addRow([k,v]);row.getCell(1).font={bold:true}});ws.addRow([]);
     ws.addRow(['Settings used']).font={bold:true,color:{argb:'FF0D3B6E'}};
     const tr=ws.rowCount+1;
-    ws.addRow(['TEa % at target mean (see level table)',rep.r.set.tea===''?'not set':rep.r.set.tea+(rep.r.set.mode==='abs'?' '+(r.a.unit||'units'):' %')]);
+    ws.addRow(['TEa (see level table for % at target mean)',sgTeaTxt(rep.r.set,r.a.unit)]);ws.addRow(['Source of TEa',rep.r.set.src||'Set by the laboratory']);
     ws.addRow(['Bias',rep.settings[1][1]]);
     const ubRow=ws.addRow(['Uncertainty of bias, u(bias) %',num(rep.r.set.ub)||0]);ubRow.getCell(2).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7D6'}};
     const kRow=ws.addRow(['Coverage factor k',r.k]);kRow.getCell(2).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7D6'}};
@@ -284,6 +306,12 @@ async function sgExportXlsx(list){
     audit('Sigma report exported',(rows.length>1?rows.length+' analytes':rows[0].a.name)+' (Excel)',null,[...new Set(list.map(a=>a.dept))]);save()}catch(e){toast((e&&e.message)||'Export failed.')}
 }
 
+/* the TEa source is kept only while the values still match the CLIA limit it came from */
+function sgSrcFor(a,d,mode,tea){
+  const c=cliaFor(a);if(!c||!c.usable||!d.clia||d.clia!==c.key)return '';
+  const same=c.mode===mode&&(mode==='abs'?num(d.tea)===c.abs:num(d.tea)===c.pct)&&(mode!=='both'||num(d.abs)===c.abs);
+  return same?CLIA_DATA.version:'';
+}
 /* ---- actions ---- */
 function sgDraftRead(){const s=sgState();return s.draft}
 function sgAct(act,el){
@@ -291,19 +319,34 @@ function sgAct(act,el){
   if(!perm('v_sigma'))return true;
   switch(act){
    case 'sgtoggle':s.open[id]=!s.open[id];render();return true;
+   case 'sgclia':{
+     if(!perm('e_sigma')){toast('Your access level does not include this. Ask an administrator.');return true}
+     const a=anOf(id),m=cliaFor(a);if(!a||!canSeeD(a.dept)||!m||!m.usable)return true;
+     a.sigma={...cliaSettings(a,m),...stampNow()};delete s.draft[id];
+     audit('Sigma settings saved',a.name+': TEa '+sgTeaTxt(a.sigma,a.unit)+' ('+CLIA_DATA.version+')',null,[a.dept]);save();toast('CLIA limit applied to '+a.name+'.');render();return true}
+   case 'sgcliaask':if(perm('e_sigma')){s.cliaAsk=!s.cliaAsk;render()}return true;
+   case 'sgcliarun':{
+     if(!perm('e_sigma')){toast('Your access level does not include this. Ask an administrator.');return true}
+     const only=el.dataset.m==='empty';let n=0,skip=0;
+     sgAll().forEach(r=>{const a=r.a,m=cliaFor(a);if(!m||!m.usable)return;if(only&&r.set.tea!==''&&r.set.tea!=null){skip++;return}a.sigma={...cliaSettings(a,m),...stampNow()};delete s.draft[a.id];n++});
+     s.cliaAsk=false;
+     if(n)audit('Sigma settings saved','CLIA limits ('+CLIA_DATA.version+') applied to '+n+' test'+(n===1?'':'s')+(only?', only those with no allowable error':''),null,[...new Set(sgAll().map(r=>r.a.dept))]);
+     save();toast(n?'CLIA limits applied to '+n+' test'+(n===1?'':'s')+(skip?'. Left '+skip+' with their own goal.':'.'):'No tests to apply. '+(skip?skip+' already have a goal.':'No CLIA limit matches these tests.'));render();return true}
+   case 'sgcliacheck':cliaRefresh(true);toast('Checking for a newer CLIA table…');return true;
    case 'sgreport':UI.modal={sgrep:id};render();return true;
    case 'sgsave':{
      if(!perm('e_sigma')){toast('Your access level does not include this. Ask an administrator.');return true}
      const a=anOf(id);if(!a||!canSeeD(a.dept))return true;
      const d=Object.assign({},sgSet(a),s.draft[id]||{});
-     const tea=d.tea===''?null:num(d.tea);
+     const tea=d.tea===''?null:num(d.tea),mode=d.mode==='abs'?'abs':d.mode==='both'?'both':'pct';
+     if(mode==='both'&&tea!=null&&(d.abs===''||num(d.abs)==null||num(d.abs)<=0))return toast('Enter the units value as a number above 0.'),true;
      if(d.tea!==''&&(tea==null||tea<=0))return toast('Allowable error must be a number above 0.'),true;
      if(d.bias!==''&&num(d.bias)==null)return toast('Bias must be a number.'),true;
      if(d.ub!==''&&(num(d.ub)==null||num(d.ub)<0))return toast('Uncertainty of bias must be 0 or more.'),true;
      const k=num(d.k);if(k==null||k<=0)return toast('k must be a number above 0 (usually 2).'),true;
-     a.sigma={tea:d.tea===''?'':String(tea),mode:d.mode==='abs'?'abs':'pct',bias:d.bias===''?'':String(num(d.bias)),bsrc:d.bsrc==='qc'?'qc':'entered',ub:d.ub===''?'':String(num(d.ub)),k:k,...stampNow()};
+     a.sigma={tea:d.tea===''?'':String(tea),mode,abs:mode==='both'?String(num(d.abs)):'',src:sgSrcFor(a,d,mode,tea),clia:d.clia||'',bias:d.bias===''?'':String(num(d.bias)),bsrc:d.bsrc==='qc'?'qc':'entered',ub:d.ub===''?'':String(num(d.ub)),k:k,...stampNow()};
      delete s.draft[id];
-     audit('Sigma settings saved',a.name+': TEa '+(a.sigma.tea||'none')+(a.sigma.mode==='abs'?' '+(a.unit||'units'):' %')+', bias '+(a.sigma.bsrc==='qc'?'from QC data':(a.sigma.bias||'0')+' %')+', k '+a.sigma.k,null,[a.dept]);
+     audit('Sigma settings saved',a.name+': TEa '+(a.sigma.tea?sgTeaTxt(a.sigma,a.unit):'none')+(a.sigma.src?' ('+a.sigma.src+')':'')+', bias '+(a.sigma.bsrc==='qc'?'from QC data':(a.sigma.bias||'0')+' %')+', k '+a.sigma.k,null,[a.dept]);
      save();toast('Saved for '+a.name+'.');render();return true}
    case 'sgpdf':case 'sgxl':case 'sgpdfall':case 'sgxlall':{
      if(!perm('e_export')){toast('Your access level does not include exporting.');return true}
@@ -321,7 +364,7 @@ function sgChange(e){
     if(d.sgsel==='excl')s.excl=t.checked;else{s[d.sgsel]=t.value;if(d.sgsel==='dept')s.panel=''}
     render();return true}
   const [id,f]=d.sgf.split(':');(s.draft[id]||(s.draft[id]={}))[f]=t.value;
-  if(f==='bsrc'){sgCaptureDrafts();render()}
+  if(f==='bsrc'||f==='mode'){sgCaptureDrafts();render()}
   return true;
 }
 function sgCaptureDrafts(){const s=sgState();document.querySelectorAll('[data-sgf]').forEach(i=>{const [id,f]=i.dataset.sgf.split(':');(s.draft[id]||(s.draft[id]={}))[f]=i.value})}
