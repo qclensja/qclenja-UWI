@@ -4,7 +4,7 @@ function renderSetupHome(){
   if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
   const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&!isBuiltin(st.dept)?(UI.drn?`<label class="f" style="flex:1 1 200px">Department name<input type="text" id="drn-name" maxlength="40" value="${esc(st.dept==='Other / Custom'?'':st.dept)}"></label><button class="btn primary" data-act="drnsave">Save name</button><button class="btn" data-act="drncancel">Cancel</button>`:'<button class="btn" data-act="drnstart">Rename department</button>'):''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results?</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&!isBuiltin(st.dept)?(UI.drn?`<label class="f" style="flex:1 1 200px">Department name<input type="text" id="drn-name" maxlength="40" value="${esc(st.dept==='Other / Custom'?'':st.dept)}"></label><button class="btn primary" data-act="drnsave">Save name</button><button class="btn" data-act="drncancel">Cancel</button>`:'<button class="btn" data-act="drnstart">Rename department</button>'):''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results? It can be restored for 30 days.</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
    <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b>${esc(dsub(st.sub))}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
@@ -16,7 +16,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub()+renderBackups():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub()+renderBackups()+renderTrash():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -62,7 +62,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
@@ -161,10 +161,10 @@ document.addEventListener('click',e=>{
    case 'deldeptno':UI.delDept=false;break;
    case 'deldeptok':{UI.delDept=false;if(!isAdmin())return;if(deptList().length<2)return toast('There must be at least one department.');
      const id=st.cur,nm=st.dept,ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),nr=S.results.filter(r=>ids.includes(r.aid)).length;
-     tomb(id,...ids);S.analytes=S.analytes.filter(a=>a.dept!==id);S.results=S.results.filter(r=>!ids.includes(r.aid));S.skips=S.skips.filter(s=>!ids.includes(s.aid));S.est=(S.est||[]).filter(e=>!ids.includes(e.aid));
+     trashDept(id);tomb(id,...ids);S.analytes=S.analytes.filter(a=>a.dept!==id);S.results=S.results.filter(r=>!ids.includes(r.aid));S.skips=S.skips.filter(s=>!ids.includes(s.aid));S.est=(S.est||[]).filter(e=>!ids.includes(e.aid));
      S.depts=S.depts.filter(d=>d.id!==id);S.users.forEach(u=>{if(Array.isArray(u.depts)&&u.depts.includes(id)){u.depts=u.depts.filter(x=>x!==id);u.mod=nowIso()}});
      const nx=S.depts.find(d=>d.dept);if(nx){st.cur='';loadCtx(nx.id)}UI.dept='';UI.inst='';UI.mod='';
-     audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted.');break}
+     audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted. It can be restored for '+TRASH_DAYS+' days from Setup, Recently deleted.');break}
    case 'matnew':UI.mdr={id:'',name:'',depts:[],levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
    case 'matedit':{const m=matList().find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,depts:(m.depts||[]).slice(),levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
    case 'matcancel':UI.mdr=null;break;
@@ -178,7 +178,7 @@ document.addEventListener('click',e=>{
      audit(i>=0?'QC material edited':'QC material added',nm+' ('+matDeptTxt(rec)+')',null,rec.depts);UI.mdr=null;toast('QC material saved.');break}
    case 'matdel':UI.mdel=id;break;
    case 'matdelno':UI.mdel=null;break;
-   case 'matdelok':{const m=matList().find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
+   case 'matdelok':{const m=matList().find(x=>x.id===id);UI.mdel=null;if(m){trashAdd('material',m.name,'QC material',{material:m});tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
    case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
    case 'matapplycancel':UI.mAp=null;break;
    case 'matselall':if(UI.mAp){VA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
@@ -248,7 +248,7 @@ document.addEventListener('click',e=>{
    case 'addsave':if(saveAdd())return;break;
    case 'aedit':UI.modal={edit:id};break;
    case 'aeditsave':if(saveEdit())return;break;
-   case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed.');break;
+   case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);if(an)trashTests([id],'test',an.name,an.panel);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed. An administrator can restore it from Setup, Recently deleted.');break;
    case 'arcancel':UI.confirmDel=null;break;
    case 'mnp':{const n=document.getElementById('mnewpanel').value.trim();if(!n)return toast('Give the panel a name.');
      if(panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('A panel with that name already exists.');
@@ -256,7 +256,7 @@ document.addEventListener('click',e=>{
    case 'pdel':{const pn=el.dataset.p,ids=DA().filter(a=>a.panel===pn).map(a=>a.id);
      if(UI.confirmDel!=='p:'+pn){UI.confirmDel='p:'+pn;break}
      const nr=ids.reduce((n,i)=>n+nRes(i),0);audit('Panel deleted',pn+' ('+ids.length+' analytes, '+nr+' results)');
-     ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted.');break}
+     if(ids.length)trashTests(ids,'panel',pn,pn);ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted. An administrator can restore it from Setup, Recently deleted.');break}
    case 'mclose':UI.modal=null;UI.lateReason=null;break;
    case 'lateok':{const v=(document.getElementById('late-note')||{value:''}).value.trim();if(!v){const e=document.getElementById('late-err');e.textContent='Write a reason before saving.';e.hidden=false;return}UI.lateReason=v;UI.modal=null;saveQC(UI.saveScope);render();return}
    case 'msave':return saveLot()||render();

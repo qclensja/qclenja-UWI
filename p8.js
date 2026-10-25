@@ -98,7 +98,7 @@ function mergeStates(L,R){
   if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
   out.drules={};out.drulesAt={};{const ids=new Set([...Object.keys(L.drulesAt||{}),...Object.keys(R.drulesAt||{}),...Object.keys(L.drules||{}),...Object.keys(R.drules||{})]);
    ids.forEach(id=>{const lr=(L.drulesAt||{})[id]||'',rr=(R.drulesAt||{})[id]||'',useR=rr>lr;const src=useR?R:L;if((src.drules||{})[id]!==undefined)out.drules[id]=src.drules[id];if(useR?rr:lr)out.drulesAt[id]=useR?rr:lr})}
-  out.tomb=[...tomb];
+  out.trash=by(L.trash,R.trash);out.tomb=[...tomb];
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
 }

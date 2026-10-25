@@ -412,7 +412,7 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[],drules:{},drulesAt:{}});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],trash:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[],drules:{},drulesAt:{}});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 /* change stamps: every analyte, department and limits set remembers when it last changed, so an out-of-date copy on another device can never overwrite a newer edit */
@@ -420,7 +420,7 @@ const canonS=v=>Array.isArray(v)?'['+v.map(canonS).join(',')+']':v&&typeof v==='
 const shash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36)};
 function initHashes(o){['analytes','depts','est','materials'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
 function norm(o){
-  o.users=o.users||[];o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -1136,7 +1136,7 @@ function renderManager(){
     return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:center">
      <div class="row" style="align-items:center;gap:8px">${cp?`<input type="text" data-rnp="${esc(pn)}" value="${esc(pn)}" aria-label="Panel name" style="width:220px;font-weight:600">`:`<h3>${esc(pn)}</h3>`}<span class="chip${cp?'':' acc'}">${cp?'Custom':'Routine'}</span></div>
      <div class="row" style="gap:6px"><button class="btn sm" data-act="addopen" data-p="${esc(pn)}">Add or move analytes</button>
-     ${pc?`<span class="small">Delete the panel "${esc(pn)}", its ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} QC result${nr===1?'':'s'}? This cannot be undone.</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Yes, delete panel</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`}</div></div>
+     ${pc?`<span class="small">Delete the panel "${esc(pn)}", its ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} QC result${nr===1?'':'s'}? An administrator can restore it for 30 days from Setup, Recently deleted.</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Yes, delete panel</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`}</div></div>
      ${list.length?`<div class="scroll"><table class="t" style="margin-top:6px"><thead><tr><th>Analyte</th><th>Unit</th>${ctxMulti()?'<th>Analyser · module</th>':''}<th>Schedule</th><th>QC materials · lots</th><th></th></tr></thead><tbody>${list.map(a=>{const t=curTarget(a),c=UI.confirmDel===a.id,n=nRes(a.id);
        return `<tr><td><b>${esc(a.name)}</b></td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
        <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="aedit" data-id="${a.id}" aria-label="Edit ${esc(a.name)}">Edit</button> <button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
@@ -1963,7 +1963,7 @@ function mergeStates(L,R){
   if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
   out.drules={};out.drulesAt={};{const ids=new Set([...Object.keys(L.drulesAt||{}),...Object.keys(R.drulesAt||{}),...Object.keys(L.drules||{}),...Object.keys(R.drules||{})]);
    ids.forEach(id=>{const lr=(L.drulesAt||{})[id]||'',rr=(R.drulesAt||{})[id]||'',useR=rr>lr;const src=useR?R:L;if((src.drules||{})[id]!==undefined)out.drules[id]=src.drules[id];if(useR?rr:lr)out.drulesAt[id]=useR?rr:lr})}
-  out.tomb=[...tomb];
+  out.trash=by(L.trash,R.trash);out.tomb=[...tomb];
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
 }
@@ -2957,13 +2957,102 @@ function renderBackups(){
    ${list&&list.length?`<div style="max-height:260px;overflow:auto"><table class="t small"><thead><tr><th>Backup</th><th>Size</th><th></th></tr></thead><tbody>${list.map(x=>`<tr><td>${esc(bkDate(x.date))}</td><td>${Math.max(1,Math.round(x.size/1024))} KB</td><td class="row" style="gap:6px"><button class="btn small" data-act="bkpdl" data-n="${esc(x.name)}">Download</button><button class="btn small danger" data-act="bkprestore" data-n="${esc(x.name)}">Restore</button></td></tr>`).join('')}</tbody></table></div>`:''}
   </div>`;
 }
+/* p15: Recently deleted (30-day holding area for departments, panels, tests and QC materials) */
+const TRASH_DAYS=30;
+const clone=o=>JSON.parse(JSON.stringify(o));
+function trashAdd(kind,label,detail,data){
+  S.trash=S.trash||[];const now=Date.now();
+  S.trash.push({id:uid(),kind,label,detail:detail||'',at:new Date(now).toISOString(),by:CU?CU.id:null,byName:CU?CU.name:'',exp:new Date(now+TRASH_DAYS*864e5).toISOString(),data:clone(data)});
+}
+function trashPurge(o){o=o||S;if(Array.isArray(o.trash)){const n=new Date().toISOString();o.trash=o.trash.filter(t=>!t.exp||t.exp>n)}}
+/* what a set of analytes carries with it */
+function trashPack(ids){
+  const set=new Set(ids);
+  return {analytes:S.analytes.filter(a=>set.has(a.id)),results:S.results.filter(r=>set.has(r.aid)),skips:S.skips.filter(s=>set.has(s.aid)),est:[]};
+}
+function trashDept(id){   /* call BEFORE the department is removed */
+  syncCtx();const rec=S.depts.find(d=>d.id===id);if(!rec)return;
+  const ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),set=new Set(ids),pk=trashPack(ids);
+  pk.est=(S.est||[]).filter(e=>set.has(e.aid));
+  trashAdd('dept',rec.dept,ids.length+' tests, '+pk.results.length+' QC results',{...pk,dept:rec,drules:(S.drules||{})[id]||null,userIds:S.users.filter(u=>Array.isArray(u.depts)&&u.depts.includes(id)).map(u=>u.id)});
+}
+function trashTests(ids,kind,label,panelName){   /* call BEFORE removeAnalyte */
+  const pk=trashPack(ids),st=S.setup,cp=st.cpanels.find(c=>c.name===panelName);
+  const first=anOf(ids[0]);
+  trashAdd(kind,label,(kind==='panel'?ids.length+' tests, ':'')+pk.results.length+' QC results · '+(st.dept||''),{...pk,deptId:st.cur,deptName:st.dept,panel:panelName,customPanel:!!cp,unit:first?first.unit:''});
+}
+/* ---- restore ---- */
+function trashRestore(tid,intoDept){
+  const t=(S.trash||[]).find(x=>x.id===tid);if(!t)return false;
+  const d=clone(t.data),now=nowIso(),map={};
+  const fresh=(x)=>{delete x._h;x.modAt=now;return x};
+  if(t.kind==='material'){
+    const m=fresh(d.material);m.id=uid();S.materials.push(m);
+  }else if(t.kind==='dept'){
+    const rec=fresh(d.dept),oldId=rec.id,newId=uid();rec.id=newId;S.depts.push(rec);
+    d.analytes.forEach(a=>{map[a.id]=uid();a.id=map[a.id];a.dept=newId;fresh(a)});
+    d.results.forEach(r=>{r.id=uid();r.aid=map[r.aid]});
+    d.skips.forEach(s=>{s.aid=map[s.aid];if(s.id)s.id=uid()});
+    d.est.forEach(e=>{e.aid=map[e.aid];e.id=uid();fresh(e)});
+    S.analytes.push(...d.analytes);S.results.push(...d.results);S.skips.push(...d.skips);S.est.push(...d.est);
+    if(d.drules!=null){S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[newId]=d.drules;S.drulesAt[newId]=now}
+    (d.userIds||[]).forEach(uid_=>{const u=S.users.find(x=>x.id===uid_);if(u&&Array.isArray(u.depts)&&!u.depts.includes(newId)){u.depts=[...u.depts,newId];u.mod=now}});
+  }else{   /* panel or test: goes back into a department (original one, or one chosen) */
+    const target=S.depts.find(x=>x.id===(intoDept||d.deptId));if(!target)return false;
+    const keepCtx=S.setup.cur;syncCtx();loadCtx(target.id);
+    try{
+      if(d.customPanel&&!S.setup.cpanels.some(c=>c.name===d.panel))S.setup.cpanels.push({id:uid(),name:d.panel,items:[]});
+      d.analytes.forEach(a=>{
+        const old=a.id;map[old]=uid();a.id=map[old];a.dept=target.id;fresh(a);
+        try{a.name=registerSrc(a.panel,a.name,a.unit)}catch(e){}
+      });
+      d.results.forEach(r=>{r.id=uid();r.aid=map[r.aid]});
+      d.skips.forEach(s=>{s.aid=map[s.aid];if(s.id)s.id=uid()});
+      S.est.forEach(e=>{if(map[e.aid]){e.aid=map[e.aid];e.modAt=now}});
+      S.analytes.push(...d.analytes);S.results.push(...d.results);S.skips.push(...d.skips);
+      syncCtx();
+    }finally{if(keepCtx&&keepCtx!==target.id&&S.depts.some(x=>x.id===keepCtx))loadCtx(keepCtx)}
+  }
+  tomb(tid);S.trash=S.trash.filter(x=>x.id!==tid);
+  audit('Restored from recently deleted',({dept:'Department',panel:'Panel',test:'Test',material:'QC material'})[t.kind]+' '+t.label);
+  save();return true;
+}
+function trashDays(t){return Math.max(0,Math.ceil((new Date(t.exp)-Date.now())/864e5))}
+function trashAct(act,el){
+  if(!isAdmin())return false;
+  const id=el.dataset.id;
+  if(act==='trrestore'){
+    const t=(S.trash||[]).find(x=>x.id===id);if(!t)return true;
+    const sel=document.getElementById('trinto-'+id);
+    if(!trashRestore(id,sel?sel.value:undefined)){toast('Choose a department to restore it into.');return true}
+    toast(t.label+' restored.');render();return true;
+  }
+  if(act==='trpurge'){
+    if(UI.trconf!==id){UI.trconf=id;render();return true}
+    UI.trconf=null;const t=(S.trash||[]).find(x=>x.id===id);tomb(id);S.trash=(S.trash||[]).filter(x=>x.id!==id);
+    if(t)audit('Deleted permanently',t.label);save();toast('Deleted permanently.');render();return true;
+  }
+  if(act==='trpurgeno'){UI.trconf=null;render();return true}
+  return false;
+}
+const KIND_TXT={dept:'Department',panel:'Panel',test:'Test',material:'QC material'};
+function renderTrash(){
+  if(!isAdmin())return '';
+  trashPurge();const list=(S.trash||[]).slice().sort((x,y)=>x.at<y.at?1:-1);
+  const depts=(S.depts||[]).filter(d=>d.dept);
+  return `<div class="panel stack"><div><h3>Recently deleted</h3><p class="small muted" style="margin:4px 0 0;max-width:80ch">Departments, panels, tests and QC materials that were deleted stay here for ${TRASH_DAYS} days so they can be restored with their QC results. After that they are removed for good. Only administrators can see this list.</p></div>
+   ${list.length?`<div class="scroll"><table class="t small"><thead><tr><th>Deleted item</th><th>Type</th><th>Deleted</th><th>Left</th><th></th></tr></thead><tbody>${list.map(t=>{
+     const needSel=(t.kind==='panel'||t.kind==='test')&&!depts.some(d=>d.id===t.data.deptId);
+     const sel=(t.kind==='panel'||t.kind==='test')?`<label class="f small" style="margin:0">${needSel?'Original department was deleted. Restore into':'Restore into'}<select id="trinto-${t.id}" style="width:auto">${depts.map(d=>`<option value="${d.id}"${d.id===t.data.deptId?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:'';
+     return `<tr><td><b>${esc(t.label)}</b><div class="muted">${esc(t.detail)}</div></td><td>${KIND_TXT[t.kind]||t.kind}</td><td>${fmtTs(t.at)}${t.byName?'<div class="muted">'+esc(t.byName)+'</div>':''}</td><td>${trashDays(t)} day${trashDays(t)===1?'':'s'}</td><td><div class="row" style="gap:6px;align-items:flex-end">${sel}<button class="btn sm primary" data-act="trrestore" data-id="${t.id}">Restore</button>${UI.trconf===t.id?`<button class="btn sm danger" data-act="trpurge" data-id="${t.id}">Yes, delete for good</button><button class="btn sm" data-act="trpurgeno">Cancel</button>`:`<button class="btn sm" data-act="trpurge" data-id="${t.id}">Delete for good</button>`}</div></td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:0">Nothing has been deleted recently.</p>'}</div>`;
+}
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
   if(!canSeeD(S.setup.cur)){const f=visDepts()[0];if(f){syncCtx();loadCtx(f.id)}}
   const st=S.setup,recs=isAdmin()?deptList():visDepts(),mine=DA(),ans=st.analysers||[],d=CAT[st.dept]||{analysers:[]};
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-end"><h2>Setup</h2>
-    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&!isBuiltin(st.dept)?(UI.drn?`<label class="f" style="flex:1 1 200px">Department name<input type="text" id="drn-name" maxlength="40" value="${esc(st.dept==='Other / Custom'?'':st.dept)}"></label><button class="btn primary" data-act="drnsave">Save name</button><button class="btn" data-act="drncancel">Cancel</button>`:'<button class="btn" data-act="drnstart">Rename department</button>'):''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results?</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
+    <div class="row">${recs.length>1?`<label class="f">Department<select id="deptsw" style="width:auto;min-width:200px">${recs.map(r=>`<option value="${r.id}"${r.id===st.cur?' selected':''}>${esc(r.dept)}</option>`).join('')}</select></label>`:''}${isAdmin()?'<button class="btn" data-act="adddept">Add department</button>':''}${isAdmin()&&!isBuiltin(st.dept)?(UI.drn?`<label class="f" style="flex:1 1 200px">Department name<input type="text" id="drn-name" maxlength="40" value="${esc(st.dept==='Other / Custom'?'':st.dept)}"></label><button class="btn primary" data-act="drnsave">Save name</button><button class="btn" data-act="drncancel">Cancel</button>`:'<button class="btn" data-act="drnstart">Rename department</button>'):''}${isAdmin()&&recs.length>1?(UI.delDept?`<span class="small">Delete ${esc(st.dept)} with ${DA().length} analytes and ${DA().reduce((n,a)=>n+nRes(a.id),0)} results? It can be restored for 30 days.</span><button class="btn danger" data-act="deldeptok">Yes, delete department</button><button class="btn" data-act="deldeptno">Cancel</button>`:'<button class="btn danger" data-act="deldept">Delete department</button>'):''}</div></div>
    ${recs.length>1?`<div class="small muted">${recs.map(r=>esc(r.dept)+': '+S.analytes.filter(a=>a.dept===r.id).length+' analytes on '+(r.id===st.cur?ans:r.analysers||[]).length+' analyser'+((r.id===st.cur?ans:r.analysers||[]).length===1?'':'s')).join(' · ')}</div>`:''}
    <div class="panelcard"><div class="grid2"><div><div class="small muted">Department</div><b>${esc(st.dept)}</b>${esc(dsub(st.sub))}</div>
    <div><div class="small muted">Analytes</div><b>${mine.length}</b> in ${new Set(mine.map(a=>a.panel)).size} panels · 1 to 6 control levels each, set per analyte</div></div>
@@ -2975,7 +3064,7 @@ function renderSetupHome(){
    <p class="small muted" style="margin:6px 0 0">A new analyser starts with no analytes. Use <b>Change schedules and analyser assignment</b> to assign analytes to an analyser and module. Adding the same model again names it "(2)" automatically.</p>
    <div class="row" style="margin-top:10px"><button class="btn" data-act="edit" data-n="1">Change analysers or analytes</button><button class="btn" data-act="edit" data-n="3">Change schedules and analyser assignment</button><button class="btn" data-act="edit" data-n="4">Edit starting targets</button></div></div>
    <p class="small muted" style="margin:0">To change a mean or SD for a new lot, use <b>Lot change</b> on the Charts screen. It needs a comment and keeps the history.</p></div>
-   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub()+renderBackups():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
+   ${renderAssign()}${renderManager()}${isAdmin()?renderGithub()+renderBackups()+renderTrash():''}${isAdmin()?'<div class="panel stack"><h3>Data</h3>':'<div hidden>'}<div class="row"><button class="btn primary" data-act="xlall">Export all analytes to Excel</button><button class="btn" data-act="backup">Save backup file</button>
     <label class="btn" for="restore" style="cursor:pointer">Restore from backup</label><input type="file" id="restore" accept=".json,application/json" hidden></div>
    <p class="small muted" style="margin:0">${ghOn()?'All data is stored in GitHub, not on this device. This browser only keeps changes that have not uploaded yet. A backup file is still a good extra copy.':'Results are stored in this browser on this device. Save a backup file regularly, and before clearing browser data or switching device. Connect cloud storage above to keep everything on GitHub instead.'}</p>
    <div class="row">${UI.confirmReset?'<span class="small">This deletes all setup and QC results.</span><button class="btn danger" data-act="reset2">Yes, delete everything</button><button class="btn" data-act="reset0">Keep my data</button>':'<button class="btn danger" data-act="reset1"'+(ghOn()?' disabled':'')+'>Start over</button>'}${ghOn()?'<span class="small muted">Disconnect GitHub storage first, otherwise the saved copy would restore your data.</span>':''}</div></div></div>`;
@@ -3021,7 +3110,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
@@ -3120,10 +3209,10 @@ document.addEventListener('click',e=>{
    case 'deldeptno':UI.delDept=false;break;
    case 'deldeptok':{UI.delDept=false;if(!isAdmin())return;if(deptList().length<2)return toast('There must be at least one department.');
      const id=st.cur,nm=st.dept,ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),nr=S.results.filter(r=>ids.includes(r.aid)).length;
-     tomb(id,...ids);S.analytes=S.analytes.filter(a=>a.dept!==id);S.results=S.results.filter(r=>!ids.includes(r.aid));S.skips=S.skips.filter(s=>!ids.includes(s.aid));S.est=(S.est||[]).filter(e=>!ids.includes(e.aid));
+     trashDept(id);tomb(id,...ids);S.analytes=S.analytes.filter(a=>a.dept!==id);S.results=S.results.filter(r=>!ids.includes(r.aid));S.skips=S.skips.filter(s=>!ids.includes(s.aid));S.est=(S.est||[]).filter(e=>!ids.includes(e.aid));
      S.depts=S.depts.filter(d=>d.id!==id);S.users.forEach(u=>{if(Array.isArray(u.depts)&&u.depts.includes(id)){u.depts=u.depts.filter(x=>x!==id);u.mod=nowIso()}});
      const nx=S.depts.find(d=>d.dept);if(nx){st.cur='';loadCtx(nx.id)}UI.dept='';UI.inst='';UI.mod='';
-     audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted.');break}
+     audit('Department deleted',nm+' ('+ids.length+' analytes, '+nr+' results)',null,[]);toast(nm+' deleted. It can be restored for '+TRASH_DAYS+' days from Setup, Recently deleted.');break}
    case 'matnew':UI.mdr={id:'',name:'',depts:[],levels:[blankMatLv(),blankMatLv()]};UI.mAp=null;break;
    case 'matedit':{const m=matList().find(x=>x.id===id);if(m){UI.mdr={id:m.id,name:m.name,depts:(m.depts||[]).slice(),levels:m.levels.map(l=>({...l}))};UI.mAp=null}break}
    case 'matcancel':UI.mdr=null;break;
@@ -3137,7 +3226,7 @@ document.addEventListener('click',e=>{
      audit(i>=0?'QC material edited':'QC material added',nm+' ('+matDeptTxt(rec)+')',null,rec.depts);UI.mdr=null;toast('QC material saved.');break}
    case 'matdel':UI.mdel=id;break;
    case 'matdelno':UI.mdel=null;break;
-   case 'matdelok':{const m=matList().find(x=>x.id===id);UI.mdel=null;if(m){tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
+   case 'matdelok':{const m=matList().find(x=>x.id===id);UI.mdel=null;if(m){trashAdd('material',m.name,'QC material',{material:m});tomb(id);S.materials=S.materials.filter(x=>x.id!==id);audit('QC material deleted',m.name,null,[]);toast('Deleted. Tests that already use it keep their values.')}break}
    case 'matapply':UI.mAp={id,sel:{}};UI.mdr=null;break;
    case 'matapplycancel':UI.mAp=null;break;
    case 'matselall':if(UI.mAp){VA().forEach(a=>UI.mAp.sel[a.id]=1)}break;
@@ -3207,7 +3296,7 @@ document.addEventListener('click',e=>{
    case 'addsave':if(saveAdd())return;break;
    case 'aedit':UI.modal={edit:id};break;
    case 'aeditsave':if(saveEdit())return;break;
-   case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed.');break;
+   case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);if(an)trashTests([id],'test',an.name,an.panel);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed. An administrator can restore it from Setup, Recently deleted.');break;
    case 'arcancel':UI.confirmDel=null;break;
    case 'mnp':{const n=document.getElementById('mnewpanel').value.trim();if(!n)return toast('Give the panel a name.');
      if(panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('A panel with that name already exists.');
@@ -3215,7 +3304,7 @@ document.addEventListener('click',e=>{
    case 'pdel':{const pn=el.dataset.p,ids=DA().filter(a=>a.panel===pn).map(a=>a.id);
      if(UI.confirmDel!=='p:'+pn){UI.confirmDel='p:'+pn;break}
      const nr=ids.reduce((n,i)=>n+nRes(i),0);audit('Panel deleted',pn+' ('+ids.length+' analytes, '+nr+' results)');
-     ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted.');break}
+     if(ids.length)trashTests(ids,'panel',pn,pn);ids.forEach(removeAnalyte);st.cpanels=st.cpanels.filter(c=>c.name!==pn);if(st.sel)delete st.sel[pn];UI.confirmDel=null;toast('Panel deleted. An administrator can restore it from Setup, Recently deleted.');break}
    case 'mclose':UI.modal=null;UI.lateReason=null;break;
    case 'lateok':{const v=(document.getElementById('late-note')||{value:''}).value.trim();if(!v){const e=document.getElementById('late-err');e.textContent='Write a reason before saving.';e.hidden=false;return}UI.lateReason=v;UI.modal=null;saveQC(UI.saveScope);render();return}
    case 'msave':return saveLot()||render();
