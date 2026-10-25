@@ -1,8 +1,9 @@
 /* ===== Levey-Jennings chart ===== */
 const CW=920,CH=360;
+const winPts=(pts,n)=>n==='r'?pts.filter(r=>(!UI.cfrom||r.date>=UI.cfrom)&&(!UI.cto||r.date<=UI.cto)):(n>0?pts.slice(-n):pts);
 function ljSVG(a,lv,flags,n,forExport){
   const pts=S.results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:0);
-  const win=n>0?pts.slice(-n):pts;
+  const win=winPts(pts,n);
   const cur=curTarget(a).levels[lv]||{mean:0,sd:1},dp=decs(a);
   const ml=62,mr=104,mt=16,mb=36,pw=CW-ml-mr,ph=CH-mt-mb;
   const zs=win.map(r=>zOf(a,r)),ymax=Math.max(3.5,Math.ceil((Math.max(0,...zs.map(Math.abs))+.3)*2)/2);
@@ -48,7 +49,7 @@ function ljSVG(a,lv,flags,n,forExport){
 }
 function patternBox(a,lv,n){
   const flags0=allFlags();
-  const pts=S.results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:1),win=new Set((n>0?pts.slice(-n):pts).map(r=>r.id));
+  const pts=S.results.filter(r=>r.aid===a.id&&r.lv===lv).sort((x,y)=>x.date<y.date?-1:1),win=new Set(winPts(pts,n).map(r=>r.id));
   const sp=patternsFor(a,lv,S.results).filter(p=>p.ids.some(id=>win.has(id))).sort((x,y)=>x.to<y.to?1:-1).slice(0,4);
   if(!sp.length)return '';
   return `<div class="alert warn" style="margin-top:10px"><b>${sp.some(p=>p.kind==='trend')&&sp.some(p=>p.kind==='shift')?'Trend and shift detected':sp[0].kind==='trend'?'Trend detected':'Shift detected'} on ${levelName(lv)}</b>
@@ -67,13 +68,13 @@ function renderCharts(){
     return `<div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(a.name)} · ${levelName(lv)}</h3>
      <div class="small muted mono">Mean ${fmt(l.mean,dp+1)} · SD ${fmt(l.sd,dp+1)} · CV ${l.mean?(l.sd/l.mean*100).toFixed(1):'–'}% · ${esc(a.unit)}</div><div class="small muted">${esc(l.material||'No QC material')}${l.lot?' · Lot '+esc(l.lot):''} ${expChip(l.exp)}</div></div>
      <div>${c.flagged?`<span class="chip bad">${c.flagged} rejection${c.flagged>1?'s':''}</span>`:'<span class="chip good">No rejections</span>'} ${c.warn?`<span class="chip warn">${c.warn} warning${c.warn>1?'s':''}</span>`:''}</div></div>
-     <div class="chartbox" style="margin-top:10px">${c.svg}</div>
+     <div class="chartbox" style="margin-top:10px">${c.svg}</div>${UI.win==='r'?`<p class="small muted" style="margin:6px 0 0">${winPts(S.results.filter(r=>r.aid===a.id&&r.lv===lv),'r').length?'Showing results from '+fmtDate(UI.cfrom||'')+' to '+fmtDate(UI.cto||todayStr())+'.':'<b>No results in this date range.</b> Choose different dates.'}</p>`:''}
      ${patternBox(a,lv,UI.win)}
      <div class="legend"><span><i style="background:var(--accent)"></i>In control</span><span><i style="background:var(--warn)"></i>1₂ₛ warning</span><span><i style="background:var(--bad)"></i>Rule violation</span><span><i style="background:var(--surface);border:2px solid var(--bad);width:8px;height:8px"></i>Overridden</span><span><i style="background:var(--warn);opacity:.35;width:14px"></i>Trend</span><span><i style="background:var(--bad);opacity:.25;width:14px"></i>Shift</span><span>Points are plotted in SD units against the targets active on their date. Right-hand values are the current limits.</span></div></div>`}).join('');
   const rows=S.results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?1:x.date>y.date?-1:x.lv-y.lv).slice(0,20);
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between">
     <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
-     <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option></select></label></div>
+     <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option><option value="r"${UI.win==='r'?' selected':''}>Date range…</option></select></label>${UI.win==='r'?`<label class="f">From<input type="date" id="cfrom" value="${esc(UI.cfrom||'')}" max="${esc(UI.cto||todayStr())}" style="width:auto"></label><label class="f">To<input type="date" id="cto" value="${esc(UI.cto||'')}" min="${esc(UI.cfrom||'')}" max="${todayStr()}" style="width:auto"></label><div class="row" style="align-items:flex-end;gap:6px">${[['7 days',7],['30 days',30],['90 days',90],['1 year',365]].map(([l,d])=>`<button class="btn sm" data-act="crange" data-d="${d}">${l}</button>`).join('')}</div>`:''}</div>
     <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
    ${charts}

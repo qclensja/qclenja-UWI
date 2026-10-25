@@ -62,7 +62,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
@@ -357,7 +357,8 @@ document.addEventListener('change',e=>{
   if(d.tg){const [id,lv,f]=d.tg.split(':');anOf(id).targets[0].levels[+lv][f]=num(t.value);save();return refreshNext()}
   if(t.id==='qcdate'){UI.date=t.value||todayStr();UI.report=[];UI.skipOpen=null;return render()}
   if(t.id==='cid'){UI.cid=t.value;return render()}
-  if(t.id==='win'){UI.win=+t.value;return render()}
+  if(t.id==='win'){if(t.value==='r'){UI.win='r';if(!UI.cfrom&&!UI.cto){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-29*864e5))}}else UI.win=+t.value;return render()}
+  if(t.id==='cfrom'||t.id==='cto'){UI[t.id]=t.value||'';if(UI.cfrom&&UI.cto&&UI.cfrom>UI.cto){const x=UI.cfrom;UI.cfrom=UI.cto;UI.cto=x}return render()}
   if(t.id==='restore'&&t.files[0]){const fr=new FileReader();fr.onload=()=>{try{restoreData(JSON.parse(fr.result),'a backup file')}catch(x){toast('That file is not a valid QC backup.')}};fr.readAsText(t.files[0])}
 });
 document.addEventListener('toggle',e=>{if(e.target.hasAttribute&&e.target.hasAttribute('data-more'))UI.moreOpen=e.target.open;if(e.target.hasAttribute&&e.target.hasAttribute('data-thopen')){const id=e.target.getAttribute('data-thopen');if(e.target.open)UI.thOpen=id;else if(UI.thOpen===id)UI.thOpen=null}},true);
