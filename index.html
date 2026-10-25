@@ -1625,9 +1625,9 @@ function deptCell(u){
 }
 function renderPerms(){
   const row=d=>`<tr><td>${esc(d.l)}</td>${PROLES.map(([r,n])=>`<td style="text-align:center"><input type="checkbox" data-perm="${r}:${d.k}"${permFor(r,d.k)?' checked':''} aria-label="${esc(d.l)} for ${esc(n)}"></td>`).join('')}</tr>`;
-  const grp=g=>`<tr><th colspan="4" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
-  return `<div class="panel stack"><div><h3>What each user type can view and edit</h3><p class="muted small" style="margin:4px 0 0;max-width:80ch">Tick what technologists, supervisory technologists and consultants/residents may do. Administrators always have full access. Department limits still apply: everyone only sees the departments they are given. Changes apply the next time each person's screen refreshes.</p></div>
-   <div class="scroll"><table class="t"><thead><tr><th>Permission</th><th style="text-align:center">Technologist</th><th style="text-align:center">Supervisory Tech.</th><th style="text-align:center">Consultant</th></tr></thead><tbody>${grp('View')}${grp('Edit')}</tbody></table></div>
+  const grp=g=>`<tr><th colspan="${PROLES.length+1}" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
+  return `<div class="panel stack"><div><h3>What each user type can view and edit</h3><p class="muted small" style="margin:4px 0 0;max-width:80ch">Tick what each user type (Technologist, Supervisory Tech., Quality Manager and Consultant) may do. Administrators always have full access. Department limits still apply: everyone only sees the departments they are given. Changes apply the next time each person's screen refreshes.</p></div>
+   <div class="scroll"><table class="t"><thead><tr><th>Permission</th>${PROLES.map(([r,n])=>`<th style="text-align:center;min-width:92px;white-space:normal;line-height:1.25">${esc(n)}</th>`).join('')}</tr></thead><tbody>${grp('View')}${grp('Edit')}</tbody></table></div>
    <div class="row"><button class="btn" data-act="permreset">Restore defaults</button><span class="small muted">Today (entering and viewing daily QC) is always available. These settings control what the app shows and allows. For strict protection of the data itself, keep the number of administrators small.</span></div></div>`;
 }
 function renderUsers(){
