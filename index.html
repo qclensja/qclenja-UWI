@@ -2355,7 +2355,7 @@ function renderSigma(){
   const tiles=`<div class="row" style="gap:8px">${SGCLS.map(c=>`<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid ${c.col}"><div class="small muted">${c.min>-1e8?'Sigma ≥ '+c.min:'Sigma < 3'}</div><div style="font-size:22px;font-weight:700">${cnt[c.key]}</div><div class="small">${c.name}</div></div>`).join('')}<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid #8a9aa0"><div class="small muted">No allowable error set</div><div style="font-size:22px;font-weight:700">${miss}</div><div class="small">Not scored</div></div></div>`;
   const head=`<div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h2>Sigma metrics and measurement uncertainty</h2>
    <p class="small muted" style="margin:4px 0 0;max-width:90ch">The sigma score says how much room a test has for error. It compares the total allowable error (TEa) with how much error the test actually has, from its bias and its imprecision (CV).</p></div>
-   ${ex&&rows.length?`<div class="row" style="gap:6px"><button class="btn sm" data-act="sgpdfall">Summary and reports (PDF)</button><button class="btn sm" data-act="sgxlall">Summary and reports (Excel)</button></div>`:''}</div>
+   ${ex&&rows.length?`<div class="row" style="gap:6px"><button class="btn sm" data-act="sgpdfall">Summary and reports (PDF)</button><button class="btn sm" data-act="sgxlall">Summary and reports (Excel)</button><button class="btn sm" data-act="sgmupdfall">Uncertainty only (PDF)</button><button class="btn sm" data-act="sgmuxlall">Uncertainty only (Excel)</button></div>`:''}</div>
    <div class="panelcard" style="background:var(--surface2)"><b>Sigma = (TEa % &minus; |Bias %|) &divide; CV %</b><div class="small muted" style="margin-top:4px">Higher is better. A sigma of 6 or more is world class, 5 to 6 excellent, 4 to 5 good, 3 to 4 marginal, and below 3 not acceptable. Measurement uncertainty is U = k &times; &radic;(CV&sup2; + u<sub>bias</sub>&sup2;), with k = 2 for about 95% confidence.</div></div>
    ${cliaPanel(ed,rows)}
    <div class="row" style="align-items:flex-end;gap:10px">
@@ -2386,7 +2386,7 @@ function renderSigma(){
       ${r.levels.map(l=>`<tr><td>${levelName(l.lv)}</td><td class="small">${esc(l.t.material||'–')}${l.t.lot?' · '+esc(l.t.lot):''}</td><td>${l.n}</td><td>${sgf(l.cv)} <span class="small muted">${l.cvSrc}</span></td><td>${l.bias==null?'<span class="small muted">'+esc(l.biasNote||'not entered')+'</span>':sgf(l.bias)}</td><td>${sgf(l.teaPct)}</td><td><b>${sgf(l.sigma,1)}</b></td><td>${sgChip(l.cls)}</td><td>${l.used==null?'–':sgf(l.used,0)+'%'}</td><td>${sgf(l.Upct)}</td><td>${sgf(l.Uabs,3)}</td></tr>`).join('')}</tbody></table></div>
       ${r.levels.some(l=>l.cvSrc==='target')?`<p class="small muted" style="margin:6px 0 0">Levels marked <i>target</i> have fewer than ${SG_MINN} QC values in this period, so the CV comes from the target SD and mean instead.</p>`:''}`;
     const adv=r.cls?`<div class="panelcard" style="margin-top:8px;border-left:4px solid ${r.cls.col}"><b>${r.cls.name} (lowest sigma ${sgf(r.worst,1)})</b><div class="small" style="margin-top:2px">${esc(r.cls.adv)}</div></div>`:'';
-    const btns=`<div class="row" style="gap:6px;margin-top:10px"><button class="btn" data-act="sgreport" data-id="${a.id}">View report</button>${ex?`<button class="btn" data-act="sgpdf" data-id="${a.id}">Report (PDF)</button><button class="btn" data-act="sgxl" data-id="${a.id}">Report (Excel)</button>`:''}</div>`;
+    const btns=`<div class="row" style="gap:6px;margin-top:10px"><button class="btn" data-act="sgreport" data-id="${a.id}">View report</button>${ex?`<button class="btn" data-act="sgpdf" data-id="${a.id}">Report (PDF)</button><button class="btn" data-act="sgxl" data-id="${a.id}">Report (Excel)</button>`:''}<span class="muted" style="align-self:center">|</span><button class="btn" data-act="sgmureport" data-id="${a.id}">View uncertainty report</button>${ex?`<button class="btn" data-act="sgmupdf" data-id="${a.id}">Uncertainty (PDF)</button><button class="btn" data-act="sgmuxl" data-id="${a.id}">Uncertainty (Excel)</button>`:''}</div>`;
     return `<div class="panelcard">${sum}${open?`${cliaRow(a,ed)}${set}${tbl}${adv}${btns}`:''}</div>`;
   };
   return `<div class="stack">${head}${rows.length?`<div class="stack">${rows.map(card).join('')}</div>`:'<div class="panel empty">No tests to show.</div>'}${ed&&rows.length?`<p class="small muted">Open a test to set its allowable error. Settings save per test with the Save button. TEa is your laboratory's own goal, for example from CLIA, RCPA, biological variation or your manufacturer.</p>`:''}</div>`;
@@ -2429,17 +2429,17 @@ function sgReportHtml(rep){
 }
 function renderSgModal(){
   const a=anOf(UI.modal.sgrep);if(!a){UI.modal=null;return ''}
-  const s=sgState(),r=sgCalc(a,s.win,s.excl),rep=sgReport(r),ex=perm('e_export');
-  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:1000px" role="dialog" aria-modal="true" aria-label="Sigma report" data-stop>
-   ${sgReportHtml(rep)}
-   <div class="row" style="justify-content:flex-end;gap:6px;margin-top:14px">${ex?`<button class="btn primary" data-act="sgpdf" data-id="${a.id}">Download PDF</button><button class="btn" data-act="sgxl" data-id="${a.id}">Download Excel</button>`:''}<button class="btn" data-act="mclose">Close</button></div></div></div>`;
+  const s=sgState(),r=sgCalc(a,s.win,s.excl),mu=UI.modal.kind==='mu',rep=mu?muReport(r):sgReport(r),ex=perm('e_export'),p=mu?'sgmu':'sg';
+  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:1000px" role="dialog" aria-modal="true" aria-label="${mu?'Measurement uncertainty report':'Sigma report'}" data-stop>
+   ${mu?muReportHtml(rep):sgReportHtml(rep)}
+   <div class="row" style="justify-content:flex-end;gap:6px;margin-top:14px">${ex?`<button class="btn primary" data-act="${p}pdf" data-id="${a.id}">Download PDF</button><button class="btn" data-act="${p}xl" data-id="${a.id}">Download Excel</button>`:''}<button class="btn" data-act="mclose">Close</button></div></div></div>`;
 }
 
 /* ---- a small PDF writer (A4, Helvetica) so reports can be saved without any other library ---- */
 const PW_H=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
 const PW_B=[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
 function pdfClean(s){
-  s=String(s==null?'':s).replace(/[–—−]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/≥/g,'>=').replace(/≤/g,'<=').replace(/[₀-₉]/g,'').replace(/ₙ|ₛ|ₓ/g,'').replace(/²/g,'2').replace(/√/g,'sqrt').replace(/…/g,'...').replace(/ /g,' ');
+  s=String(s==null?'':s).replace(/[–—−]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/≥/g,'>=').replace(/≤/g,'<=').replace(/[₀-₉]/g,'').replace(/ₙ|ₛ|ₓ/g,'').replace(/²/g,'2').replace(/[µμ]/g,'u').replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g,m=>'^'+m.split('').map(c=>'⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)).join('')).replace(/[±]/g,'+/-').replace(/√/g,'sqrt').replace(/…/g,'...').replace(/ /g,' ');
   let o='';for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);o+=c<32?' ':c<=255?s[i]:'?'}return o;
 }
 class MiniPdf{
@@ -2606,6 +2606,12 @@ function sgAct(act,el){
      save();toast(n?'CLIA limits applied to '+n+' test'+(n===1?'':'s')+(skip?'. Left '+skip+' with their own goal.':'.'):'No tests to apply. '+(skip?skip+' already have a goal.':'No CLIA limit matches these tests.'));render();return true}
    case 'sgcliacheck':cliaRefresh(true);toast('Checking for a newer CLIA table…');return true;
    case 'sgreport':UI.modal={sgrep:id};render();return true;
+   case 'sgmureport':UI.modal={sgrep:id,kind:'mu'};render();return true;
+   case 'sgmupdf':case 'sgmuxl':case 'sgmupdfall':case 'sgmuxlall':{
+     if(!perm('e_export')){toast('Your access level does not include exporting.');return true}
+     const all=act.endsWith('all'),list=(all?sgAll().map(r=>r.a):[anOf(id)].filter(Boolean)).filter(a=>sgCalc(a,s.win,s.excl).levels.some(l=>l.Upct!=null));
+     if(!list.length){toast('No test has enough information for an uncertainty report.');return true}
+     (act.startsWith('sgmupdf')?muExportPdf:muExportXlsx)(list);return true}
    case 'sgsave':{
      if(!perm('e_sigma')){toast('Your access level does not include this. Ask an administrator.');return true}
      const a=anOf(id);if(!a||!canSeeD(a.dept))return true;
@@ -2640,6 +2646,110 @@ function sgChange(e){
   return true;
 }
 function sgCaptureDrafts(){const s=sgState();document.querySelectorAll('[data-sgf]').forEach(i=>{const [id,f]=i.dataset.sgf.split(':');(s.draft[id]||(s.draft[id]={}))[f]=i.value})}
+
+
+/* ===== Measurement uncertainty report (no allowable error needed) ===== */
+function muReport(r){
+  const a=r.a,d=deptOfA(a),set=r.set,u=a.unit||'';
+  const meta=[['Laboratory',S.setup.lab||''],['Department',(d.dept||'')+dsub(d.sub)],['Analyser',instLabel(a)],['Panel',a.panel||''],['Analyte',a.name+(u?' ('+u+')':'')],
+    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',SGWIN[r.win]+(r.excl?'; values beyond 3 SD left out':'')]];
+  const ub=num(set.ub)||0;
+  const settings=[['Imprecision, u(Rw)','The CV of the laboratory\'s own QC values over the period, when a level has '+SG_MINN+' or more. Otherwise the CV from the target SD and mean.'],
+    ['Uncertainty of bias, u(bias)',ub+' %'+(ub?'':' (not entered, so the uncertainty reflects imprecision only)')],['Coverage factor, k',sgf(r.k,0)+(r.k===2?' (about 95% confidence)':'')]];
+  const levels=r.levels.map(l=>({name:levelName(l.lv),mat:(l.t.material||'')+(l.t.lot?' lot '+l.t.lot:''),tmean:l.t.mean,n:l.n,omean:l.mo,osd:l.so,cv:l.cv,src:l.cvSrc,ub:ub,uc:l.cv==null?null:Math.sqrt(l.cv*l.cv+ub*ub),k:l.k,U:l.Upct,Uabs:l.Uabs,lo:l.Uabs==null?null:l.t.mean-l.Uabs,hi:l.Uabs==null?null:l.t.mean+l.Uabs}));
+  const stmts=levels.filter(l=>l.Uabs!=null).map(l=>`${l.name}: at the target mean of ${fmt(l.tmean)}${u?' '+u:''}, the expanded uncertainty is ±${sgf(l.Uabs,3)}${u?' '+u:''} (±${sgf(l.U)} %, k=${sgf(l.k,0)}). A result at this level is expected to lie within ${sgf(l.lo,3)} to ${sgf(l.hi,3)}${u?' '+u:''} of the true value${l.k===2?' with about 95% confidence':''}.`);
+  const notes=['Combined standard uncertainty u(c) = sqrt(u(Rw)^2 + u(bias)^2), in %. Expanded uncertainty U = k x u(c). U in units = U % / 100 x the target mean.',
+    'u(Rw) is the within-laboratory reproducibility, estimated here by the CV of the laboratory\'s QC values. It reflects the whole measurement procedure over time, including calibration and reagent lot changes in the period.',
+    'The uncertainty of bias is the value entered on the Sigma metrics tab. If it is not known, leave it at 0 and state that the figure covers imprecision only.',
+    'This is an estimate from QC data and does not replace the laboratory\'s own procedure for evaluating measurement uncertainty.'];
+  return {title:'Measurement uncertainty report',meta,settings,levels,stmts,notes,r};
+}
+function muReportHtml(rep){
+  const f=sgf;
+  return `<div id="sg-report"><h3 style="margin:0 0 6px">${esc(rep.title)}</h3>
+   <div class="row" style="gap:4px 24px">${rep.meta.map(([k,v])=>`<div style="flex:1 1 220px"><span class="small muted">${esc(k)}</span><div>${esc(v||'–')}</div></div>`).join('')}</div>
+   <h4 style="margin:14px 0 4px">Basis of the estimate</h4><div class="stack" style="gap:4px">${rep.settings.map(([k,v])=>`<div><span class="small muted">${esc(k)}</span><div>${esc(v)}</div></div>`).join('')}</div>
+   <h4 style="margin:14px 0 4px">Uncertainty by control level</h4>
+   <div class="scroll"><table class="t"><thead><tr><th>Level</th><th>Target mean</th><th>n</th><th>u(Rw) = CV %</th><th>u(bias) %</th><th>u(c) %</th><th>k</th><th>U %</th><th>U (units)</th><th>Range at target mean</th></tr></thead><tbody>
+   ${rep.levels.map(l=>`<tr><td>${esc(l.name)}<div class="small muted">${esc(l.mat)}</div></td><td>${f(l.tmean,3)}</td><td>${l.n}</td><td>${f(l.cv)} <span class="small muted">${l.src}</span></td><td>${f(l.ub)}</td><td>${f(l.uc)}</td><td>${f(l.k,0)}</td><td><b>${f(l.U)}</b></td><td><b>${f(l.Uabs,3)}</b></td><td>${l.lo==null?'–':f(l.lo,3)+' to '+f(l.hi,3)}</td></tr>`).join('')}</tbody></table></div>
+   ${rep.levels.some(l=>l.src==='target')?`<p class="small muted" style="margin:6px 0 0">Levels marked <i>target</i> have fewer than ${SG_MINN} QC values in this period, so the CV comes from the target SD and mean.</p>`:''}
+   ${rep.stmts.length?`<h4 style="margin:14px 0 4px">Statement of uncertainty</h4><ul style="margin:0;padding-left:18px">${rep.stmts.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+   <h4 style="margin:14px 0 4px">Notes</h4><ul class="small muted" style="margin:0;padding-left:18px">${rep.notes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+}
+const muFile=a=>'QCLens-uncertainty-'+a.name.replace(/[^\w-]+/g,'_')+'-'+todayStr();
+function muPdfReport(pdf,rep,first){
+  if(!first)pdf.add();
+  const W=pdf.W,M=pdf.M,f=sgf;
+  pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,rep.title,{size:16,bold:true,color:'#ffffff'});pdf.y=80;
+  const colw=(W-2*M)/2;let y0=pdf.y;
+  rep.meta.forEach(([k,v],i)=>{const x=M+(i%2)*colw,y=y0+Math.floor(i/2)*26;pdf.text(x,y+8,k,{size:7.5,color:'#566a73'});pdf.text(x,y+19,String(v||'-').slice(0,62),{size:9.5})});
+  pdf.y=y0+Math.ceil(rep.meta.length/2)*26+4;
+  pdf.h('Basis of the estimate');rep.settings.forEach(([k,v])=>pdf.para(k+': '+v,{size:9,gap:2}));
+  pdf.h('Uncertainty by control level');
+  pdf.table([{h:'Level',w:44},{h:'Material and lot',w:72},{h:'Target mean',w:46,align:'right'},{h:'n',w:22,align:'right'},{h:'u(Rw) = CV %',w:56,align:'right'},{h:'u(bias) %',w:42,align:'right'},{h:'u(c) %',w:38,align:'right'},{h:'U %',w:38,align:'right'},{h:'U (units)',w:48,align:'right'},{h:'Range at target mean',w:90,align:'right'}],
+    rep.levels.map(l=>[l.name,l.mat||'-',f(l.tmean,3),String(l.n),f(l.cv)+' ('+l.src+')',f(l.ub),f(l.uc),{t:f(l.U),bold:true},{t:f(l.Uabs,3),bold:true},l.lo==null?'-':f(l.lo,3)+' to '+f(l.hi,3)]));
+  if(rep.stmts.length){pdf.h('Statement of uncertainty');rep.stmts.forEach(x=>pdf.para(x,{size:9,gap:3}))}
+  pdf.h('Notes');rep.notes.forEach(x=>pdf.para('- '+x,{size:8,color:'#566a73',gap:2}));
+  pdf.ensure(36);pdf.y+=16;
+  ['Prepared by','Reviewed by','Date'].forEach((t,i)=>{const x=M+i*((W-2*M)/3),w=(W-2*M)/3-14;pdf.line(x,pdf.y,x+w,pdf.y,'#14232b',0.6);pdf.text(x,pdf.y+10,t,{size:7.5,color:'#566a73'})});
+  pdf.y+=18;
+}
+function muPdfSummary(pdf,reps){
+  const W=pdf.W,M=pdf.M,f=sgf,s=sgState();
+  pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Measurement uncertainty summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
+  pdf.para((S.setup.lab||'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
+  pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. U = k x sqrt(CV^2 + u(bias)^2). Levels with fewer than '+SG_MINN+' QC values use the target CV.',{size:8.5,color:'#566a73'});
+  const rows=[];reps.forEach(rep=>rep.levels.forEach((l,i)=>{if(l.U!=null)rows.push([i?'':rep.r.a.name+(rep.r.a.unit?' ('+rep.r.a.unit+')':''),l.name,f(l.tmean,3),f(l.cv)+(l.src==='target'?' (target)':''),f(l.ub),{t:f(l.U),bold:true},f(l.k,0),{t:f(l.Uabs,3),bold:true}])}));
+  pdf.table([{h:'Analyte',w:130},{h:'Level',w:50},{h:'Target mean',w:62,align:'right'},{h:'CV %',w:62,align:'right'},{h:'u(bias) %',w:50,align:'right'},{h:'U %',w:46,align:'right'},{h:'k',w:24,align:'right'},{h:'U (units)',w:60,align:'right'}],rows);
+}
+async function muExportPdf(list){
+  const s=sgState(),reps=list.map(a=>muReport(sgCalc(a,s.win,s.excl))),pdf=new MiniPdf();
+  if(reps.length>1){muPdfSummary(pdf,reps);reps.forEach(r=>muPdfReport(pdf,r,false))}else muPdfReport(pdf,reps[0],true);
+  const fn=reps.length>1?'QCLens-uncertainty-summary-'+todayStr()+'.pdf':muFile(list[0])+'.pdf';
+  if(await sgSave(fn,pdf.bytes('QCLens measurement uncertainty  ·  '+(S.setup.lab||''))))toast('PDF ready.');
+  audit('Uncertainty report exported',(list.length>1?list.length+' analytes':list[0].name)+' (PDF)',null,[...new Set(list.map(a=>a.dept))]);save();
+}
+async function muExportXlsx(list){
+  if(typeof ExcelJS==='undefined'){toast('Excel export is not available right now. Check your connection.');return}
+  const s=sgState(),reps=list.map(a=>muReport(sgCalc(a,s.win,s.excl))),wb=new ExcelJS.Workbook();wb.creator='QCLens';wb.created=new Date();
+  const hdr=c=>{c.font={bold:true,color:{argb:'FF0D3B6E'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE3F2EF'}};c.alignment={wrapText:true,vertical:'middle'}};
+  if(reps.length>1){
+    const ws=wb.addWorksheet('Summary');ws.addRow(['Measurement uncertainty summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow(['Analyte','Unit','Level','Target mean','CV %','CV source','u(bias) %','k','U %','U (units)','Lower','Upper']).eachCell(hdr);
+    reps.forEach(rep=>rep.levels.forEach(l=>{if(l.U==null)return;const rn=ws.rowCount+1;
+      const row=ws.addRow([rep.r.a.name,rep.r.a.unit||'',l.name,l.tmean,+l.cv.toFixed(4),l.src,l.ub,l.k,'','','','']);
+      row.getCell(9).value={formula:`H${rn}*SQRT(E${rn}^2+G${rn}^2)`,result:+l.U.toFixed(3)};
+      row.getCell(10).value={formula:`I${rn}/100*ABS(D${rn})`,result:+l.Uabs.toFixed(4)};
+      row.getCell(11).value={formula:`D${rn}-J${rn}`,result:+l.lo.toFixed(4)};row.getCell(12).value={formula:`D${rn}+J${rn}`,result:+l.hi.toFixed(4)};
+      [9,10,11,12].forEach(c=>row.getCell(c).numFmt='0.000')}));
+    [26,10,10,12,10,11,11,6,10,12,12,12].forEach((w,i)=>ws.getColumn(i+1).width=w);
+  }
+  const used=new Set();
+  reps.slice(0,60).forEach(rep=>{
+    let nm=('Uncertainty '+rep.r.a.name).replace(/[\\\/\?\*\[\]:]/g,'').slice(0,28),k=1,base=nm;while(used.has(nm.toLowerCase()))nm=base.slice(0,26)+' '+(++k);used.add(nm.toLowerCase());
+    const ws=wb.addWorksheet(nm);ws.addRow([rep.title]).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};ws.addRow([]);
+    rep.meta.forEach(([k,v])=>{const row=ws.addRow([k,v]);row.getCell(1).font={bold:true}});ws.addRow([]);
+    ws.addRow(['Basis of the estimate']).font={bold:true,color:{argb:'FF0D3B6E'}};rep.settings.forEach(([k,v])=>ws.addRow([k,v]));
+    const kRow=ws.addRow(['Coverage factor k (change to recalculate)',rep.r.k]);kRow.getCell(2).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7D6'}};
+    ws.addRow([]);const kA='$B$'+kRow.number;
+    ws.addRow(['Level','Material and lot','Target mean','n','Observed mean','Observed SD','u(Rw) = CV %','CV source','u(bias) %','u(c) %','U %','U (units)','Lower','Upper']).eachCell(hdr);
+    rep.levels.forEach(l=>{const rn=ws.rowCount+1;
+      const row=ws.addRow([l.name,l.mat,l.tmean,l.n,l.omean==null?'':+l.omean.toFixed(4),l.osd==null?'':+l.osd.toFixed(4),l.cv==null?'':+l.cv.toFixed(4),l.src,l.ub,'','','','','']);
+      row.getCell(10).value={formula:`SQRT(G${rn}^2+I${rn}^2)`,result:l.uc==null?'':+l.uc.toFixed(4)};
+      row.getCell(11).value={formula:`${kA}*J${rn}`,result:l.U==null?'':+l.U.toFixed(3)};
+      row.getCell(12).value={formula:`K${rn}/100*ABS(C${rn})`,result:l.Uabs==null?'':+l.Uabs.toFixed(4)};
+      row.getCell(13).value={formula:`C${rn}-L${rn}`,result:l.lo==null?'':+l.lo.toFixed(4)};row.getCell(14).value={formula:`C${rn}+L${rn}`,result:l.hi==null?'':+l.hi.toFixed(4)};
+      [10,11,12,13,14].forEach(c=>row.getCell(c).numFmt='0.000')});
+    ws.addRow([]);ws.addRow(['Statement of uncertainty']).font={bold:true,color:{argb:'FF0D3B6E'}};rep.stmts.forEach(x=>ws.addRow([x]));
+    ws.addRow([]);ws.addRow(['Notes']).font={bold:true,color:{argb:'FF0D3B6E'}};rep.notes.forEach(x=>ws.addRow([x]));
+    ws.addRow([]);ws.addRow(['Prepared by: ____________________','Reviewed by: ____________________','Date: ____________']);
+    [34,30,12,8,13,13,13,11,11,10,10,12,12,12].forEach((w,i)=>ws.getColumn(i+1).width=w);
+  });
+  try{toast('Preparing Excel file…');const buf=await wb.xlsx.writeBuffer(),fn=reps.length>1?'QCLens-uncertainty-summary-'+todayStr()+'.xlsx':muFile(list[0])+'.xlsx';
+    if(await sgSave(fn,buf))toast('Excel file ready.');
+    audit('Uncertainty report exported',(list.length>1?list.length+' analytes':list[0].name)+' (Excel)',null,[...new Set(list.map(a=>a.dept))]);save()}catch(e){toast((e&&e.message)||'Export failed.')}
+}
 /* ===== CLIA acceptance limits (criteria for acceptable performance) =====
    Built-in copy of the CLIA proficiency testing acceptance limits (42 CFR part 493 subpart I) as revised by the 2024 final rule (CMS-3355-F),
    from CMS memo QSO-24-15-CLIA, Attachment 1. A newer table can be loaded from clia.json in the QCLens repository (see cliaRefresh). */
