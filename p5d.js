@@ -208,6 +208,7 @@ document.addEventListener('click',e=>{
      if(deptList().some(d=>d.id!==st.cur&&d.dept.toLowerCase()===nm.toLowerCase()&&(d.sub||'')===(st.sub||'')))return toast('Another department already has that name.');
      const old=st.dept;st.dept=nm;syncCtx();audit('Department renamed',old+' to '+nm,null,[st.cur]);UI.drn=false;toast('Department renamed to '+nm+'.');break}
    case 'donetoggle':UI.doneOpen=!UI.doneOpen;break;
+   case 'azsort':UI.az=!UI.az;try{localStorage.setItem('qclens.az',UI.az?'1':'0')}catch(e){}break;
    case 'obsave':saveOther();break;
    case 'obsaveone':saveOther(id);break;
    case 'obmode':obState().mode=el.dataset.m;break;

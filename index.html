@@ -675,7 +675,7 @@ function renderSetup(){
    <button class="btn primary" data-act="next"${canNext?'':' disabled'}>${next}</button></div></div>`;
 }
 /* ===== Today, alerts ===== */
-const UI={date:todayStr(),cid:null,win:30,skipOpen:null,report:[],modal:null};
+const UI={az:(()=>{try{return localStorage.getItem('qclens.az')==='1'}catch(e){return false}})(),date:todayStr(),cid:null,win:30,skipOpen:null,report:[],modal:null};
 const anOf=id=>S.analytes.find(a=>a.id===id);
 function allFlags(){const f={};S.analytes.forEach(a=>Object.assign(f,evaluate(a,S.results)));return f}
 const resultAt=(aid,lv,date)=>S.results.find(r=>r.aid===aid&&r.lv===lv&&r.date===date);
@@ -749,7 +749,7 @@ function renderToday(){
   const flags=allFlags(),due=VA().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VA().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VA().filter(a=>inF(a)&&isOD(a));
   const un=unresolved(flags);
   const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()||anyMod?(instOf(a)||'No analyser')+(a.mod?' · '+a.mod:''):'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
-    return Object.entries(gi).map(([k,l])=>`${k?`<div class="angh" style="padding:10px 12px 6px;margin:0">${esc(k)}</div>`:''}${Object.entries(groupBy(l,a=>a.panel)).map(([p,pl])=>`<div class="small muted" style="${hd}">${esc(p)}</div>${pl.map(a=>dueRow(a,flags)).join('')}`).join('')}`).join('')};
+    return Object.entries(gi).map(([k,l])=>`${k?`<div class="angh" style="padding:10px 12px 6px;margin:0">${esc(k)}</div>`:''}${UI.az?l.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true,sensitivity:'base'})).map(a=>dueRow(a,flags)).join(''):Object.entries(groupBy(l,a=>a.panel)).map(([p,pl])=>`<div class="small muted" style="${hd}">${esc(p)}</div>${pl.map(a=>dueRow(a,flags)).join('')}`).join('')}`).join('')};
   const isDone=a=>{if(skipAt(a.id,UI.date))return true;const rs=Array.from({length:a.nlev},(_,lv)=>resultAt(a.id,lv,UI.date));return rs.every(Boolean)&&!rs.some(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject'))};
   const pend=due.filter(a=>!isDone(a)),fin=due.filter(isDone);
   const done=due.filter(a=>skipAt(a.id,UI.date)||S.results.some(r=>r.aid===a.id&&r.date===UI.date)).length;
@@ -764,7 +764,7 @@ function renderToday(){
     <p class="small muted" style="margin:10px 0 0">${due.length} scheduled for ${fmtDate(UI.date)} · ${done} entered or marked not performed${due.length-done>0?` · <b>${due.length-done} waiting</b>`:''}</p></div>
    ${UI.date<todayStr()?`<div class="alert warn" style="margin:0"><b>Entering QC for ${fmtDate(UI.date)}.</b> Values you save are plotted on that date, not today. <button class="btn sm" data-act="today">Back to today</button></div>`:''}
    ${missedPanel(inF)}
-   <div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">To be entered <span class="small muted" style="font-weight:400">${pend.length} test${pend.length===1?'':'s'}</span></div>${pend.length?byPanel(pend):due.length?'<div class="empty">All scheduled QC for this date is entered or marked not performed.</div>':'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
+   <div class="panel" style="padding:0"><div class="row" style="justify-content:space-between;align-items:center;padding-right:12px"><div class="angh" style="padding:10px 12px 6px;margin:0">To be entered <span class="small muted" style="font-weight:400">${pend.length} test${pend.length===1?'':'s'}</span></div><label class="small" style="display:flex;gap:6px;align-items:center;cursor:pointer;margin-top:6px"><input type="checkbox" data-act="azsort"${UI.az?' checked':''}> Sort A to Z within each ${anyMod?'module':'analyser'}</label></div>${pend.length?byPanel(pend):due.length?'<div class="empty">All scheduled QC for this date is entered or marked not performed.</div>':'<div class="empty">Nothing is scheduled for this date. Use the list below to enter QC for an analyte anyway.</div>'}</div>
    ${fin.length?`<div class="panel" style="padding:0"><div class="row" style="padding:10px 12px;justify-content:space-between;align-items:center"><div><b>Entered or not performed</b> <span class="small muted">${fin.length} test${fin.length===1?'':'s'} with no violation to resolve</span></div><button class="btn sm" data-act="donetoggle" aria-expanded="${UI.doneOpen?'true':'false'}">${UI.doneOpen?'Hide':'Show'}</button></div>${UI.doneOpen?byPanel(fin):''}</div>`:''}
    ${od.length?`<div class="panel" style="padding:0"><div class="angh" style="padding:10px 12px 6px;margin:0">On-demand tests <span class="small muted" style="font-weight:400">No fixed schedule. Enter QC on the date it is run.</span></div>${byPanel(od)}</div>`:''}
    ${rest.length?`<details class="panel" style="padding:0"><summary style="padding:12px 16px;cursor:pointer"><b>Not scheduled on this date (${rest.length})</b> <span class="muted small">Open to run QC anyway</span></summary>${byPanel(rest)}</details>`:''}
@@ -3263,6 +3263,7 @@ document.addEventListener('click',e=>{
      if(deptList().some(d=>d.id!==st.cur&&d.dept.toLowerCase()===nm.toLowerCase()&&(d.sub||'')===(st.sub||'')))return toast('Another department already has that name.');
      const old=st.dept;st.dept=nm;syncCtx();audit('Department renamed',old+' to '+nm,null,[st.cur]);UI.drn=false;toast('Department renamed to '+nm+'.');break}
    case 'donetoggle':UI.doneOpen=!UI.doneOpen;break;
+   case 'azsort':UI.az=!UI.az;try{localStorage.setItem('qclens.az',UI.az?'1':'0')}catch(e){}break;
    case 'obsave':saveOther();break;
    case 'obsaveone':saveOther(id);break;
    case 'obmode':obState().mode=el.dataset.m;break;
