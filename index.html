@@ -711,7 +711,7 @@ function alertCard(r,flags,full){
    <span class="mono">${fmt(r.value,dp)} ${esc(a.unit)}</span> <span class="muted small">(${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp)})</span><br><span class="small muted">${byLine(r)}</span></div>
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <ul>${f.map(x=>`<li><b>${RULES[x.rule].name}:</b> ${RULES[x.rule].desc}</li>`).join('')}</ul>
-   ${evNear(a,dAdd(r.date,-7),r.date)}
+   ${evNear(a,dAdd(r.date,-7),r.date)}${ptNotesHtml(r)}
    <details${full?' open':''} style="margin-top:8px"><summary><b>Suggested actions</b></summary><ul>${fixes.map(x=>`<li>${x}</li>`).join('')}</ul></details>
    ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> ${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button>`:''}</p>`
    :!perm('e_override')?`<p class="small muted" style="margin:8px 0 0">${isAdmin()?'':'Your access level can view this alert but not resolve it.'}</p>`
@@ -779,7 +779,7 @@ function resolvedCard(r,flags){
   return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(a.name)}</b> · ${levelName(r.lv)} · ${fmtDate(r.date)}${instTag(a)}<br>
    <span class="mono">${fmt(r.value,dp)} ${esc(a.unit)}</span> <span class="muted small">(${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp)})</span><br><span class="small muted">Entered: ${byLine(r)}</span></div>
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
-   <div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
+   ${ptNotesHtml(r)}<div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
    ${edits.length?`<div class="small" style="margin-top:6px"><b>Edit comments:</b>${edits.map(h=>`<div class="muted">${esc(h.reason)} (changed from ${fmt(h.value,dp)}${h.byName?' · '+esc(h.byName):''}${h.at?' · '+fmtTs(h.at):''})</div>`).join('')}</div>`:''}
    <div class="row" style="margin-top:6px">${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button>`:''}</div></div>`;
 }
@@ -871,7 +871,8 @@ function ljSVG(a,lv,flags,n,forExport){
     if(!forExport){
       const f=(flags[r.id]||[]).map(q=>RULES[q.rule].name).join(', ');
       const tip=`<b>${fmtDate(r.date)}</b><br>${fmt(r.value,dp+1)} ${esc(a.unit)} (${zs[i]>=0?'+':''}${zs[i].toFixed(2)} SD)${f?'<br>'+f:''}${r.ov?'<br>Override: '+esc(r.ov.comment)+(r.ov.byName?' ('+esc(r.ov.byName)+')':''):''}<br>${byLine(r)}`;
-      s+=`<circle class="hit" cx="${x}" cy="${y}" r="13" fill="transparent" data-tip="${esc(tip)}"/>`;
+      const nn=ptNotes(r).length;if(nn)s+=ptMark(x,y,nn);
+      s+=`<circle class="hit" cx="${x}" cy="${y}" r="13" fill="transparent" style="cursor:pointer" data-act="ptnote" data-id="${r.id}" data-tip="${esc(tip+(nn?'<br>'+nn+' comment'+(nn>1?'s':''):'')+'<br><i>Click to read or add comments</i>')}"/>`;
     }
   });
   return {svg:s+'</svg>',count:win.length,flagged:stat.filter(x=>x==='rej').length,warn:stat.filter(x=>x==='warn').length,cur};
@@ -909,7 +910,7 @@ function renderCharts(){
    ${charts}
    ${targetHistory(a)}
    <div class="panel"><h3 style="margin-bottom:8px">Recent results</h3><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Level</th><th>Value</th><th>SD from mean</th><th>Status</th><th>Comment</th><th>Entered by</th><th>Entered</th></tr></thead><tbody>
-   ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${levelName(r.lv)}</td><td class="mono">${fmt(r.value,dp+1)}</td><td class="mono">${zOf(a,r).toFixed(2)}</td><td>${chipFor(r,flags)}</td><td class="small">${r.ov?esc(r.ov.comment):''}</td><td>${esc(r.byName||'–')}</td><td class="small">${r.at?fmtTs(r.at):'–'}${r.upd?'<br>edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at)+(r.upd.reason?'<br><i>Reason: '+esc(r.upd.reason)+'</i>':''):''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</tbody></table></div></div></div>`;
+   ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${levelName(r.lv)}</td><td class="mono">${fmt(r.value,dp+1)}</td><td class="mono">${zOf(a,r).toFixed(2)}</td><td>${chipFor(r,flags)}</td><td class="small">${r.ov?esc(r.ov.comment):''}${ptNotes(r).length?`<div class="muted">${ptNotes(r).length} comment${ptNotes(r).length>1?'s':''}: ${esc(ptNotes(r)[ptNotes(r).length-1].text.slice(0,60))}${ptNotes(r)[ptNotes(r).length-1].text.length>60?'…':''}</div>`:''}</td><td>${esc(r.byName||'–')}</td><td class="small">${r.at?fmtTs(r.at):'–'}${r.upd?'<br>edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at)+(r.upd.reason?'<br><i>Reason: '+esc(r.upd.reason)+'</i>':''):''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</tbody></table></div></div></div>`;
 }
 /* ===== Lot change modal ===== */
 const CHG=['New control lot','New reagent lot','New calibrator lot','After recalibration','Corrected target values','Other'];
@@ -919,6 +920,7 @@ function renderModal(){
   if(m.tedit!==undefined)return renderTargetEditModal();
   if(m.exp)return renderExpModal();
   if(m.sgrep)return renderSgModal();
+  if(m.ptn)return renderPtModal();
   if(m.add)return renderAddModal();
   if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
@@ -1987,7 +1989,7 @@ function mergeStates(L,R){
   out.analytes=by(L.analytes,R.analytes,(a,b)=>newerMod(a,b)||(b.targets.length>a.targets.length?b:a));
   const ok=new Set(out.analytes.map(a=>a.id));
   const rst=r=>[r.at,(r.upd||{}).at,r.ov&&r.ov.at,r.ovAt].filter(Boolean).sort().pop()||'';
-  out.results=by(L.results,R.results,(a,b)=>rst(b)>rst(a)?b:a).filter(r=>ok.has(r.aid));
+  out.results=by(L.results,R.results,(a,b)=>{const w=rst(b)>rst(a)?b:a;return (a.notes||b.notes)?{...w,notes:mergeNotes(a.notes,b.notes),noteAt:[a.noteAt,b.noteAt].filter(Boolean).sort().pop()}:w}).filter(r=>ok.has(r.aid));
   const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
@@ -2314,17 +2316,22 @@ const SGCLS=[
 const sgClass=s=>s==null||!isFinite(s)?null:SGCLS.find(c=>s>=c.min);
 const sgSet=a=>Object.assign({tea:'',mode:'pct',abs:'',src:'',clia:'',bias:'',bsrc:'entered',ub:'',k:2},a.sigma||{});
 const sgTeaTxt=(set,u)=>set.tea===''||set.tea==null?'not set':set.mode==='abs'?set.tea+' '+(u||'units'):set.mode==='both'?set.tea+' % or '+(set.abs===''?'?':set.abs)+' '+(u||'units')+' (whichever is greater)':set.tea+' %';
-const sgState=()=>UI.sg||(UI.sg={dept:'',panel:'',sort:'high',win:'era',excl:false,open:{},draft:{}});
-const SGWIN={era:'Since the current target started',90:'Last 90 days',180:'Last 180 days',365:'Last 365 days'};
+const sgState=()=>UI.sg||(UI.sg={dept:'',panel:'',sort:'high',win:'era',from:'',to:'',excl:false,open:{},draft:{}});
+const SGWIN={era:'Since the current target started',90:'Last 90 days',180:'Last 180 days',365:'Last 365 days',range:'Specific start date or date range…'};
+function sgWinTxt(win){
+  if(win!=='range')return SGWIN[win]||SGWIN.era;
+  const s=sgState(),f=s.from,t=s.to;
+  return (f&&t?'Specific period '+fmtDate(f)+' to '+fmtDate(t):f?'From '+fmtDate(f)+' to today':t?'Up to '+fmtDate(t):'All results')+' (results under the targets in force on '+(t?fmtDate(t):'the last day')+')';
+}
 const sgf=(v,d)=>v==null||!isFinite(v)?'–':(+v).toFixed(d==null?2:d);
 
 function sgCalc(a,win,excl){
   const set=sgSet(a),tea=num(set.tea),ub=num(set.ub)||0,k=num(set.k)||2,bias0=num(set.bias),today=todayStr();
-  const cut=!win||win==='era'?'':dstr(new Date(Date.now()-(+win)*864e5)),T=curTarget(a),levels=[];
+  const rg=win==='range'?sgState():null,cut=rg?(rg.from||''):!win||win==='era'?'':dstr(new Date(Date.now()-(+win)*864e5)),cutTo=rg?(rg.to||''):'',asOf=rg&&cutTo&&cutTo<today?cutTo:today,T=rg?targetFor(a,asOf):curTarget(a),levels=[];
   for(let lv=0;lv<a.nlev;lv++){
     const t=T.levels[lv];if(!t)continue;
-    const era=lvEra(a,lv,today);
-    let rs=S.results.filter(r=>r.aid===a.id&&r.lv===lv&&r.value!=null&&isFinite(r.value)&&lvEra(a,lv,r.date)===era&&(!cut||r.date>=cut));
+    const era=lvEra(a,lv,asOf);
+    let rs=S.results.filter(r=>r.aid===a.id&&r.lv===lv&&r.value!=null&&isFinite(r.value)&&lvEra(a,lv,r.date)===era&&(!cut||r.date>=cut)&&(!cutTo||r.date<=cutTo));
     if(excl&&t.sd>0)rs=rs.filter(r=>Math.abs((r.value-t.mean)/t.sd)<=3);
     const n=rs.length;let mo=null,so=null;
     if(n){mo=rs.reduce((s,r)=>s+r.value,0)/n;so=n>1?Math.sqrt(rs.reduce((s,r)=>s+(r.value-mo)*(r.value-mo),0)/(n-1)):null}
@@ -2406,7 +2413,7 @@ function renderSigma(){
    <div class="row" style="align-items:flex-end;gap:10px">
     ${ds.length>1?`<label class="f" style="flex:0 1 200px">Department<select data-sgsel="dept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${s.dept===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>`:''}
     <label class="f" style="flex:0 1 200px">Panel<select data-sgsel="panel"><option value="">All panels</option>${panels.map(p=>`<option${s.panel===p?' selected':''}>${esc(p)}</option>`).join('')}</select></label>
-    <label class="f" style="flex:0 1 230px">QC values used for CV<select data-sgsel="win">${Object.entries(SGWIN).map(([k,v])=>`<option value="${k}"${String(s.win)===k?' selected':''}>${v}</option>`).join('')}</select></label>
+    <label class="f" style="flex:0 1 230px">QC values used for CV<select data-sgsel="win">${Object.entries(SGWIN).map(([k,v])=>`<option value="${k}"${String(s.win)===k?' selected':''}>${v}</option>`).join('')}</select></label>${s.win==='range'?`<label class="f">From<input type="date" data-sgsel="from" value="${esc(s.from||'')}" max="${esc(s.to||todayStr())}" style="width:auto"></label><label class="f">To (blank = today)<input type="date" data-sgsel="to" value="${esc(s.to||'')}" min="${esc(s.from||'')}" max="${todayStr()}" style="width:auto"></label><div class="row" style="gap:6px;align-items:flex-end">${[['pm','Last month'],['pq','Last quarter'],['ytd','Year to date']].map(([k,t])=>`<button class="btn sm" data-act="sgrange" data-k="${k}">${t}</button>`).join('')}</div>`:''}
     <label class="f" style="flex:0 1 230px">Order<select data-sgsel="sort"><option value="low"${s.sort==='low'?' selected':''}>Least room for error first</option><option value="high"${s.sort==='high'?' selected':''}>Most room for error first</option><option value="name"${s.sort==='name'?' selected':''}>Name</option></select></label>
     <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:400;padding-bottom:9px"><input type="checkbox" data-sgsel="excl"${s.excl?' checked':''}>Leave out values beyond 3 SD</label></div>
    ${tiles}</div>`;
@@ -2441,7 +2448,7 @@ function renderSigma(){
 function sgReport(r){
   const a=r.a,d=deptOfA(a),set=r.set,u=a.unit||'';
   const meta=[['Laboratory',S.setup.lab||''],['Department',(d.dept||'')+dsub(d.sub)],['Analyser',instLabel(a)],['Panel',a.panel||''],['Analyte',a.name+(u?' ('+u+')':'')],
-    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',SGWIN[r.win]+(r.excl?'; values beyond 3 SD left out':'')]];
+    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',sgWinTxt(r.win)+(r.excl?'; values beyond 3 SD left out':'')]];
   const settings=[['Total allowable error (TEa)',sgTeaTxt(set,u)+(set.mode==='abs'||set.mode==='both'?' (converted to % at each level\'s target mean)':'')],['Source of TEa',set.src||'Set by the laboratory'],
     ['Bias',set.bsrc==='qc'?'From QC data: observed mean against target mean':(set.bias===''?'not entered (treated as 0)':set.bias+' % (entered)')],
     ['Uncertainty of bias, u(bias)',(num(set.ub)||0)+' %'],['Coverage factor, k',sgf(r.k,0)+(r.k===2?' (about 95% confidence)':'')]];
@@ -2557,7 +2564,7 @@ function sgPdfSummary(pdf,rows){
   const W=pdf.W,M=pdf.M;
   pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Sigma metrics summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
   pdf.para((S.setup.lab||'')+(sgLabel?'   Department: '+sgLabel:'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
-  const s=sgState();pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. Sigma = (TEa % - |Bias %|) / CV %.',{size:8.5,color:'#566a73'});
+  const s=sgState();pdf.para('QC values used for CV: '+sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')+'. Sigma = (TEa % - |Bias %|) / CV %.',{size:8.5,color:'#566a73'});
   pdf.table([{h:'Analyte',w:100},{h:'Panel',w:90},{h:'TEa',w:44,align:'right'},{h:'Lowest sigma',w:56,align:'right'},{h:'Class',w:74},{h:'Error used',w:56,align:'right'},{h:'CV % (worst level)',w:95,align:'right'}],
    rows.map(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null);return [r.a.name,r.a.panel||'',r.set.tea===''?'-':sgTeaTxt(r.set,r.a.unit||'').replace(' (whichever is greater)',' (greater)'),{t:sgf(r.worst,1),bold:true},{t:r.cls?r.cls.name:'Not scored',fill:r.cls?sgMix(r.cls.col):null},used.length?sgf(Math.max(...used),0)+'%':'-',cvs.length?sgf(Math.max(...cvs)):'-']}));
 }
@@ -2582,7 +2589,7 @@ async function sgExportXlsx(list,label){sgLabel=label||'';
   const argb=h=>'FF'+h.replace('#','').toUpperCase(),light=h=>{h=h.replace('#','');const m=i=>Math.round(parseInt(h.substr(i,2),16)*0.35+255*0.65).toString(16).padStart(2,'0');return 'FF'+(m(0)+m(2)+m(4)).toUpperCase()};
   if(rows.length>1){
     const ws=wb.addWorksheet('Summary');ws.addRow(['Sigma metrics summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
-    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     const h=ws.addRow(['Analyte','Panel','Department','TEa','TEa given as','Lowest sigma','Class','Highest % of TEa used','Highest CV %']);h.eachCell(hdr);
     rows.forEach(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null),d=deptOfA(r.a);
       const row=ws.addRow([r.a.name,r.a.panel||'',(d.dept||'')+dsub(d.sub),r.set.tea===''||r.set.mode==='both'?'':+r.set.tea,r.set.tea===''?'':r.set.mode==='both'?sgTeaTxt(r.set,r.a.unit):r.set.mode==='abs'?(r.a.unit||'units'):'%',r.worst==null?'':+r.worst.toFixed(2),r.cls?r.cls.name:'Not scored',used.length?+(Math.max(...used)/100).toFixed(4):'',cvs.length?+Math.max(...cvs).toFixed(3):'']);
@@ -2637,6 +2644,9 @@ function sgAct(act,el){
   if(!perm('v_sigma'))return true;
   switch(act){
    case 'sgtoggle':s.open[id]=!s.open[id];render();return true;
+   case 'sgrange':{const k=el.dataset.k,now=new Date(),y=now.getFullYear(),m=now.getMonth();let f,t;
+     if(k==='pm'){f=new Date(y,m-1,1);t=new Date(y,m,0)}else if(k==='pq'){const q=Math.floor(m/3);f=new Date(y,(q-1)*3,1);t=new Date(y,q*3,0)}else{f=new Date(y,0,1);t=now}
+     s.from=dstr(f);s.to=dstr(t)>todayStr()?todayStr():dstr(t);render();return true}
    case 'sgclia':{
      if(!perm('e_sigma')){toast('Your access level does not include this. Ask an administrator.');return true}
      const a=anOf(id),m=cliaFor(a);if(!a||!canSeeD(a.dept)||!m||!m.usable)return true;
@@ -2708,7 +2718,7 @@ function sgCaptureDrafts(){const s=sgState();document.querySelectorAll('[data-sg
 function muReport(r){
   const a=r.a,d=deptOfA(a),set=r.set,u=a.unit||'';
   const meta=[['Laboratory',S.setup.lab||''],['Department',(d.dept||'')+dsub(d.sub)],['Analyser',instLabel(a)],['Panel',a.panel||''],['Analyte',a.name+(u?' ('+u+')':'')],
-    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',SGWIN[r.win]+(r.excl?'; values beyond 3 SD left out':'')]];
+    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',sgWinTxt(r.win)+(r.excl?'; values beyond 3 SD left out':'')]];
   const ub=num(set.ub)||0;
   const settings=[['Imprecision, u(Rw)','The CV of the laboratory\'s own QC values over the period, when a level has '+SG_MINN+' or more. Otherwise the CV from the target SD and mean.'],
     ['Uncertainty of bias, u(bias)',ub+' %'+(ub?'':' (not entered, so the uncertainty reflects imprecision only)')],['Coverage factor, k',sgf(r.k,0)+(r.k===2?' (about 95% confidence)':'')]];
@@ -2754,7 +2764,7 @@ function muPdfSummary(pdf,reps){
   const W=pdf.W,M=pdf.M,f=sgf,s=sgState();
   pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Measurement uncertainty summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
   pdf.para((S.setup.lab||'')+(sgLabel?'   Department: '+sgLabel:'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
-  pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. U = k x sqrt(CV^2 + u(bias)^2). Levels with fewer than '+SG_MINN+' QC values use the target CV.',{size:8.5,color:'#566a73'});
+  pdf.para('QC values used for CV: '+sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')+'. U = k x sqrt(CV^2 + u(bias)^2). Levels with fewer than '+SG_MINN+' QC values use the target CV.',{size:8.5,color:'#566a73'});
   const rows=[];reps.forEach(rep=>rep.levels.forEach((l,i)=>{if(l.U!=null)rows.push([i?'':rep.r.a.name+(rep.r.a.unit?' ('+rep.r.a.unit+')':''),l.name,f(l.tmean,3),f(l.cv)+(l.src==='target'?' (target)':''),f(l.ub),{t:f(l.U),bold:true},f(l.k,0),{t:f(l.Uabs,3),bold:true}])}));
   pdf.table([{h:'Analyte',w:130},{h:'Level',w:50},{h:'Target mean',w:62,align:'right'},{h:'CV %',w:62,align:'right'},{h:'u(bias) %',w:50,align:'right'},{h:'U %',w:46,align:'right'},{h:'k',w:24,align:'right'},{h:'U (units)',w:60,align:'right'}],rows);
 }
@@ -2771,7 +2781,7 @@ async function muExportXlsx(list,label){sgLabel=label||'';
   const hdr=c=>{c.font={bold:true,color:{argb:'FF0D3B6E'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE3F2EF'}};c.alignment={wrapText:true,vertical:'middle'}};
   if(reps.length>1){
     const ws=wb.addWorksheet('Summary');ws.addRow(['Measurement uncertainty summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
-    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     ws.addRow(['Analyte','Unit','Level','Target mean','CV %','CV source','u(bias) %','k','U %','U (units)','Lower','Upper']).eachCell(hdr);
     reps.forEach(rep=>rep.levels.forEach(l=>{if(l.U==null)return;const rn=ws.rowCount+1;
       const row=ws.addRow([rep.r.a.name,rep.r.a.unit||'',l.name,l.tmean,+l.cv.toFixed(4),l.src,l.ub,l.k,'','','','']);
@@ -3204,6 +3214,56 @@ function evAct(act,el){
   if(act==='evdelok'){const o=(S.events||[]).find(x=>x.id===id);UI.evdel=null;if(o){tomb(id);S.events=S.events.filter(x=>x.id!==id);audit('Log entry deleted',evT(o.type)[1]+' '+fmtDate(o.date)+' · '+evScope(o),null,[o.dept]);save();toast('Deleted from the log.')}render();return true}
   return false;
 }
+/* p17: comments on chart points (click a point on a Levey-Jennings chart) */
+const ptNotes=r=>(r&&r.notes||[]).filter(n=>!n.del);
+function mergeNotes(a,b){
+  const m=new Map();[...(a||[]),...(b||[])].forEach(n=>{const o=m.get(n.id);m.set(n.id,o?(o.del||n.del?{...o,...n,del:o.del||n.del}:o):n)});
+  return [...m.values()].sort((x,y)=>(x.at||'')<(y.at||'')?-1:1);
+}
+function ptMark(x,y,n){   /* small speech bubble with the number of comments, drawn beside a point */
+  return `<g pointer-events="none"><path d="M${x+4},${y-19}h13a3,3 0 0 1 3,3v7a3,3 0 0 1 -3,3h-8l-4,4v-4h-1a3,3 0 0 1 -3,-3v-7a3,3 0 0 1 3,-3z" fill="#2f7fc4" stroke="#fff" stroke-width="1"/><text x="${x+11.5}" y="${y-11}" text-anchor="middle" style="fill:#fff;font-size:9px;font-weight:700">${n}</text></g>`;
+}
+function ptNotesHtml(r){
+  const l=ptNotes(r);if(!l.length)return '';
+  return `<div class="small" style="margin-top:6px"><b>Comments (${l.length}):</b>${l.slice(-3).map(n=>`<div class="muted">${esc(n.text)} <span style="opacity:.8">(${esc(n.byName||'')} · ${fmtTs(n.at)})</span></div>`).join('')}${l.length>3?`<div class="muted">and ${l.length-3} earlier. Click the point on the chart to read all.</div>`:''}</div>`;
+}
+function renderPtModal(){
+  const r=S.results.find(x=>x.id===UI.modal.ptn),a=r&&anOf(r.aid);
+  if(!r||!a||!canSee(a)){UI.modal=null;return ''}
+  const flags=allFlags(),f=flags[r.id]||[],z=zOf(a,r),t=targetFor(a,r.date).levels[r.lv],dp=decs(a),notes=ptNotes(r),can=perm('e_override');
+  const near=evNear(a,dAdd(r.date,-7),r.date);
+  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Comments on a QC point" data-stop>
+   <h2>${esc(a.name)} · ${levelName(r.lv)}</h2>
+   <p class="muted" style="margin:4px 0 8px">${fmtDate(r.date)} · <span class="mono">${fmt(r.value,dp+1)} ${esc(a.unit)}</span> (${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp+1)})</p>
+   <div class="row" style="gap:6px;margin-bottom:6px">${chipFor(r,flags)}</div>
+   <div class="small muted">${byLine(r)}</div>
+   ${r.ov?`<div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--surface2);border-radius:4px"><b>${f.some(x=>x.sev==='reject')?'Resolution comment':'Override note'}:</b> ${esc(r.ov.comment||'')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>`:''}
+   ${near}
+   <h3 style="margin:14px 0 6px">Comments${notes.length?' ('+notes.length+')':''}</h3>
+   ${notes.length?notes.map(n=>`<div class="panelcard" style="margin-bottom:6px"><div style="white-space:pre-wrap">${esc(n.text)}</div><div class="small muted" style="margin-top:4px">${esc(n.byName||'')} · ${fmtTs(n.at)}${n.by&&CU&&(n.by===CU.id||isAdmin())?` · <button class="btn sm" type="button" data-act="ptnotedel" data-id="${r.id}" data-n="${n.id}">Delete</button>`:''}</div></div>`).join(''):'<p class="small muted" style="margin:0 0 6px">No comments on this point yet.</p>'}
+   ${can?`<label class="f">Add a comment<textarea id="pt-text" rows="3" maxlength="500" placeholder="e.g. New vial opened before this run. Repeat is in control."></textarea></label>
+   <p id="pt-err" class="small" style="color:var(--bad);margin:6px 0 0" hidden></p>`:'<p class="small muted">Your access level can read comments but not add them.</p>'}
+   <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-act="mclose">Close</button>${can?`<button class="btn primary" data-act="ptnoteadd" data-id="${r.id}">Add comment</button>`:''}</div>
+  </div></div>`;
+}
+function ptAct(act,el){
+  const id=el.dataset.id;
+  if(act==='ptnote'){const r=S.results.find(x=>x.id===id);if(r){UI.modal={ptn:id};render()}return true}
+  const r=S.results.find(x=>x.id===id);if(!r)return true;
+  if(act==='ptnoteadd'){
+    if(!perm('e_override'))return true;
+    const box=document.getElementById('pt-text'),txt=(box&&box.value||'').trim();
+    if(!txt){const e=document.getElementById('pt-err');if(e){e.textContent='Write a comment first.';e.hidden=false}return true}
+    const a=anOf(r.aid),now=nowIso();
+    (r.notes=r.notes||[]).push({id:uid(),text:txt,by:CU?CU.id:null,byName:CU?CU.name:'',at:now});r.noteAt=now;
+    audit('Point comment added',(a?a.name:'')+' '+levelName(r.lv)+' '+fmtDate(r.date)+' value '+r.value+': '+(txt.length>120?txt.slice(0,120)+'…':txt),null,a?[a.dept]:[]);
+    save();toast('Comment added.');render();return true}
+  if(act==='ptnotedel'){
+    const n=(r.notes||[]).find(x=>x.id===el.dataset.n);if(!n||!CU||!(n.by===CU.id||isAdmin()))return true;
+    n.del={by:CU.id,at:nowIso()};r.noteAt=nowIso();const a=anOf(r.aid);
+    audit('Point comment deleted',(a?a.name:'')+' '+levelName(r.lv)+' '+fmtDate(r.date),null,a?[a.dept]:[]);save();render();return true}
+  return false;
+}
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
@@ -3269,7 +3329,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);

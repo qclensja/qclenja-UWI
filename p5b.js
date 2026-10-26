@@ -43,7 +43,8 @@ function ljSVG(a,lv,flags,n,forExport){
     if(!forExport){
       const f=(flags[r.id]||[]).map(q=>RULES[q.rule].name).join(', ');
       const tip=`<b>${fmtDate(r.date)}</b><br>${fmt(r.value,dp+1)} ${esc(a.unit)} (${zs[i]>=0?'+':''}${zs[i].toFixed(2)} SD)${f?'<br>'+f:''}${r.ov?'<br>Override: '+esc(r.ov.comment)+(r.ov.byName?' ('+esc(r.ov.byName)+')':''):''}<br>${byLine(r)}`;
-      s+=`<circle class="hit" cx="${x}" cy="${y}" r="13" fill="transparent" data-tip="${esc(tip)}"/>`;
+      const nn=ptNotes(r).length;if(nn)s+=ptMark(x,y,nn);
+      s+=`<circle class="hit" cx="${x}" cy="${y}" r="13" fill="transparent" style="cursor:pointer" data-act="ptnote" data-id="${r.id}" data-tip="${esc(tip+(nn?'<br>'+nn+' comment'+(nn>1?'s':''):'')+'<br><i>Click to read or add comments</i>')}"/>`;
     }
   });
   return {svg:s+'</svg>',count:win.length,flagged:stat.filter(x=>x==='rej').length,warn:stat.filter(x=>x==='warn').length,cur};
@@ -81,7 +82,7 @@ function renderCharts(){
    ${charts}
    ${targetHistory(a)}
    <div class="panel"><h3 style="margin-bottom:8px">Recent results</h3><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Level</th><th>Value</th><th>SD from mean</th><th>Status</th><th>Comment</th><th>Entered by</th><th>Entered</th></tr></thead><tbody>
-   ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${levelName(r.lv)}</td><td class="mono">${fmt(r.value,dp+1)}</td><td class="mono">${zOf(a,r).toFixed(2)}</td><td>${chipFor(r,flags)}</td><td class="small">${r.ov?esc(r.ov.comment):''}</td><td>${esc(r.byName||'–')}</td><td class="small">${r.at?fmtTs(r.at):'–'}${r.upd?'<br>edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at)+(r.upd.reason?'<br><i>Reason: '+esc(r.upd.reason)+'</i>':''):''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</tbody></table></div></div></div>`;
+   ${rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td>${levelName(r.lv)}</td><td class="mono">${fmt(r.value,dp+1)}</td><td class="mono">${zOf(a,r).toFixed(2)}</td><td>${chipFor(r,flags)}</td><td class="small">${r.ov?esc(r.ov.comment):''}${ptNotes(r).length?`<div class="muted">${ptNotes(r).length} comment${ptNotes(r).length>1?'s':''}: ${esc(ptNotes(r)[ptNotes(r).length-1].text.slice(0,60))}${ptNotes(r)[ptNotes(r).length-1].text.length>60?'…':''}</div>`:''}</td><td>${esc(r.byName||'–')}</td><td class="small">${r.at?fmtTs(r.at):'–'}${r.upd?'<br>edited by '+esc(r.upd.byName)+' · '+fmtTs(r.upd.at)+(r.upd.reason?'<br><i>Reason: '+esc(r.upd.reason)+'</i>':''):''}</td></tr>`).join('')||'<tr><td colspan="8" class="muted">No results yet.</td></tr>'}</tbody></table></div></div></div>`;
 }
 /* ===== Lot change modal ===== */
 const CHG=['New control lot','New reagent lot','New calibrator lot','After recalibration','Corrected target values','Other'];
@@ -91,6 +92,7 @@ function renderModal(){
   if(m.tedit!==undefined)return renderTargetEditModal();
   if(m.exp)return renderExpModal();
   if(m.sgrep)return renderSgModal();
+  if(m.ptn)return renderPtModal();
   if(m.add)return renderAddModal();
   if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>

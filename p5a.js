@@ -34,7 +34,7 @@ function alertCard(r,flags,full){
    <span class="mono">${fmt(r.value,dp)} ${esc(a.unit)}</span> <span class="muted small">(${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp)})</span><br><span class="small muted">${byLine(r)}</span></div>
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <ul>${f.map(x=>`<li><b>${RULES[x.rule].name}:</b> ${RULES[x.rule].desc}</li>`).join('')}</ul>
-   ${evNear(a,dAdd(r.date,-7),r.date)}
+   ${evNear(a,dAdd(r.date,-7),r.date)}${ptNotesHtml(r)}
    <details${full?' open':''} style="margin-top:8px"><summary><b>Suggested actions</b></summary><ul>${fixes.map(x=>`<li>${x}</li>`).join('')}</ul></details>
    ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> ${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button>`:''}</p>`
    :!perm('e_override')?`<p class="small muted" style="margin:8px 0 0">${isAdmin()?'':'Your access level can view this alert but not resolve it.'}</p>`
@@ -102,7 +102,7 @@ function resolvedCard(r,flags){
   return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px"><div><b>${esc(a.name)}</b> · ${levelName(r.lv)} · ${fmtDate(r.date)}${instTag(a)}<br>
    <span class="mono">${fmt(r.value,dp)} ${esc(a.unit)}</span> <span class="muted small">(${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp)})</span><br><span class="small muted">Entered: ${byLine(r)}</span></div>
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
-   <div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
+   ${ptNotesHtml(r)}<div class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--${rej?'good':'line'});background:var(--surface2);border-radius:4px"><b>${rej?'Resolution comment':'Note'}:</b> ${esc(r.ov.comment||'No comment')}<div class="muted">${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)}</div></div>
    ${edits.length?`<div class="small" style="margin-top:6px"><b>Edit comments:</b>${edits.map(h=>`<div class="muted">${esc(h.reason)} (changed from ${fmt(h.value,dp)}${h.byName?' · '+esc(h.byName):''}${h.at?' · '+fmtTs(h.at):''})</div>`).join('')}</div>`:''}
    <div class="row" style="margin-top:6px">${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button>`:''}</div></div>`;
 }

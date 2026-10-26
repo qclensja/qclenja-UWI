@@ -9,17 +9,22 @@ const SGCLS=[
 const sgClass=s=>s==null||!isFinite(s)?null:SGCLS.find(c=>s>=c.min);
 const sgSet=a=>Object.assign({tea:'',mode:'pct',abs:'',src:'',clia:'',bias:'',bsrc:'entered',ub:'',k:2},a.sigma||{});
 const sgTeaTxt=(set,u)=>set.tea===''||set.tea==null?'not set':set.mode==='abs'?set.tea+' '+(u||'units'):set.mode==='both'?set.tea+' % or '+(set.abs===''?'?':set.abs)+' '+(u||'units')+' (whichever is greater)':set.tea+' %';
-const sgState=()=>UI.sg||(UI.sg={dept:'',panel:'',sort:'high',win:'era',excl:false,open:{},draft:{}});
-const SGWIN={era:'Since the current target started',90:'Last 90 days',180:'Last 180 days',365:'Last 365 days'};
+const sgState=()=>UI.sg||(UI.sg={dept:'',panel:'',sort:'high',win:'era',from:'',to:'',excl:false,open:{},draft:{}});
+const SGWIN={era:'Since the current target started',90:'Last 90 days',180:'Last 180 days',365:'Last 365 days',range:'Specific start date or date range…'};
+function sgWinTxt(win){
+  if(win!=='range')return SGWIN[win]||SGWIN.era;
+  const s=sgState(),f=s.from,t=s.to;
+  return (f&&t?'Specific period '+fmtDate(f)+' to '+fmtDate(t):f?'From '+fmtDate(f)+' to today':t?'Up to '+fmtDate(t):'All results')+' (results under the targets in force on '+(t?fmtDate(t):'the last day')+')';
+}
 const sgf=(v,d)=>v==null||!isFinite(v)?'–':(+v).toFixed(d==null?2:d);
 
 function sgCalc(a,win,excl){
   const set=sgSet(a),tea=num(set.tea),ub=num(set.ub)||0,k=num(set.k)||2,bias0=num(set.bias),today=todayStr();
-  const cut=!win||win==='era'?'':dstr(new Date(Date.now()-(+win)*864e5)),T=curTarget(a),levels=[];
+  const rg=win==='range'?sgState():null,cut=rg?(rg.from||''):!win||win==='era'?'':dstr(new Date(Date.now()-(+win)*864e5)),cutTo=rg?(rg.to||''):'',asOf=rg&&cutTo&&cutTo<today?cutTo:today,T=rg?targetFor(a,asOf):curTarget(a),levels=[];
   for(let lv=0;lv<a.nlev;lv++){
     const t=T.levels[lv];if(!t)continue;
-    const era=lvEra(a,lv,today);
-    let rs=S.results.filter(r=>r.aid===a.id&&r.lv===lv&&r.value!=null&&isFinite(r.value)&&lvEra(a,lv,r.date)===era&&(!cut||r.date>=cut));
+    const era=lvEra(a,lv,asOf);
+    let rs=S.results.filter(r=>r.aid===a.id&&r.lv===lv&&r.value!=null&&isFinite(r.value)&&lvEra(a,lv,r.date)===era&&(!cut||r.date>=cut)&&(!cutTo||r.date<=cutTo));
     if(excl&&t.sd>0)rs=rs.filter(r=>Math.abs((r.value-t.mean)/t.sd)<=3);
     const n=rs.length;let mo=null,so=null;
     if(n){mo=rs.reduce((s,r)=>s+r.value,0)/n;so=n>1?Math.sqrt(rs.reduce((s,r)=>s+(r.value-mo)*(r.value-mo),0)/(n-1)):null}
@@ -101,7 +106,7 @@ function renderSigma(){
    <div class="row" style="align-items:flex-end;gap:10px">
     ${ds.length>1?`<label class="f" style="flex:0 1 200px">Department<select data-sgsel="dept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${s.dept===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>`:''}
     <label class="f" style="flex:0 1 200px">Panel<select data-sgsel="panel"><option value="">All panels</option>${panels.map(p=>`<option${s.panel===p?' selected':''}>${esc(p)}</option>`).join('')}</select></label>
-    <label class="f" style="flex:0 1 230px">QC values used for CV<select data-sgsel="win">${Object.entries(SGWIN).map(([k,v])=>`<option value="${k}"${String(s.win)===k?' selected':''}>${v}</option>`).join('')}</select></label>
+    <label class="f" style="flex:0 1 230px">QC values used for CV<select data-sgsel="win">${Object.entries(SGWIN).map(([k,v])=>`<option value="${k}"${String(s.win)===k?' selected':''}>${v}</option>`).join('')}</select></label>${s.win==='range'?`<label class="f">From<input type="date" data-sgsel="from" value="${esc(s.from||'')}" max="${esc(s.to||todayStr())}" style="width:auto"></label><label class="f">To (blank = today)<input type="date" data-sgsel="to" value="${esc(s.to||'')}" min="${esc(s.from||'')}" max="${todayStr()}" style="width:auto"></label><div class="row" style="gap:6px;align-items:flex-end">${[['pm','Last month'],['pq','Last quarter'],['ytd','Year to date']].map(([k,t])=>`<button class="btn sm" data-act="sgrange" data-k="${k}">${t}</button>`).join('')}</div>`:''}
     <label class="f" style="flex:0 1 230px">Order<select data-sgsel="sort"><option value="low"${s.sort==='low'?' selected':''}>Least room for error first</option><option value="high"${s.sort==='high'?' selected':''}>Most room for error first</option><option value="name"${s.sort==='name'?' selected':''}>Name</option></select></label>
     <label class="small" style="display:flex;gap:6px;align-items:center;font-weight:400;padding-bottom:9px"><input type="checkbox" data-sgsel="excl"${s.excl?' checked':''}>Leave out values beyond 3 SD</label></div>
    ${tiles}</div>`;
@@ -136,7 +141,7 @@ function renderSigma(){
 function sgReport(r){
   const a=r.a,d=deptOfA(a),set=r.set,u=a.unit||'';
   const meta=[['Laboratory',S.setup.lab||''],['Department',(d.dept||'')+dsub(d.sub)],['Analyser',instLabel(a)],['Panel',a.panel||''],['Analyte',a.name+(u?' ('+u+')':'')],
-    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',SGWIN[r.win]+(r.excl?'; values beyond 3 SD left out':'')]];
+    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',sgWinTxt(r.win)+(r.excl?'; values beyond 3 SD left out':'')]];
   const settings=[['Total allowable error (TEa)',sgTeaTxt(set,u)+(set.mode==='abs'||set.mode==='both'?' (converted to % at each level\'s target mean)':'')],['Source of TEa',set.src||'Set by the laboratory'],
     ['Bias',set.bsrc==='qc'?'From QC data: observed mean against target mean':(set.bias===''?'not entered (treated as 0)':set.bias+' % (entered)')],
     ['Uncertainty of bias, u(bias)',(num(set.ub)||0)+' %'],['Coverage factor, k',sgf(r.k,0)+(r.k===2?' (about 95% confidence)':'')]];
@@ -252,7 +257,7 @@ function sgPdfSummary(pdf,rows){
   const W=pdf.W,M=pdf.M;
   pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Sigma metrics summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
   pdf.para((S.setup.lab||'')+(sgLabel?'   Department: '+sgLabel:'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
-  const s=sgState();pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. Sigma = (TEa % - |Bias %|) / CV %.',{size:8.5,color:'#566a73'});
+  const s=sgState();pdf.para('QC values used for CV: '+sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')+'. Sigma = (TEa % - |Bias %|) / CV %.',{size:8.5,color:'#566a73'});
   pdf.table([{h:'Analyte',w:100},{h:'Panel',w:90},{h:'TEa',w:44,align:'right'},{h:'Lowest sigma',w:56,align:'right'},{h:'Class',w:74},{h:'Error used',w:56,align:'right'},{h:'CV % (worst level)',w:95,align:'right'}],
    rows.map(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null);return [r.a.name,r.a.panel||'',r.set.tea===''?'-':sgTeaTxt(r.set,r.a.unit||'').replace(' (whichever is greater)',' (greater)'),{t:sgf(r.worst,1),bold:true},{t:r.cls?r.cls.name:'Not scored',fill:r.cls?sgMix(r.cls.col):null},used.length?sgf(Math.max(...used),0)+'%':'-',cvs.length?sgf(Math.max(...cvs)):'-']}));
 }
@@ -277,7 +282,7 @@ async function sgExportXlsx(list,label){sgLabel=label||'';
   const argb=h=>'FF'+h.replace('#','').toUpperCase(),light=h=>{h=h.replace('#','');const m=i=>Math.round(parseInt(h.substr(i,2),16)*0.35+255*0.65).toString(16).padStart(2,'0');return 'FF'+(m(0)+m(2)+m(4)).toUpperCase()};
   if(rows.length>1){
     const ws=wb.addWorksheet('Summary');ws.addRow(['Sigma metrics summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
-    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     const h=ws.addRow(['Analyte','Panel','Department','TEa','TEa given as','Lowest sigma','Class','Highest % of TEa used','Highest CV %']);h.eachCell(hdr);
     rows.forEach(r=>{const used=r.levels.map(l=>l.used).filter(x=>x!=null),cvs=r.levels.map(l=>l.cv).filter(x=>x!=null),d=deptOfA(r.a);
       const row=ws.addRow([r.a.name,r.a.panel||'',(d.dept||'')+dsub(d.sub),r.set.tea===''||r.set.mode==='both'?'':+r.set.tea,r.set.tea===''?'':r.set.mode==='both'?sgTeaTxt(r.set,r.a.unit):r.set.mode==='abs'?(r.a.unit||'units'):'%',r.worst==null?'':+r.worst.toFixed(2),r.cls?r.cls.name:'Not scored',used.length?+(Math.max(...used)/100).toFixed(4):'',cvs.length?+Math.max(...cvs).toFixed(3):'']);
@@ -332,6 +337,9 @@ function sgAct(act,el){
   if(!perm('v_sigma'))return true;
   switch(act){
    case 'sgtoggle':s.open[id]=!s.open[id];render();return true;
+   case 'sgrange':{const k=el.dataset.k,now=new Date(),y=now.getFullYear(),m=now.getMonth();let f,t;
+     if(k==='pm'){f=new Date(y,m-1,1);t=new Date(y,m,0)}else if(k==='pq'){const q=Math.floor(m/3);f=new Date(y,(q-1)*3,1);t=new Date(y,q*3,0)}else{f=new Date(y,0,1);t=now}
+     s.from=dstr(f);s.to=dstr(t)>todayStr()?todayStr():dstr(t);render();return true}
    case 'sgclia':{
      if(!perm('e_sigma')){toast('Your access level does not include this. Ask an administrator.');return true}
      const a=anOf(id),m=cliaFor(a);if(!a||!canSeeD(a.dept)||!m||!m.usable)return true;
@@ -403,7 +411,7 @@ function sgCaptureDrafts(){const s=sgState();document.querySelectorAll('[data-sg
 function muReport(r){
   const a=r.a,d=deptOfA(a),set=r.set,u=a.unit||'';
   const meta=[['Laboratory',S.setup.lab||''],['Department',(d.dept||'')+dsub(d.sub)],['Analyser',instLabel(a)],['Panel',a.panel||''],['Analyte',a.name+(u?' ('+u+')':'')],
-    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',SGWIN[r.win]+(r.excl?'; values beyond 3 SD left out':'')]];
+    ['Report date',fmtDate(todayStr())],['Prepared by',CU?CU.name+' ('+roleName(CU.role)+')':''],['QC values used',sgWinTxt(r.win)+(r.excl?'; values beyond 3 SD left out':'')]];
   const ub=num(set.ub)||0;
   const settings=[['Imprecision, u(Rw)','The CV of the laboratory\'s own QC values over the period, when a level has '+SG_MINN+' or more. Otherwise the CV from the target SD and mean.'],
     ['Uncertainty of bias, u(bias)',ub+' %'+(ub?'':' (not entered, so the uncertainty reflects imprecision only)')],['Coverage factor, k',sgf(r.k,0)+(r.k===2?' (about 95% confidence)':'')]];
@@ -449,7 +457,7 @@ function muPdfSummary(pdf,reps){
   const W=pdf.W,M=pdf.M,f=sgf,s=sgState();
   pdf.rect(0,0,W,64,'#0d3b6e');pdf.text(M,30,'QCLens',{size:11,bold:true,color:'#b4e05a'});pdf.text(M,52,'Measurement uncertainty summary',{size:16,bold:true,color:'#ffffff'});pdf.y=80;
   pdf.para((S.setup.lab||'')+(sgLabel?'   Department: '+sgLabel:'')+'   Report date: '+fmtDate(todayStr())+'   Prepared by: '+(CU?CU.name:''),{size:9,color:'#566a73'});
-  pdf.para('QC values used for CV: '+SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')+'. U = k x sqrt(CV^2 + u(bias)^2). Levels with fewer than '+SG_MINN+' QC values use the target CV.',{size:8.5,color:'#566a73'});
+  pdf.para('QC values used for CV: '+sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')+'. U = k x sqrt(CV^2 + u(bias)^2). Levels with fewer than '+SG_MINN+' QC values use the target CV.',{size:8.5,color:'#566a73'});
   const rows=[];reps.forEach(rep=>rep.levels.forEach((l,i)=>{if(l.U!=null)rows.push([i?'':rep.r.a.name+(rep.r.a.unit?' ('+rep.r.a.unit+')':''),l.name,f(l.tmean,3),f(l.cv)+(l.src==='target'?' (target)':''),f(l.ub),{t:f(l.U),bold:true},f(l.k,0),{t:f(l.Uabs,3),bold:true}])}));
   pdf.table([{h:'Analyte',w:130},{h:'Level',w:50},{h:'Target mean',w:62,align:'right'},{h:'CV %',w:62,align:'right'},{h:'u(bias) %',w:50,align:'right'},{h:'U %',w:46,align:'right'},{h:'k',w:24,align:'right'},{h:'U (units)',w:60,align:'right'}],rows);
 }
@@ -466,7 +474,7 @@ async function muExportXlsx(list,label){sgLabel=label||'';
   const hdr=c=>{c.font={bold:true,color:{argb:'FF0D3B6E'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE3F2EF'}};c.alignment={wrapText:true,vertical:'middle'}};
   if(reps.length>1){
     const ws=wb.addWorksheet('Summary');ws.addRow(['Measurement uncertainty summary']).font={bold:true,size:14,color:{argb:'FF0D3B6E'}};
-    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',SGWIN[s.win]+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
+    ws.addRow([S.setup.lab||'','Report date',fmtDate(todayStr()),'Prepared by',CU?CU.name:'']);if(sgLabel)ws.addRow(['Department',sgLabel]);ws.addRow(['QC values used for CV',sgWinTxt(s.win)+(s.excl?'; values beyond 3 SD left out':'')]);ws.addRow([]);
     ws.addRow(['Analyte','Unit','Level','Target mean','CV %','CV source','u(bias) %','k','U %','U (units)','Lower','Upper']).eachCell(hdr);
     reps.forEach(rep=>rep.levels.forEach(l=>{if(l.U==null)return;const rn=ws.rowCount+1;
       const row=ws.addRow([rep.r.a.name,rep.r.a.unit||'',l.name,l.tmean,+l.cv.toFixed(4),l.src,l.ub,l.k,'','','','']);
