@@ -361,3 +361,12 @@ async function exportAudit(){
     await dl.save({filename:'QCLens-audit-log-'+todayStr()+'.xlsx',data:await wb.xlsx.writeBuffer()});toast('Audit log ready.');
   }catch(e){toast(e&&e.code==='declined'?'Save cancelled.':'Export failed.')}
 }
+
+/* ===== Administration tab: Users and Audit log as two sections ===== */
+function renderAdmin(){
+  const secs=[...(isAdmin()?[['users','Users']]:[]),...(canAudit()?[['audit','Audit log']]:[])];
+  if(!secs.length)return '';
+  if(!secs.some(x=>x[0]===UI.admSec))UI.admSec=secs[0][0];
+  const nav=secs.length>1?`<div class="row" role="tablist" aria-label="Administration sections" style="gap:6px;margin-bottom:12px">${secs.map(([k,n])=>`<button class="btn${UI.admSec===k?' primary':''}" role="tab" aria-selected="${UI.admSec===k}" data-act="admsec" data-s="${k}">${n}</button>`).join('')}</div>`:'';
+  return nav+(UI.admSec==='audit'?renderAudit():renderUsers());
+}
