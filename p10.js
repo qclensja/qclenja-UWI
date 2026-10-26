@@ -11,7 +11,7 @@ function obDates(o){
 function renderOther(){
   const o=obState(),yest=dstr(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()-1,12));
   if(o.to>yest)o.to=yest;if(o.from>o.to)o.from=o.to;
-  const all=VA();if(!all.length)return '<div class="panel empty">No analytes available.</div>';
+  const all=VAL();if(!all.length)return '<div class="panel empty">No active analytes available.</div>';
   if(o.mode==='day')return renderOtherDay(o,all,yest);
   const cf=x=>(!o.inst||instOf(x)===o.inst)&&(!o.mod||(x.mod||'')===o.mod);let L=all.filter(cf);if(!L.length){o.inst='';o.mod='';L=all}
   if(!L.some(x=>x.id===o.aid))o.aid=L[0].id;

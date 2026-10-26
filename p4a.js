@@ -173,6 +173,7 @@ const DA=()=>S.analytes.filter(a=>a.dept===S.setup.cur);
 const canSeeD=id=>!CU||CU.role==='admin'||!Array.isArray(CU.depts)||CU.depts.includes(id);
 const canSee=a=>canSeeD(a.dept);
 const VA=()=>S.analytes.filter(canSee);
+const VAL=()=>VA().filter(a=>!a.off);   /* visible and not disabled */
 const VR=()=>{const ok=new Set(VA().map(a=>a.id));return S.results.filter(r=>ok.has(r.aid))};
 const deptList=()=>{syncCtx();return(S.depts||[]).filter(d=>d.dept)};
 const visDepts=()=>deptList().filter(d=>canSeeD(d.id));

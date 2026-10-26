@@ -43,7 +43,7 @@ function alertCard(r,flags,full){
 }
 function unresolved(flags){return VR().filter(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1)}
 function expAlerts(){
-  const out=[];VA().forEach(a=>{const t=curTarget(a);t.levels.slice(0,a.nlev).forEach((l,i)=>{const e=expInfo(l.exp);if(l.expDis&&e.st==='expired')return;if(e.st==='expired'||e.st==='soon')out.push({a,i,l,e})})});
+  const out=[];VAL().forEach(a=>{const t=curTarget(a);t.levels.slice(0,a.nlev).forEach((l,i)=>{const e=expInfo(l.exp);if(l.expDis&&e.st==='expired')return;if(e.st==='expired'||e.st==='soon')out.push({a,i,l,e})})});
   return out.sort((x,y)=>x.e.days-y.e.days);
 }
 function expBanner(){
@@ -57,7 +57,7 @@ function missedDays(inF){
   const out=[],n=UI.missDays||14,t=new Date();
   for(let i=1;i<=n;i++){
     const d=dstr(new Date(t.getFullYear(),t.getMonth(),t.getDate()-i,12));
-    const miss=VA().filter(a=>inF(a)&&isDue(a,d)&&d>=(a.targets[0].from||'')&&!skipAt(a.id,d)&&!S.results.some(r=>r.aid===a.id&&r.date===d));
+    const miss=VAL().filter(a=>inF(a)&&isDue(a,d)&&d>=(a.targets[0].from||'')&&d>=(a.enFrom||'')&&!skipAt(a.id,d)&&!S.results.some(r=>r.aid===a.id&&r.date===d));
     if(miss.length)out.push({d,miss});
   }
   return out;
@@ -70,8 +70,8 @@ function missedPanel(inF){
 }
 function renderToday(){
   const dl=visDepts(),inF=a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)&&(!UI.mod||(a.mod||'')===UI.mod);
-  const modOpts=[...new Set(VA().filter(a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)).map(a=>a.mod).filter(Boolean))].sort(),anyMod=VA().some(a=>a.mod);
-  const flags=allFlags(),due=VA().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VA().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VA().filter(a=>inF(a)&&isOD(a));
+  const modOpts=[...new Set(VAL().filter(a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)).map(a=>a.mod).filter(Boolean))].sort(),anyMod=VAL().some(a=>a.mod);
+  const flags=allFlags(),due=VAL().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VAL().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VAL().filter(a=>inF(a)&&isOD(a));
   const un=unresolved(flags);
   const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()||anyMod?(instOf(a)||'No analyser')+(a.mod?' · '+a.mod:''):'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
     return Object.entries(gi).map(([k,l])=>`${k?`<div class="angh" style="padding:10px 12px 6px;margin:0">${esc(k)}</div>`:''}${UI.az?l.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true,sensitivity:'base'})).map(a=>dueRow(a,flags)).join(''):Object.entries(groupBy(l,a=>a.panel)).map(([p,pl])=>`<div class="small muted" style="${hd}">${esc(p)}</div>${pl.map(a=>dueRow(a,flags)).join('')}`).join('')}`).join('')};

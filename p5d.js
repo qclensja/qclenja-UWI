@@ -252,6 +252,8 @@ document.addEventListener('click',e=>{
    case 'aeditsave':if(saveEdit())return;break;
    case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);if(an)trashTests([id],'test',an.name,an.panel);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed. An administrator can restore it from Setup, Recently deleted.');break;
    case 'arcancel':UI.confirmDel=null;break;
+   case 'atoggle':{const a=anOf(id);if(!a||!perm('e_setup'))return;a.off=!a.off;if(a.off)a.offAt=nowIso();else{delete a.offAt;a.enFrom=todayStr()}audit(a.off?'Analyte disabled':'Analyte enabled',a.name+' ('+a.panel+')',null,[a.dept]);toast(a.off?a.name+' disabled. It is no longer asked for on Today. Its results are kept.':a.name+' enabled.');break}
+   case 'ptoggle':{if(!perm('e_setup'))return;const pn=el.dataset.p,l=DA().filter(a=>a.panel===pn);if(!l.length)break;const off=!l.every(a=>a.off);l.forEach(a=>{a.off=off;if(off)a.offAt=nowIso();else{delete a.offAt;a.enFrom=todayStr()}});audit(off?'Panel disabled':'Panel enabled',pn+' ('+l.length+' analytes)',null,[S.setup.cur]);toast(pn+(off?' disabled.':' enabled.'));break}
    case 'mnp':{const n=document.getElementById('mnewpanel').value.trim();if(!n)return toast('Give the panel a name.');
      if(panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('A panel with that name already exists.');
      st.cpanels.push({id:uid(),name:n,items:[]});toast('Panel created. Use Add analyte to put tests in it.');break}

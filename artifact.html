@@ -484,6 +484,7 @@ const DA=()=>S.analytes.filter(a=>a.dept===S.setup.cur);
 const canSeeD=id=>!CU||CU.role==='admin'||!Array.isArray(CU.depts)||CU.depts.includes(id);
 const canSee=a=>canSeeD(a.dept);
 const VA=()=>S.analytes.filter(canSee);
+const VAL=()=>VA().filter(a=>!a.off);   /* visible and not disabled */
 const VR=()=>{const ok=new Set(VA().map(a=>a.id));return S.results.filter(r=>ok.has(r.aid))};
 const deptList=()=>{syncCtx();return(S.depts||[]).filter(d=>d.dept)};
 const visDepts=()=>deptList().filter(d=>canSeeD(d.id));
@@ -717,7 +718,7 @@ function alertCard(r,flags,full){
 }
 function unresolved(flags){return VR().filter(r=>!r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1)}
 function expAlerts(){
-  const out=[];VA().forEach(a=>{const t=curTarget(a);t.levels.slice(0,a.nlev).forEach((l,i)=>{const e=expInfo(l.exp);if(l.expDis&&e.st==='expired')return;if(e.st==='expired'||e.st==='soon')out.push({a,i,l,e})})});
+  const out=[];VAL().forEach(a=>{const t=curTarget(a);t.levels.slice(0,a.nlev).forEach((l,i)=>{const e=expInfo(l.exp);if(l.expDis&&e.st==='expired')return;if(e.st==='expired'||e.st==='soon')out.push({a,i,l,e})})});
   return out.sort((x,y)=>x.e.days-y.e.days);
 }
 function expBanner(){
@@ -731,7 +732,7 @@ function missedDays(inF){
   const out=[],n=UI.missDays||14,t=new Date();
   for(let i=1;i<=n;i++){
     const d=dstr(new Date(t.getFullYear(),t.getMonth(),t.getDate()-i,12));
-    const miss=VA().filter(a=>inF(a)&&isDue(a,d)&&d>=(a.targets[0].from||'')&&!skipAt(a.id,d)&&!S.results.some(r=>r.aid===a.id&&r.date===d));
+    const miss=VAL().filter(a=>inF(a)&&isDue(a,d)&&d>=(a.targets[0].from||'')&&d>=(a.enFrom||'')&&!skipAt(a.id,d)&&!S.results.some(r=>r.aid===a.id&&r.date===d));
     if(miss.length)out.push({d,miss});
   }
   return out;
@@ -744,8 +745,8 @@ function missedPanel(inF){
 }
 function renderToday(){
   const dl=visDepts(),inF=a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)&&(!UI.mod||(a.mod||'')===UI.mod);
-  const modOpts=[...new Set(VA().filter(a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)).map(a=>a.mod).filter(Boolean))].sort(),anyMod=VA().some(a=>a.mod);
-  const flags=allFlags(),due=VA().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VA().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VA().filter(a=>inF(a)&&isOD(a));
+  const modOpts=[...new Set(VAL().filter(a=>(!UI.inst||instOf(a)===UI.inst)&&(!UI.dept||a.dept===UI.dept)).map(a=>a.mod).filter(Boolean))].sort(),anyMod=VAL().some(a=>a.mod);
+  const flags=allFlags(),due=VAL().filter(a=>inF(a)&&isDue(a,UI.date)),rest=VAL().filter(a=>inF(a)&&!isDue(a,UI.date)&&!isOD(a)),od=VAL().filter(a=>inF(a)&&isOD(a));
   const un=unresolved(flags);
   const byPanel=list=>{const gi=groupBy(list,a=>(dl.length>1?(deptOfA(a).dept||'')+' · ':'')+(multiInst()||anyMod?(instOf(a)||'No analyser')+(a.mod?' · '+a.mod:''):'')),hd='padding:10px 12px 0;font-weight:600;text-transform:uppercase;letter-spacing:.06em';
     return Object.entries(gi).map(([k,l])=>`${k?`<div class="angh" style="padding:10px 12px 6px;margin:0">${esc(k)}</div>`:''}${UI.az?l.slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true,sensitivity:'base'})).map(a=>dueRow(a,flags)).join(''):Object.entries(groupBy(l,a=>a.panel)).map(([p,pl])=>`<div class="small muted" style="${hd}">${esc(p)}</div>${pl.map(a=>dueRow(a,flags)).join('')}`).join('')}`).join('')};
@@ -891,7 +892,7 @@ function renderCharts(){
   const t=curTarget(a);
   const charts=Array.from({length:a.nlev},(_,lv)=>{
     const c=ljSVG(a,lv,flags,UI.win,false),l=t.levels[lv];
-    return `<div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(a.name)} · ${levelName(lv)}</h3>
+    return `<div class="panel"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(a.name)} · ${levelName(lv)}${a.off?' <span class="chip">Disabled</span>':''}</h3>
      <div class="small muted mono">Mean ${fmt(l.mean,dp+1)} · SD ${fmt(l.sd,dp+1)} · CV ${l.mean?(l.sd/l.mean*100).toFixed(1):'–'}% · ${esc(a.unit)}</div><div class="small muted">${esc(l.material||'No QC material')}${l.lot?' · Lot '+esc(l.lot):''} ${expChip(l.exp)}</div></div>
      <div>${c.flagged?`<span class="chip bad">${c.flagged} rejection${c.flagged>1?'s':''}</span>`:'<span class="chip good">No rejections</span>'} ${c.warn?`<span class="chip warn">${c.warn} warning${c.warn>1?'s':''}</span>`:''}</div></div>
      <div class="chartbox" style="margin-top:10px">${c.svg}</div>${UI.win==='r'?`<p class="small muted" style="margin:6px 0 0">${winPts(S.results.filter(r=>r.aid===a.id&&r.lv===lv),'r').length?'Showing results from '+fmtDate(UI.cfrom||'')+' to '+fmtDate(UI.cto||todayStr())+'.':'<b>No results in this date range.</b> Choose different dates.'}</p>`:''}
@@ -899,7 +900,7 @@ function renderCharts(){
      <div class="legend"><span><i style="background:var(--accent)"></i>In control</span><span><i style="background:var(--warn)"></i>1₂ₛ warning</span><span><i style="background:var(--bad)"></i>Rule violation</span><span><i style="background:var(--surface);border:2px solid var(--bad);width:8px;height:8px"></i>Overridden</span><span><i style="background:var(--warn);opacity:.35;width:14px"></i>Trend</span><span><i style="background:var(--bad);opacity:.25;width:14px"></i>Shift</span><span><i style="background:#8b6cf0;border-radius:50%;width:10px;height:10px"></i>Calibration</span><span><i style="background:#d6459f;border-radius:50%;width:10px;height:10px"></i>Reagent lot change</span><span><i style="background:#2f7fc4;border-radius:50%;width:10px;height:10px"></i>Maintenance</span><span>Points are plotted in SD units against the targets active on their date. Right-hand values are the current limits.</span></div></div>`}).join('');
   const rows=S.results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?1:x.date>y.date?-1:x.lv-y.lv).slice(0,20);
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between">
-    <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
+    <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}${x.off?' (disabled)':''}</option>`).join('')}</optgroup>`).join('')}</select></label>
      <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option><option value="r"${UI.win==='r'?' selected':''}>Date range…</option></select></label>${UI.win==='r'?`<label class="f">From<input type="date" id="cfrom" value="${esc(UI.cfrom||'')}" max="${esc(UI.cto||todayStr())}" style="width:auto"></label><label class="f">To<input type="date" id="cto" value="${esc(UI.cto||'')}" min="${esc(UI.cfrom||'')}" max="${todayStr()}" style="width:auto"></label><div class="row" style="align-items:flex-end;gap:6px">${[['7 days',7],['30 days',30],['90 days',90],['1 year',365]].map(([l,d])=>`<button class="btn sm" data-act="crange" data-d="${d}">${l}</button>`).join('')}</div>`:''}</div>
     <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_log')?`<button class="btn" data-act="evnew" data-id="${a.id}">Log calibration / maintenance</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
@@ -1141,11 +1142,11 @@ function renderManager(){
     const allP=DA().filter(a=>a.panel===pn),nr=allP.reduce((s,a)=>s+nRes(a.id),0),pc=UI.confirmDel==='p:'+pn;
     return `<div class="panelcard"><div class="row" style="justify-content:space-between;align-items:center">
      <div class="row" style="align-items:center;gap:8px">${cp?`<input type="text" data-rnp="${esc(pn)}" value="${esc(pn)}" aria-label="Panel name" style="width:220px;font-weight:600">`:`<h3>${esc(pn)}</h3>`}<span class="chip${cp?'':' acc'}">${cp?'Custom':'Routine'}</span></div>
-     <div class="row" style="gap:6px"><button class="btn sm" data-act="addopen" data-p="${esc(pn)}">Add or move analytes</button>
+     <div class="row" style="gap:6px"><button class="btn sm" data-act="addopen" data-p="${esc(pn)}">Add or move analytes</button>${allP.length?`<button class="btn sm" data-act="ptoggle" data-p="${esc(pn)}" title="Turn every test in this panel off or on">${allP.every(a=>a.off)?'Enable panel':'Disable panel'}</button>`:''}
      ${pc?`<span class="small">Delete the panel "${esc(pn)}", its ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} QC result${nr===1?'':'s'}? An administrator can restore it for 30 days from Setup, Recently deleted.</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Yes, delete panel</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`}</div></div>
      ${list.length?`<div class="scroll"><table class="t" style="margin-top:6px"><thead><tr><th>Analyte</th><th>Unit</th>${ctxMulti()?'<th>Analyser · module</th>':''}<th>Schedule</th><th>QC materials · lots</th><th></th></tr></thead><tbody>${list.map(a=>{const t=curTarget(a),c=UI.confirmDel===a.id,n=nRes(a.id);
-       return `<tr><td><b>${esc(a.name)}</b></td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
-       <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="aedit" data-id="${a.id}" aria-label="Edit ${esc(a.name)}">Edit</button> <button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
+       return `<tr${a.off?' style="opacity:.62"':''}><td><b>${esc(a.name)}</b>${a.off?' <span class="chip">Disabled</span>':''}</td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
+       <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="aedit" data-id="${a.id}" aria-label="Edit ${esc(a.name)}">Edit</button> <button class="btn sm" data-act="atoggle" data-id="${a.id}" aria-label="${a.off?'Enable':'Disable'} ${esc(a.name)}" title="${a.off?'Start asking for QC on this test again':'Stop asking for QC on this test. Its results are kept.'}">${a.off?'Enable':'Disable'}</button> <button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
      ${sugg.length&&!seenP.has(pn)?`<div class="row" style="margin-top:8px;gap:6px;align-items:center"><span class="small muted">Routine tests not in use:</span>${sugg.map(i=>`<button class="btn sm" data-act="sugg" data-p="${esc(pn)}" data-n="${esc(i.name)}">+ ${esc(i.name)}</button>`).join('')}</div>`:''}</div>`};
   seenP.clear();
   const cards=byAnalyser(DA(),(pn,list)=>{const h=card(pn,list);seenP.add(pn);return h})+(()=>{const empty=names.filter(pn=>!DA().some(a=>a.panel===pn));return empty.length?`<div class="angrp"><div class="angh"><span>Panels with no analytes yet</span></div>${empty.map(pn=>card(pn,[])).join('')}</div>`:''})();
@@ -2144,7 +2145,7 @@ function obDates(o){
 function renderOther(){
   const o=obState(),yest=dstr(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()-1,12));
   if(o.to>yest)o.to=yest;if(o.from>o.to)o.from=o.to;
-  const all=VA();if(!all.length)return '<div class="panel empty">No analytes available.</div>';
+  const all=VAL();if(!all.length)return '<div class="panel empty">No active analytes available.</div>';
   if(o.mode==='day')return renderOtherDay(o,all,yest);
   const cf=x=>(!o.inst||instOf(x)===o.inst)&&(!o.mod||(x.mod||'')===o.mod);let L=all.filter(cf);if(!L.length){o.inst='';o.mod='';L=all}
   if(!L.some(x=>x.id===o.aid))o.aid=L[0].id;
@@ -2342,7 +2343,7 @@ function sgCalc(a,win,excl){
 }
 function sgAll(){
   const s=sgState();
-  let list=VA();
+  let list=VAL();
   if(s.dept)list=list.filter(a=>a.dept===s.dept);
   if(s.panel)list=list.filter(a=>a.panel===s.panel);
   const rows=list.map(a=>sgCalc(a,s.win,s.excl));
@@ -2371,7 +2372,7 @@ function cliaRow(a,ed){
 }
 function deptRepPanel(ex,ds){
   const s=sgState();if(!ex||!ds.length)return '';
-  const sel=s.rdept||'',n=a=>VA().filter(x=>!sel||x.dept===sel).length;
+  const sel=s.rdept||'',n=a=>VAL().filter(x=>!sel||x.dept===sel).length;
   return `<div class="panelcard"><b>Reports by department</b>
    <div class="small muted" style="margin:2px 0 8px">Choose a department and save its sigma metrics or measurement uncertainty reports as one file, using the period chosen below. Each file has a summary followed by a report for each test.</div>
    <div class="row" style="align-items:flex-end;gap:10px"><label class="f" style="flex:0 1 260px">Department<select data-sgsel="rdept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${sel===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>
@@ -2391,7 +2392,7 @@ function cliaPanel(ed,rows){
 }
 function renderSigma(){
   cliaRefresh();
-  const s=sgState(),ed=perm('e_sigma'),ex=perm('e_export'),rows=sgAll(),ds=visDepts(),panels=[...new Set(VA().filter(a=>!s.dept||a.dept===s.dept).map(a=>a.panel))].sort();
+  const s=sgState(),ed=perm('e_sigma'),ex=perm('e_export'),rows=sgAll(),ds=visDepts(),panels=[...new Set(VAL().filter(a=>!s.dept||a.dept===s.dept).map(a=>a.panel))].sort();
   const cnt={};SGCLS.forEach(c=>cnt[c.key]=0);let miss=0;rows.forEach(r=>{if(r.cls)cnt[r.cls.key]++;else miss++});
   const tiles=`<div class="row" style="gap:8px">${SGCLS.map(c=>`<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid ${c.col}"><div class="small muted">${c.min>-1e8?'Sigma ≥ '+c.min:'Sigma < 3'}</div><div style="font-size:22px;font-weight:700">${cnt[c.key]}</div><div class="small">${c.name}</div></div>`).join('')}<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid #8a9aa0"><div class="small muted">No allowable error set</div><div style="font-size:22px;font-weight:700">${miss}</div><div class="small">Not scored</div></div></div>`;
   const head=`<div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h2>Sigma metrics and measurement uncertainty</h2>
@@ -3455,6 +3456,8 @@ document.addEventListener('click',e=>{
    case 'aeditsave':if(saveEdit())return;break;
    case 'arem':if(nRes(id)&&UI.confirmDel!==id){UI.confirmDel=id;break}{const an=anOf(id);if(an)trashTests([id],'test',an.name,an.panel);audit('Analyte removed',an?an.name+' ('+an.panel+')'+(nRes(id)?' with '+nRes(id)+' results':''):'');}removeAnalyte(id);UI.confirmDel=null;toast('Analyte removed. An administrator can restore it from Setup, Recently deleted.');break;
    case 'arcancel':UI.confirmDel=null;break;
+   case 'atoggle':{const a=anOf(id);if(!a||!perm('e_setup'))return;a.off=!a.off;if(a.off)a.offAt=nowIso();else{delete a.offAt;a.enFrom=todayStr()}audit(a.off?'Analyte disabled':'Analyte enabled',a.name+' ('+a.panel+')',null,[a.dept]);toast(a.off?a.name+' disabled. It is no longer asked for on Today. Its results are kept.':a.name+' enabled.');break}
+   case 'ptoggle':{if(!perm('e_setup'))return;const pn=el.dataset.p,l=DA().filter(a=>a.panel===pn);if(!l.length)break;const off=!l.every(a=>a.off);l.forEach(a=>{a.off=off;if(off)a.offAt=nowIso();else{delete a.offAt;a.enFrom=todayStr()}});audit(off?'Panel disabled':'Panel enabled',pn+' ('+l.length+' analytes)',null,[S.setup.cur]);toast(pn+(off?' disabled.':' enabled.'));break}
    case 'mnp':{const n=document.getElementById('mnewpanel').value.trim();if(!n)return toast('Give the panel a name.');
      if(panelNames().concat(panelsNow().map(p=>p.name)).some(x=>x.toLowerCase()===n.toLowerCase()))return toast('A panel with that name already exists.');
      st.cpanels.push({id:uid(),name:n,items:[]});toast('Panel created. Use Add analyte to put tests in it.');break}

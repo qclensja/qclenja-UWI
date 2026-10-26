@@ -40,7 +40,7 @@ function sgCalc(a,win,excl){
 }
 function sgAll(){
   const s=sgState();
-  let list=VA();
+  let list=VAL();
   if(s.dept)list=list.filter(a=>a.dept===s.dept);
   if(s.panel)list=list.filter(a=>a.panel===s.panel);
   const rows=list.map(a=>sgCalc(a,s.win,s.excl));
@@ -69,7 +69,7 @@ function cliaRow(a,ed){
 }
 function deptRepPanel(ex,ds){
   const s=sgState();if(!ex||!ds.length)return '';
-  const sel=s.rdept||'',n=a=>VA().filter(x=>!sel||x.dept===sel).length;
+  const sel=s.rdept||'',n=a=>VAL().filter(x=>!sel||x.dept===sel).length;
   return `<div class="panelcard"><b>Reports by department</b>
    <div class="small muted" style="margin:2px 0 8px">Choose a department and save its sigma metrics or measurement uncertainty reports as one file, using the period chosen below. Each file has a summary followed by a report for each test.</div>
    <div class="row" style="align-items:flex-end;gap:10px"><label class="f" style="flex:0 1 260px">Department<select data-sgsel="rdept"><option value="">All departments</option>${ds.map(d=>`<option value="${d.id}"${sel===d.id?' selected':''}>${esc(d.dept+dsub(d.sub))}</option>`).join('')}</select></label>
@@ -89,7 +89,7 @@ function cliaPanel(ed,rows){
 }
 function renderSigma(){
   cliaRefresh();
-  const s=sgState(),ed=perm('e_sigma'),ex=perm('e_export'),rows=sgAll(),ds=visDepts(),panels=[...new Set(VA().filter(a=>!s.dept||a.dept===s.dept).map(a=>a.panel))].sort();
+  const s=sgState(),ed=perm('e_sigma'),ex=perm('e_export'),rows=sgAll(),ds=visDepts(),panels=[...new Set(VAL().filter(a=>!s.dept||a.dept===s.dept).map(a=>a.panel))].sort();
   const cnt={};SGCLS.forEach(c=>cnt[c.key]=0);let miss=0;rows.forEach(r=>{if(r.cls)cnt[r.cls.key]++;else miss++});
   const tiles=`<div class="row" style="gap:8px">${SGCLS.map(c=>`<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid ${c.col}"><div class="small muted">${c.min>-1e8?'Sigma ≥ '+c.min:'Sigma < 3'}</div><div style="font-size:22px;font-weight:700">${cnt[c.key]}</div><div class="small">${c.name}</div></div>`).join('')}<div class="panelcard" style="flex:1 1 110px;padding:10px 12px;border-left:4px solid #8a9aa0"><div class="small muted">No allowable error set</div><div style="font-size:22px;font-weight:700">${miss}</div><div class="small">Not scored</div></div></div>`;
   const head=`<div class="panel stack"><div class="row" style="justify-content:space-between;align-items:flex-start"><div><h2>Sigma metrics and measurement uncertainty</h2>
