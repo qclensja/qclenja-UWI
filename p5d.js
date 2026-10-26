@@ -33,10 +33,10 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():(S.setup.sub?S.setup.sub+' · ':'')+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['materials','QC materials'],['limits','Establish limits'],['rules','Westgard rules'],['sigma','Sigma metrics']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
+    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['materials','QC materials'],['limits','Establish limits'],['rules','Westgard rules'],['sigma','Sigma metrics'],['log','Calibration log']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():S.tab==='materials'?renderMaterials():S.tab==='sigma'?renderSigma():setupView();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():S.tab==='materials'?renderMaterials():S.tab==='sigma'?renderSigma():S.tab==='log'?renderLog():setupView();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h+FOOT;
@@ -62,7 +62,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
@@ -272,6 +272,8 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   if(CU&&sgChange(e))return;
+  if(CU&&evChange(e))return;
+  if(CU&&isAdmin()&&(e.target.id==='uq'||e.target.id==='urf'||e.target.id==='usort')){const k=e.target.id==='uq'?'uq':e.target.id==='urf'?'urf':'usort';UI[k]=e.target.value;render();return}
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;

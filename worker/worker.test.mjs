@@ -52,4 +52,12 @@ r=await post('/pull',{u:'quin',hash:'HQ'});ok('qm signs in',r.s===200&&r.j.me===
 r=await post('/push',{u:'quin',hash:'HQ',sha:r.j.sha,data:{users:[{id:'q1',username:'quin',name:'Q',role:'admin',active:true}],analytes:[{id:'an1',name:'X',sigma:{tea:10}}],rules:{'1-3s':false}}});ok('qm push ok',r.s===200);
 r=await post('/pull',{u:'jaba',hash:'H1'});ok('qm analyte edit kept, role/rules not changed',r.j.data.analytes[0].sigma&&r.j.data.analytes[0].sigma.tea===10&&r.j.data.users.find(u=>u.id==='q1').role==='qm'&&!r.j.data.rules);
 r=await post('/backups',{u:'quin',hash:'HQ'});ok('qm cannot use backups',r.s===403);
+// ---- events: technologist can log and delete events but not delete anything else ----
+await post('/push',{u:'jaba',hash:'H1',sha:(await post('/pull',{u:'jaba',hash:'H1'})).j.sha,data:{users:[{...adm,pw:undefined},{id:'t9',username:'zed',name:'Z',role:'tech',active:true}],analytes:[{id:'an1',name:'X'}],events:[{id:'ev0',type:'cal',date:'2026-10-01',dept:'d'}]},pwset:[{id:'t9',pw:{salt:'S9',hash:'H9'}}]});
+r=await post('/pull',{u:'zed',hash:'H9'});
+r=await post('/push',{u:'zed',hash:'H9',sha:r.j.sha,data:{users:[],events:[{id:'ev0',type:'cal',date:'2026-10-01',dept:'d'},{id:'ev1',type:'reg',date:'2026-10-02',dept:'d'}],analytes:[],tomb:['an1']}});ok('tech push with events',r.s===200);
+r=await post('/pull',{u:'jaba',hash:'H1'});ok('tech event saved, tomb for analyte ignored',r.j.data.events.length===2&&r.j.data.analytes.length===1&&!(r.j.data.tomb||[]).includes('an1'));
+const shE=r.j.sha;
+r=await post('/push',{u:'zed',hash:'H9',sha:shE,data:{users:[],events:[{id:'ev1',type:'reg',date:'2026-10-02',dept:'d'}],tomb:['ev0']}});
+r=await post('/pull',{u:'jaba',hash:'H1'});ok('tech can delete an event entry',r.j.data.events.length===1&&r.j.data.events[0].id==='ev1'&&r.j.data.tomb.includes('ev0'));
 srv.close();

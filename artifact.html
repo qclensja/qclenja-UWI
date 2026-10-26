@@ -410,13 +410,13 @@ function migDept(o){if(!o||!o.dept)return;for(const [d,s,nd,ns] of MIGRATE){if(o
 /* ===== State ===== */
 const KEY='ljqc.v1';
 let mem=null;
-const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],trash:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[],drules:{},drulesAt:{}});
+const blank=()=>({v:1,tab:'today',setup:{done:false,step:1,lab:'',dept:'Clinical Chemistry',sub:'Routine Chemistry',analyser:'',analyserOther:'',analysers:[],amods:{},cur:'',nlev:2,sel:{},selFor:'',units:{},cpanels:[],padd:{}},depts:[],analytes:[],events:[],trash:[],results:[],skips:[],lots:[],users:[],audit:[],est:[],tomb:[],requests:[],perms:{},permsAt:'',materials:[],drules:{},drulesAt:{}});
 const UNITS=['mmol/L','µmol/L','mg/dL','mg/L','g/L','g/dL','U/L','IU/L','mIU/L','µIU/mL','ng/mL','ng/dL','ng/L','pg/mL','pmol/L','nmol/L','mEq/L','%','fL','pg','×10⁹/L','×10¹²/L','/µL','s','mm/hr','mmHg','kPa','mL/min','Ct','log copies/mL','log IU/mL','COI','h','µg/mL','µg/L','mmol/kg','mmol/mol','ng/mL','mg/L FEU'];
 const emptyLevel=()=>({mean:null,sd:null,material:'',lot:'',exp:''});
 /* change stamps: every analyte, department and limits set remembers when it last changed, so an out-of-date copy on another device can never overwrite a newer edit */
 const canonS=v=>Array.isArray(v)?'['+v.map(canonS).join(',')+']':v&&typeof v==='object'?'{'+Object.keys(v).filter(k=>k!=='_h'&&k!=='modAt').sort().map(k=>JSON.stringify(k)+':'+canonS(v[k])).join(',')+'}':JSON.stringify(v);
 const shash=s=>{let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return (h>>>0).toString(36)+s.length.toString(36)};
-function initHashes(o){['analytes','depts','est','materials'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
+function initHashes(o){['analytes','depts','est','materials','events'].forEach(k=>(o[k]||[]).forEach(x=>{if(x._h===undefined)x._h=shash(canonS(x))}));return o}
 const ANMIG={'Roche cobas pro':'Roche Cobas Pro'};
 function migAnalysers(o){
   const fx=n=>ANMIG[n]||n,fixRec=r=>{if(!r)return;if(Array.isArray(r.analysers))r.analysers=r.analysers.map(fx);if(r.analyser)r.analyser=fx(r.analyser);if(r.amods)Object.keys(r.amods).forEach(k=>{if(ANMIG[k]){if(!r.amods[ANMIG[k]])r.amods[ANMIG[k]]=r.amods[k];delete r.amods[k]}})};
@@ -424,7 +424,7 @@ function migAnalysers(o){
   (o.trash||[]).forEach(t=>{const d=t.data||{};fixRec(d.dept);(d.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]})});
 }
 function norm(o){
-  o.users=o.users||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
+  o.users=o.users||[];o.events=o.events||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migAnalysers(o);migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
   st.units=st.units||{};st.padd=st.padd||{};st.cpanels=st.cpanels||[];
@@ -450,7 +450,7 @@ function load(){
 let S=load();
 function stampMods(){
   const now=new Date().toISOString();
-  ['analytes','depts','est','materials'].forEach(k=>(S[k]||[]).forEach(x=>{const h=shash(canonS(x));if(x._h===undefined)x._h=h;else if(x._h!==h){x._h=h;x.modAt=now}}));
+  ['analytes','depts','est','materials','events'].forEach(k=>(S[k]||[]).forEach(x=>{const h=shash(canonS(x));if(x._h===undefined)x._h=h;else if(x._h!==h){x._h=h;x.modAt=now}}));
 }
 function save(){
   try{syncCtx()}catch(e){}
@@ -708,6 +708,7 @@ function alertCard(r,flags,full){
    <span class="mono">${fmt(r.value,dp)} ${esc(a.unit)}</span> <span class="muted small">(${z>=0?'+':''}${z.toFixed(2)} SD from mean ${fmt(t.mean,dp)})</span><br><span class="small muted">${byLine(r)}</span></div>
    <div>${f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' ')}</div></div>
    <ul>${f.map(x=>`<li><b>${RULES[x.rule].name}:</b> ${RULES[x.rule].desc}</li>`).join('')}</ul>
+   ${evNear(a,dAdd(r.date,-7),r.date)}
    <details${full?' open':''} style="margin-top:8px"><summary><b>Suggested actions</b></summary><ul>${fixes.map(x=>`<li>${x}</li>`).join('')}</ul></details>
    ${r.ov?`<p class="small" style="margin:8px 0 0"><b>Overridden:</b> ${esc(r.ov.comment)} <span class="muted">(${r.ov.byName?esc(r.ov.byName)+' · ':''}${fmtTs(r.ov.at)})</span> ${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Undo override</button>`:''}</p>`
    :!perm('e_override')?`<p class="small muted" style="margin:8px 0 0">${isAdmin()?'':'Your access level can view this alert but not resolve it.'}</p>`
@@ -852,6 +853,7 @@ function ljSVG(a,lv,flags,n,forExport){
     if(i>0&&ti!==pt&&lvEra(a,lv,r.date)!==lvEra(a,lv,win[i-1].date)){const x=X(i)-step/2,t=a.targets[ti];
       s+=`<line class="lotline" x1="${x}" x2="${x}" y1="${mt}" y2="${mt+ph}"/><text x="${x+4}" y="${mt+11}" style="fill:var(--accent)">${esc((t.levels[lv]&&t.levels[lv].lot)?'Lot '+t.levels[lv].lot:'New targets')}</text>`}
   });
+  s+=evMarks(a,win,X,step,mt,ph,forExport);
   patternsFor(a,lv,S.results).forEach(sp=>{
     const ix=win.map((r,i)=>sp.ids.includes(r.id)?i:-1).filter(i=>i>=0);if(ix.length<2)return;
     const x0=X(ix[0])-step/2,x1=X(ix[ix.length-1])+step/2,tr=sp.kind==='trend';
@@ -878,7 +880,7 @@ function patternBox(a,lv,n){
   if(!sp.length)return '';
   return `<div class="alert warn" style="margin-top:10px"><b>${sp.some(p=>p.kind==='trend')&&sp.some(p=>p.kind==='shift')?'Trend and shift detected':sp[0].kind==='trend'?'Trend detected':'Shift detected'} on ${levelName(lv)}</b>
    ${sp.map(p=>{const tr=p.kind==='trend',R=RULES[tr?'T7':'S6'];return `<details${p===sp[0]?' open':''} style="margin-top:8px"><summary><span class="chip warn">${tr?'Trend':'Shift'} ${p.dir>0?'upward':'downward'}</span> ${p.n} runs, ${fmtDate(p.from)} to ${fmtDate(p.to)}${p.open?' · <b>still ongoing</b>':' · ended'}</summary>
-      <p class="small" style="margin:6px 0 0">${tr?'Results are moving steadily '+(p.dir>0?'up':'down')+' without a change in targets.':'Results have stayed '+(p.dir>0?'above':'below')+' the mean for '+p.n+' consecutive runs.'} ${R.desc}</p><div class="small" style="margin-top:6px"><b>Suggested actions</b></div><ul class="small" style="margin:4px 0 0">${R.fix.map(x=>`<li>${x}</li>`).join('')}</ul>${patternOverride(a,lv,p,flags0)}</details>`}).join('')}</div>`;
+      ${evNear(a,dAdd(p.from,-7),p.to)}<p class="small" style="margin:6px 0 0">${tr?'Results are moving steadily '+(p.dir>0?'up':'down')+' without a change in targets.':'Results have stayed '+(p.dir>0?'above':'below')+' the mean for '+p.n+' consecutive runs.'} ${R.desc}</p><div class="small" style="margin-top:6px"><b>Suggested actions</b></div><ul class="small" style="margin:4px 0 0">${R.fix.map(x=>`<li>${x}</li>`).join('')}</ul>${patternOverride(a,lv,p,flags0)}</details>`}).join('')}</div>`;
 }
 function renderCharts(){
   if(!VA().length)return '<div class="panel empty">No analytes available. '+(isAdmin()?'Set up analytes first.':'Ask an administrator to give you access to a department.')+'</div>';
@@ -894,12 +896,12 @@ function renderCharts(){
      <div>${c.flagged?`<span class="chip bad">${c.flagged} rejection${c.flagged>1?'s':''}</span>`:'<span class="chip good">No rejections</span>'} ${c.warn?`<span class="chip warn">${c.warn} warning${c.warn>1?'s':''}</span>`:''}</div></div>
      <div class="chartbox" style="margin-top:10px">${c.svg}</div>${UI.win==='r'?`<p class="small muted" style="margin:6px 0 0">${winPts(S.results.filter(r=>r.aid===a.id&&r.lv===lv),'r').length?'Showing results from '+fmtDate(UI.cfrom||'')+' to '+fmtDate(UI.cto||todayStr())+'.':'<b>No results in this date range.</b> Choose different dates.'}</p>`:''}
      ${patternBox(a,lv,UI.win)}
-     <div class="legend"><span><i style="background:var(--accent)"></i>In control</span><span><i style="background:var(--warn)"></i>1₂ₛ warning</span><span><i style="background:var(--bad)"></i>Rule violation</span><span><i style="background:var(--surface);border:2px solid var(--bad);width:8px;height:8px"></i>Overridden</span><span><i style="background:var(--warn);opacity:.35;width:14px"></i>Trend</span><span><i style="background:var(--bad);opacity:.25;width:14px"></i>Shift</span><span>Points are plotted in SD units against the targets active on their date. Right-hand values are the current limits.</span></div></div>`}).join('');
+     <div class="legend"><span><i style="background:var(--accent)"></i>In control</span><span><i style="background:var(--warn)"></i>1₂ₛ warning</span><span><i style="background:var(--bad)"></i>Rule violation</span><span><i style="background:var(--surface);border:2px solid var(--bad);width:8px;height:8px"></i>Overridden</span><span><i style="background:var(--warn);opacity:.35;width:14px"></i>Trend</span><span><i style="background:var(--bad);opacity:.25;width:14px"></i>Shift</span><span><i style="background:#8b6cf0;border-radius:50%;width:10px;height:10px"></i>Calibration</span><span><i style="background:#d6459f;border-radius:50%;width:10px;height:10px"></i>Reagent lot change</span><span><i style="background:#2f7fc4;border-radius:50%;width:10px;height:10px"></i>Maintenance</span><span>Points are plotted in SD units against the targets active on their date. Right-hand values are the current limits.</span></div></div>`}).join('');
   const rows=S.results.filter(r=>r.aid===a.id).sort((x,y)=>x.date<y.date?1:x.date>y.date?-1:x.lv-y.lv).slice(0,20);
   return `<div class="stack"><div class="panel"><div class="row" style="justify-content:space-between">
     <div class="row">${cinsts.length>1?`<label class="f">Analyser<select id="cinst" style="width:auto"><option value="">All analysers</option>${cinsts.map(n=>`<option${n===UI.cinst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}${cmods.length?`<label class="f">Module<select id="cmod" style="width:auto"><option value="">All modules</option>${cmods.map(m=>`<option${m===UI.cmod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}<label class="f">Analyte<select id="cid" style="width:auto;min-width:200px">${Object.entries(g).map(([p,l])=>`<optgroup label="${esc(p)}">${l.map(x=>`<option value="${x.id}"${x.id===a.id?' selected':''}>${esc(x.name)}${VA().filter(y=>y.name===x.name).length>1?' · '+esc(instLabel(x)):''}</option>`).join('')}</optgroup>`).join('')}</select></label>
      <label class="f">Show<select id="win" style="width:auto"><option value="20"${UI.win===20?' selected':''}>Last 20 runs</option><option value="30"${UI.win===30?' selected':''}>Last 30 runs</option><option value="60"${UI.win===60?' selected':''}>Last 60 runs</option><option value="90"${UI.win===90?' selected':''}>Last 90 runs</option><option value="120"${UI.win===120?' selected':''}>Last 120 runs</option><option value="0"${UI.win===0?' selected':''}>All runs</option><option value="r"${UI.win==='r'?' selected':''}>Date range…</option></select></label>${UI.win==='r'?`<label class="f">From<input type="date" id="cfrom" value="${esc(UI.cfrom||'')}" max="${esc(UI.cto||todayStr())}" style="width:auto"></label><label class="f">To<input type="date" id="cto" value="${esc(UI.cto||'')}" min="${esc(UI.cfrom||'')}" max="${todayStr()}" style="width:auto"></label><div class="row" style="align-items:flex-end;gap:6px">${[['7 days',7],['30 days',30],['90 days',90],['1 year',365]].map(([l,d])=>`<button class="btn sm" data-act="crange" data-d="${d}">${l}</button>`).join('')}</div>`:''}</div>
-    <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
+    <div class="row">${perm('e_lot')?`<button class="btn" data-act="lot" data-id="${a.id}">Lot change / adjust mean &amp; SD</button>`:''}${perm('e_log')?`<button class="btn" data-act="evnew" data-id="${a.id}">Log calibration / maintenance</button>`:''}${perm('e_export')?`<button class="btn primary" data-act="xl" data-id="${a.id}">Export to Excel</button>`:''}</div></div>
     <p class="small muted" style="margin:10px 0 0">${deptList().length>1?esc(deptOfA(a).dept)+' · ':''}${multiInst()?'Analyser: '+esc(instLabel(a))+' · ':''}Schedule: ${esc(scheduleText(a))}${a.targets.length>1?` · ${a.targets.length} target sets on record`:''}</p></div>
    ${charts}
    ${targetHistory(a)}
@@ -1331,10 +1333,10 @@ const isAdmin=()=>!!CU&&CU.role==='admin';
 const isSup=()=>!!CU&&CU.role==='sup';
 const PERMDEF=[
  {k:'v_charts',g:'View',l:'Charts',tech:1,sup:1,cons:1,qm:1},{k:'v_alerts',g:'View',l:'QC alerts',tech:1,sup:1,cons:1,qm:1},{k:'v_limits',g:'View',l:'Establish limits',tech:1,sup:1,cons:1,qm:1},{k:'v_rules',g:'View',l:'Westgard rules',tech:1,sup:1,cons:1,qm:1},
- {k:'v_materials',g:'View',l:'QC materials',tech:1,sup:1,cons:1,qm:1},{k:'v_sigma',g:'View',l:'Sigma metrics and measurement uncertainty',tech:1,sup:1,cons:1,qm:1},{k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1,cons:0,qm:1},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1,cons:1,qm:1},
+ {k:'v_materials',g:'View',l:'QC materials',tech:1,sup:1,cons:1,qm:1},{k:'v_sigma',g:'View',l:'Sigma metrics and measurement uncertainty',tech:1,sup:1,cons:1,qm:1},{k:'v_setup',g:'View',l:'Setup (their departments only)',tech:0,sup:1,cons:0,qm:1},{k:'v_audit',g:'View',l:'Audit log (their departments only)',tech:0,sup:1,cons:1,qm:1},{k:'v_log',g:'View',l:'Calibration and maintenance log',tech:1,sup:1,cons:1,qm:1},
  {k:'e_qc',g:'Edit',l:'Enter and edit QC values, mark QC not performed',tech:1,sup:1,cons:0,qm:0},{k:'e_other',g:'Edit',l:'Other QC tab: plot QC values for earlier days',tech:1,sup:1,cons:0,qm:0},{k:'e_override',g:'Edit',l:'Resolve violations with a comment, add notes, reopen violations',tech:1,sup:1,cons:1,qm:1},
  {k:'e_materials',g:'Edit',l:'QC materials: add, edit, delete and apply to tests',tech:0,sup:1,cons:0,qm:0},{k:'e_sigma',g:'Edit',l:'Sigma metrics: set allowable error, bias and uncertainty',tech:0,sup:1,cons:0,qm:1},{k:'e_lot',g:'Edit',l:'Lot change and adjust mean and SD',tech:1,sup:1,cons:0,qm:0},{k:'e_limits',g:'Edit',l:'Insert established limits into an analyte',tech:1,sup:1,cons:0,qm:0},
- {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1,cons:0,qm:0},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1,cons:1,qm:1}];
+ {k:'e_setup',g:'Edit',l:'Change Setup: analysers, analytes, panels, schedules',tech:0,sup:1,cons:0,qm:0},{k:'e_log',g:'Edit',l:'Calibration and maintenance log: add, edit and delete entries',tech:1,sup:1,cons:0,qm:0},{k:'e_export',g:'Edit',l:'Export charts to Excel',tech:1,sup:1,cons:1,qm:1}];
 const perm=k=>{if(!CU)return false;if(CU.role==='admin')return true;const d=PERMDEF.find(x=>x.k===k);if(!d)return false;const r=['sup','cons','qm'].includes(CU.role)?CU.role:'tech',o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
 const permFor=(r,k)=>{const d=PERMDEF.find(x=>x.k===k),o=S.perms&&S.perms[r];return o&&o[k]!==undefined?!!o[k]:!!d[r]};
 const PROLES=[['tech','Technologist'],['sup','Supervisory Tech.'],['qm','Quality Manager'],['cons','Consultant']];
@@ -1607,6 +1609,7 @@ document.addEventListener('submit',async e=>{
     else if(f==='uedit'){if(!isAdmin())return;await doUserEdit()}
     else if(f==='ureset'){if(!isAdmin())return;await doUserReset()}
     else if(f==='svcadmin'){if(!isAdmin())return;await doSvcAdmin()}
+    else if(f==='evsave')evSave();
     else if(f==='reqform')await doRequest();
     else if(f==='svcconn')await doSvcConn();
     else if(f==='ghconn'){if(CU&&!isAdmin())return;await doGhConnect()}
@@ -1616,11 +1619,16 @@ document.addEventListener('submit',async e=>{
 /* ===== Users and audit tabs (administrator) ===== */
 const nAdmins=()=>S.users.filter(u=>u.role==='admin'&&u.active!==false).length;
 function deptCell(u){
-  if(u.role==='admin')return '<span class="small muted">All departments</span>';
+  if(u.role==='admin')return '<span class="chip acc">All departments</span>';
   const ds=deptList();if(!ds.length)return '<span class="small muted">–</span>';
-  const all=!Array.isArray(u.depts),has=id=>all||u.depts.includes(id);
-  return `<div class="stack" style="gap:2px">${ds.map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap"><input type="checkbox" data-udept="${u.id}:${d.id}"${has(d.id)?' checked':''}>${esc(d.dept)}</label>`).join('')}${!all&&!u.depts.length?'<span class="small" style="color:var(--bad)">No access</span>':''}</div>`;
+  const all=!Array.isArray(u.depts),has=id=>all||u.depts.includes(id),mine=ds.filter(d=>has(d.id));
+  const chips=!mine.length?'<span class="chip bad">No access</span>':(all||mine.length===ds.length)&&ds.length>1?'<span class="chip acc" style="white-space:nowrap">All departments</span>':mine.map(d=>`<span class="chip" style="white-space:nowrap">${esc(d.dept)}</span>`).join(' ');
+  if(UI.udeptOpen===u.id)return `<div class="stack" style="gap:2px">${ds.map(d=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400;white-space:nowrap"><input type="checkbox" data-udept="${u.id}:${d.id}"${has(d.id)?' checked':''}>${esc(d.dept)}</label>`).join('')}<button class="btn sm" type="button" data-act="udeptdone">Done</button></div>`;
+  return `<div class="row" style="gap:4px">${chips}<button class="btn sm" type="button" data-act="udeptedit" data-id="${u.id}" title="Change the departments this user can see" aria-label="Change departments for ${esc(u.name)}">Change</button></div>`;
 }
+const relTime=iso=>{if(!iso)return null;const ms=Date.now()-new Date(iso).getTime();if(isNaN(ms))return null;const m=Math.floor(ms/6e4),h=Math.floor(m/60),d=Math.floor(h/24);
+  return m<1?'Just now':m<60?m+' min ago':h<24?h+(h===1?' hour':' hours')+' ago':d===1?'Yesterday':d<30?d+' days ago':d<365?Math.floor(d/30)+(Math.floor(d/30)===1?' month':' months')+' ago':'Over a year ago'};
+const signCell=u=>{const r=relTime(u.lastLogin);if(!r)return '<span class="chip">Never</span>';const old=(Date.now()-new Date(u.lastLogin).getTime())>30*864e5;return `<span title="${esc(fmtTs(u.lastLogin))}" class="${old?'chip warn':''}" style="white-space:nowrap">${r}</span><div class="small muted">${esc(fmtTs(u.lastLogin))}</div>`};
 function renderPerms(){
   const row=d=>`<tr><td>${esc(d.l)}</td>${PROLES.map(([r,n])=>`<td style="text-align:center"><input type="checkbox" data-perm="${r}:${d.k}"${permFor(r,d.k)?' checked':''} aria-label="${esc(d.l)} for ${esc(n)}"></td>`).join('')}</tr>`;
   const grp=g=>`<tr><th colspan="${PROLES.length+1}" style="text-align:left;padding-top:12px">${g==='View'?'Can view':'Can edit or do'}</th></tr>${PERMDEF.filter(d=>d.g===g).map(row).join('')}`;
@@ -1629,16 +1637,22 @@ function renderPerms(){
    <div class="row"><button class="btn" data-act="permreset">Restore defaults</button><span class="small muted">Today (entering and viewing daily QC) is always available. These settings control what the app shows and allows. For strict protection of the data itself, keep the number of administrators small.</span></div></div>`;
 }
 function renderUsers(){
-  const rows=S.users.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
+  const uq=(UI.uq||'').trim().toLowerCase(),urf=UI.urf||'',us=UI.usort||'name';
+  let ulist=S.users.filter(u=>(!urf||u.role===urf)&&(!uq||(u.name+' '+u.username+' '+(u.email||'')).toLowerCase().includes(uq)));
+  ulist=ulist.slice().sort(us==='login'?(x,y)=>(y.lastLogin||'')<(x.lastLogin||'')?-1:(y.lastLogin||'')>(x.lastLogin||'')?1:0:us==='role'?(x,y)=>roleName(x.role).localeCompare(roleName(y.role))||x.name.localeCompare(y.name):(x,y)=>x.name.localeCompare(y.name));
+  const nAct=S.users.filter(u=>u.active!==false).length,nDis=S.users.length-nAct,nNever=S.users.filter(u=>!u.lastLogin&&u.active!==false).length,nWeek=S.users.filter(u=>u.lastLogin&&Date.now()-new Date(u.lastLogin).getTime()<7*864e5).length;
+  const rows=ulist.map(u=>{const me=u.id===CU.id,n=S.results.filter(r=>r.by===u.id).length,last=nAdmins()===1&&u.role==='admin'&&u.active!==false;
     return `<tr><td><b>${esc(u.name)}</b>${me?' <span class="chip">You</span>':''}<div class="small muted">${esc(u.username)}${u.email?' · '+esc(u.email):''}</div></td>
      <td>${me||last?`<span class="chip${u.role==='admin'?' acc':''}">${roleName(u.role)}</span>`:`<select data-urole="${u.id}" style="width:auto" aria-label="Role for ${esc(u.name)}">${roleOpts(u.role)}</select>`}</td>
      <td>${deptCell(u)}</td>
-     <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
-     <td class="small">${u.lastLogin?fmtTs(u.lastLogin):'Never'}</td><td class="mono">${n}</td>
-     <td style="text-align:right;white-space:nowrap">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
-       :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button> <button class="btn sm" data-act="uemailpw" data-id="${u.id}" title="Generate a new temporary password and prepare an email to this user">Email new password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
+     <td>${u.active===false?'<span class="chip">Disabled</span>':u.mustChange?'<span class="chip warn" style="white-space:nowrap">Must choose password</span>':'<span class="chip good">Active</span>'}</td>
+     <td class="small">${signCell(u)}</td><td class="mono">${n}</td>
+     <td style="text-align:right;white-space:normal;min-width:230px"><div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end">${UI.resetFor===u.id?`<form data-form="ureset" class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input type="text" id="rs-pass" placeholder="Temporary password" style="width:160px" aria-label="Temporary password"><button class="btn sm" type="button" data-act="genpw" data-t="rs-pass">Generate</button><button class="btn sm primary" type="submit">Set</button><button class="btn sm" type="button" data-act="ucancel">Cancel</button></form>`
+       :`<button class="btn sm" data-act="uedit" data-id="${u.id}">Edit</button> <button class="btn sm" data-act="ureset" data-id="${u.id}">Reset password</button> <button class="btn sm" data-act="uemailpw" data-id="${u.id}" title="Generate a new temporary password and prepare an email to this user">Email new password</button>${me||last?'':` <button class="btn sm${u.active===false?'':' danger'}" data-act="utoggle" data-id="${u.id}">${u.active===false?'Enable':'Disable'}</button>`}${me||last?'':UI.udel===u.id?` <span class="small">Delete ${esc(u.name)} for good?</span> <button class="btn sm danger" data-act="udelok" data-id="${u.id}">Yes, delete</button> <button class="btn sm" data-act="udelno">Cancel</button>`:` <button class="btn sm danger" data-act="udel" data-id="${u.id}">Delete</button>`}`}</div></td></tr>${UI.uedit===u.id?`<tr><td colspan="7" style="background:var(--surface2)"><form data-form="uedit" class="stack" autocomplete="off"><div class="grid2"><label class="f">Full name<input type="text" id="eu-name" value="${esc(u.name)}"></label><label class="f">Username<input type="text" id="eu-user" value="${esc(u.username)}" autocapitalize="none"></label><label class="f">Email address<input type="email" id="eu-email" value="${esc(u.email||'')}" autocapitalize="none"></label></div><p class="small muted" style="margin:0">Access level and departments are changed in the table above. The user keeps their password. If you change a username, tell the person.</p><div class="row"><button class="btn primary" type="submit">Save changes</button><button class="btn" type="button" data-act="ueditno">Cancel</button></div></form></td></tr>`:''}`}).join('');
   return `<div class="stack">${renderRequests()}${renderPerms()}<div class="panel"><h2>Users</h2><p class="muted small" style="margin:4px 0 10px">Technologists enter QC, review charts and alerts, and record overrides, only for the departments they are given. Supervisory Techs can also open Setup and the Audit log for those departments. Quality Managers can view everything in their departments (including Setup, the Audit log and Sigma metrics), resolve violations, set Sigma metrics values and export reports, but do not enter QC or change Setup. Consultants review QC and resolve violations. The permissions table below sets exactly what each type can do. New departments are not shared with existing technologists until you tick them here. Administrators also manage setup, users and the audit log. Disabled users cannot sign in, and their past entries stay on record.</p>
-   <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
+   <div class="row" style="gap:8px;margin-bottom:10px"><span class="chip">${S.users.length} user${S.users.length===1?'':'s'}</span><span class="chip good">${nAct} active</span>${nDis?`<span class="chip">${nDis} disabled</span>`:''}<span class="chip">${nWeek} signed in this week</span>${nNever?`<span class="chip warn">${nNever} never signed in</span>`:''}</div>
+   <div class="row" style="align-items:flex-end;gap:10px;margin-bottom:10px"><label class="f" style="flex:1 1 180px">Find a user<input type="text" id="uq" value="${esc(UI.uq||'')}" placeholder="Name, username or email"></label><label class="f">Role<select id="urf" style="width:auto"><option value="">All roles</option>${PROLES.concat([['admin','Administrator']]).map(([v,n])=>`<option value="${v}"${urf===v?' selected':''}>${n}</option>`).join('')}</select></label><label class="f">Sort by<select id="usort" style="width:auto"><option value="name"${us==='name'?' selected':''}>Name</option><option value="login"${us==='login'?' selected':''}>Last sign-in (newest first)</option><option value="role"${us==='role'?' selected':''}>Role</option></select></label></div>
+   <div class="scroll"><table class="t"><thead><tr><th>Name</th><th>Role</th><th>Departments</th><th>Status</th><th>Last sign-in</th><th>QC entries</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="muted">No users match.</td></tr>'}</tbody></table></div></div>
    <div class="panel"><h3>Add a user</h3><form data-form="uadd" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
     <label class="f">Full name<input type="text" id="nu-name"></label><label class="f">Username<input type="text" id="nu-user" autocapitalize="none"></label>
     <label class="f">Email address (optional)<input type="email" id="nu-email" autocapitalize="none"></label>
@@ -1953,7 +1967,7 @@ function mergeStates(L,R){
   const tomb=new Set([...(L.tomb||[]),...(R.tomb||[])]),out=JSON.parse(JSON.stringify(L));
   const by=(a,b,pick)=>{const m=new Map();(b||[]).forEach(x=>m.set(x.id,x));(a||[]).forEach(x=>m.set(x.id,m.has(x.id)&&pick?pick(x,m.get(x.id)):x));return [...m.values()].filter(x=>!tomb.has(x.id))};
   const newer=(a,b)=>((a.upd||a).at||'')>=((b.upd||b).at||'')?a:b;
-  const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;return x};
+  const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;const ll=[a.lastLogin,b.lastLogin].filter(Boolean).sort().pop();if(ll)x.lastLogin=ll;return x};
   out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts,(a,b)=>((b.modAt||'')>(a.modAt||'')?b:a));out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
   const newerMod=(a,b)=>{const am=a.modAt||'',bm=b.modAt||'';return bm>am?b:am>bm?a:null};
   out.est=by(L.est,R.est,(a,b)=>newerMod(a,b)||(b.runs&&a.runs&&b.runs.length>a.runs.length?b:a));
@@ -1968,7 +1982,7 @@ function mergeStates(L,R){
   if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
   out.drules={};out.drulesAt={};{const ids=new Set([...Object.keys(L.drulesAt||{}),...Object.keys(R.drulesAt||{}),...Object.keys(L.drules||{}),...Object.keys(R.drules||{})]);
    ids.forEach(id=>{const lr=(L.drulesAt||{})[id]||'',rr=(R.drulesAt||{})[id]||'',useR=rr>lr;const src=useR?R:L;if((src.drules||{})[id]!==undefined)out.drules[id]=src.drules[id];if(useR?rr:lr)out.drulesAt[id]=useR?rr:lr})}
-  out.trash=by(L.trash,R.trash);out.tomb=[...tomb];
+  out.trash=by(L.trash,R.trash);out.events=by(L.events,R.events,(a,b)=>newerMod(a,b)||a);out.tomb=[...tomb];
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
 }
@@ -2979,6 +2993,7 @@ function trashDept(id){   /* call BEFORE the department is removed */
   syncCtx();const rec=S.depts.find(d=>d.id===id);if(!rec)return;
   const ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),set=new Set(ids),pk=trashPack(ids);
   pk.est=(S.est||[]).filter(e=>set.has(e.aid));
+  const evs=(S.events||[]).filter(e=>e.dept===id);evs.forEach(e=>tomb(e.id));S.events=(S.events||[]).filter(e=>e.dept!==id);pk.events=evs;
   trashAdd('dept',rec.dept,ids.length+' tests, '+pk.results.length+' QC results',{...pk,dept:rec,drules:(S.drules||{})[id]||null,userIds:S.users.filter(u=>Array.isArray(u.depts)&&u.depts.includes(id)).map(u=>u.id)});
 }
 function trashTests(ids,kind,label,panelName){   /* call BEFORE removeAnalyte */
@@ -3000,6 +3015,7 @@ function trashRestore(tid,intoDept){
     d.skips.forEach(s=>{s.aid=map[s.aid];if(s.id)s.id=uid()});
     d.est.forEach(e=>{e.aid=map[e.aid];e.id=uid();fresh(e)});
     S.analytes.push(...d.analytes);S.results.push(...d.results);S.skips.push(...d.skips);S.est.push(...d.est);
+    (d.events||[]).forEach(e=>{e.id=uid();e.dept=newId;e.aids=(e.aids||[]).map(x=>map[x]).filter(Boolean);fresh(e)});S.events=(S.events||[]).concat(d.events||[]);
     if(d.drules!=null){S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[newId]=d.drules;S.drulesAt[newId]=now}
     (d.userIds||[]).forEach(uid_=>{const u=S.users.find(x=>x.id===uid_);if(u&&Array.isArray(u.depts)&&!u.depts.includes(newId)){u.depts=[...u.depts,newId];u.mod=now}});
   }else{   /* panel or test: goes back into a department (original one, or one chosen) */
@@ -3051,6 +3067,131 @@ function renderTrash(){
      const sel=(t.kind==='panel'||t.kind==='test')?`<label class="f small" style="margin:0">${needSel?'Original department was deleted. Restore into':'Restore into'}<select id="trinto-${t.id}" style="width:auto">${depts.map(d=>`<option value="${d.id}"${d.id===t.data.deptId?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:'';
      return `<tr><td><b>${esc(t.label)}</b><div class="muted">${esc(t.detail)}</div></td><td>${KIND_TXT[t.kind]||t.kind}</td><td>${fmtTs(t.at)}${t.byName?'<div class="muted">'+esc(t.byName)+'</div>':''}</td><td>${trashDays(t)} day${trashDays(t)===1?'':'s'}</td><td><div class="row" style="gap:6px;align-items:flex-end">${sel}<button class="btn sm primary" data-act="trrestore" data-id="${t.id}">Restore</button>${UI.trconf===t.id?`<button class="btn sm danger" data-act="trpurge" data-id="${t.id}">Yes, delete for good</button><button class="btn sm" data-act="trpurgeno">Cancel</button>`:`<button class="btn sm" data-act="trpurge" data-id="${t.id}">Delete for good</button>`}</div></td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:0">Nothing has been deleted recently.</p>'}</div>`;
 }
+/* p16: calibration, reagent lot and maintenance log (events) shown as markers on charts */
+const EVT=[['cal','Calibration','C','#8b6cf0'],['reg','Reagent lot change','R','#d6459f'],['mnt','Maintenance','M','#2f7fc4'],['oth','Other','!','#6b7280']];
+const evT=k=>EVT.find(x=>x[0]===k)||EVT[3];
+const evVis=ev=>canSeeD(ev.dept);
+function evApplies(ev,a){
+  if(ev.dept!==a.dept)return false;
+  if(Array.isArray(ev.aids)&&ev.aids.length)return ev.aids.includes(a.id);
+  if(ev.inst&&instOf(a)!==ev.inst)return false;
+  if(ev.mod&&(a.mod||'')!==ev.mod)return false;
+  return true;
+}
+const evFor=(a,from,to)=>(S.events||[]).filter(ev=>evApplies(ev,a)&&(!from||ev.date>=from)&&(!to||ev.date<=to)).sort((x,y)=>x.date<y.date?-1:x.date>y.date?1:(x.at||'')<(y.at||'')?-1:1);
+function evScope(ev){
+  const d=(S.depts||[]).find(x=>x.id===ev.dept)||{};
+  if(Array.isArray(ev.aids)&&ev.aids.length){const n=ev.aids.map(id=>(anOf(id)||{}).name).filter(Boolean);return (ev.inst?ev.inst+' · ':'')+(n.length>3?n.slice(0,3).join(', ')+' and '+(n.length-3)+' more':n.join(', '))}
+  return (ev.inst||'All analysers')+(ev.mod?' · '+ev.mod:'')+' · all tests'+(S.depts&&S.depts.filter(x=>x.dept).length>1?' ('+(d.dept||'')+')':'');
+}
+function evLine(ev,a){
+  const t=evT(ev.type);return `${t[1]} ${fmtDate(ev.date)}${ev.lot?' (lot '+ev.lot+')':''}${ev.note?': '+ev.note:''}`;
+}
+/* markers drawn on a Levey-Jennings chart. win = plotted results, X(i) = x of point i */
+function evMarks(a,win,X,step,mt,ph,forExport){
+  if(!win.length)return '';
+  const first=win[0].date,list=evFor(a,first,todayStr());if(!list.length)return '';
+  const groups={};
+  list.forEach(ev=>{
+    let i=win.findIndex(r=>r.date>=ev.date),x;
+    if(i<0)x=X(win.length-1)+step/2;else x=X(i)-step/2;
+    const k=Math.round(x);(groups[k]=groups[k]||{x,evs:[]}).evs.push(ev)});
+  return Object.values(groups).map(g=>{
+    const e0=g.evs[0],t=evT(e0.type),col=g.evs.length>1&&new Set(g.evs.map(e=>e.type)).size>1?'#374151':t[3],lab=g.evs.length>1?String(g.evs.length):t[2];
+    const tip='<b>Logged events</b><br>'+g.evs.map(ev=>esc(evLine(ev,a))+(ev.byName?' <span style="opacity:.7">('+esc(ev.byName)+')</span>':'')).join('<br>');
+    return `<line x1="${g.x}" x2="${g.x}" y1="${mt}" y2="${mt+ph}" stroke="${col}" stroke-width="1.5" stroke-dasharray="2 3" opacity=".85"/><circle cx="${g.x}" cy="${mt-4}" r="7.5" fill="${col}"/><text x="${g.x}" y="${mt-1}" text-anchor="middle" style="fill:#fff;font-size:9px;font-weight:700">${lab}</text>${forExport?'':`<circle class="hit" cx="${g.x}" cy="${mt-4}" r="11" fill="transparent" data-tip="${esc(tip)}"/>`}`}).join('');
+}
+function evNear(a,fromDate,toDate){   /* text block for shifts and violations */
+  const l=evFor(a,fromDate,toDate);if(!l.length)return '';
+  return `<div class="small" style="margin-top:6px"><b>Logged around then:</b><ul style="margin:4px 0 0">${l.slice(-6).map(ev=>`<li>${esc(evLine(ev,a))}</li>`).join('')}</ul></div>`;
+}
+const dAdd=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return dstr(d)};
+/* ---------- the Calibration log tab ---------- */
+function evDraft(){return UI.evd||(UI.evd={id:'',type:'cal',date:todayStr(),dept:'',inst:'',mod:'',aids:[],lot:'',note:''})}
+function evRead(){
+  const d=evDraft(),g=id=>{const e=document.getElementById(id);return e?e.value:null};
+  const v={type:g('ev-type'),date:g('ev-date'),dept:g('ev-dept'),inst:g('ev-inst'),mod:g('ev-mod'),lot:g('ev-lot'),note:g('ev-note')};
+  Object.keys(v).forEach(k=>{if(v[k]!==null)d[k]=v[k]});
+  const boxes=[...document.querySelectorAll('[data-evt]')];if(boxes.length||document.getElementById('ev-tests'))d.aids=boxes.filter(b=>b.checked).map(b=>b.dataset.evt);
+}
+function evChange(e){
+  const t=e.target;if(!t.id||!t.id.startsWith('ev-')&&!t.hasAttribute('data-evt'))return false;
+  if(t.id&&t.id.startsWith('evf-')){UI.evf=UI.evf||{};UI.evf[t.id.slice(4)]=t.value;UI.evLim=0;render();return true}
+  evRead();const d=evDraft();
+  if(t.tagName==='TEXTAREA'||t.type==='text'||t.type==='date')return true;   /* no redraw: it would swallow the click on the Save button */
+  if(t.id==='ev-dept'){d.inst='';d.mod='';d.aids=[]}
+  if(t.id==='ev-inst'){d.mod='';d.aids=[]}
+  if(t.id==='ev-mod')d.aids=[];
+  render();return true;
+}
+function evScopeList(d){return S.analytes.filter(a=>a.dept===d.dept&&(!d.inst||instOf(a)===d.inst)&&(!d.mod||(a.mod||'')===d.mod)).sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true,sensitivity:'base'}))}
+function evForm(){
+  if(!perm('e_log'))return '';
+  const d=evDraft(),dl=visDepts();if(!dl.length)return '';
+  if(!d.dept||!dl.some(x=>x.id===d.dept))d.dept=dl[0].id;
+  const rec=dl.find(x=>x.id===d.dept),insts=[...new Set(S.analytes.filter(a=>a.dept===d.dept).map(instOf).filter(Boolean))],
+    mods=[...new Set(S.analytes.filter(a=>a.dept===d.dept&&(!d.inst||instOf(a)===d.inst)).map(a=>a.mod).filter(Boolean))].sort(),
+    tests=evScopeList(d);
+  const open=UI.evOpen||!!d.id||(d.aids&&d.aids.length)||UI.evNew;
+  return `<details class="panel"${open?' open':''} data-evopen><summary style="cursor:pointer"><b>${d.id?'Edit logged event':'Log a calibration, reagent lot change or maintenance'}</b></summary>
+   <form data-form="evsave" class="stack" style="margin-top:10px" autocomplete="off"><div class="grid2">
+    <label class="f">What happened<select id="ev-type">${EVT.map(t=>`<option value="${t[0]}"${t[0]===d.type?' selected':''}>${t[1]}</option>`).join('')}</select></label>
+    <label class="f">Date<input type="date" id="ev-date" value="${esc(d.date)}" max="${todayStr()}"></label>
+    ${dl.length>1?`<label class="f">Department<select id="ev-dept">${dl.map(x=>`<option value="${x.id}"${x.id===d.dept?' selected':''}>${esc(x.dept)}</option>`).join('')}</select></label>`:''}
+    <label class="f">Analyser<select id="ev-inst"><option value="">All analysers</option>${insts.map(n=>`<option${n===d.inst?' selected':''}>${esc(n)}</option>`).join('')}</select></label>
+    ${mods.length?`<label class="f">Module<select id="ev-mod"><option value="">All modules</option>${mods.map(m=>`<option${m===d.mod?' selected':''}>${esc(m)}</option>`).join('')}</select></label>`:''}
+    <label class="f">${d.type==='reg'?'Reagent lot number':d.type==='cal'?'Calibrator lot or calibration ID':'Lot or reference'} (optional)<input type="text" id="ev-lot" maxlength="60" value="${esc(d.lot)}"></label></div>
+    <details id="ev-tests"${d.aids&&d.aids.length?' open':''}><summary class="small" style="cursor:pointer">Applies to <b>${d.aids&&d.aids.length?d.aids.length+' selected test'+(d.aids.length===1?'':'s'):'all '+tests.length+' tests'}</b> on this selection. Pick specific tests (optional)</summary>
+     <div class="row" style="gap:6px 16px;margin-top:6px">${tests.map(a=>`<label class="small" style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" data-evt="${a.id}"${(d.aids||[]).includes(a.id)?' checked':''}>${esc(a.name)}</label>`).join('')}</div></details>
+    <label class="f">Details (optional)<textarea id="ev-note" rows="2" maxlength="300" placeholder="e.g. Full calibration after reagent change; replaced ISE electrode; probe cleaned">${esc(d.note)}</textarea></label>
+    ${UI.evMsg?`<p class="amsg" role="alert">${esc(UI.evMsg)}</p>`:''}
+    <div class="row"><button class="btn primary" type="submit">${d.id?'Save changes':'Add to log'}</button>${d.id||UI.evNew||(d.aids&&d.aids.length)?'<button class="btn" type="button" data-act="evcancel">Cancel</button>':''}</div></form></details>`;
+}
+function renderLog(){
+  const f=UI.evf||{},dl=visDepts(),can=perm('e_log');
+  let list=(S.events||[]).filter(evVis);
+  if(f.type)list=list.filter(e=>e.type===f.type);
+  if(f.dept)list=list.filter(e=>e.dept===f.dept);
+  if(f.from)list=list.filter(e=>e.date>=f.from);if(f.to)list=list.filter(e=>e.date<=f.to);
+  if(f.q){const q=f.q.toLowerCase();list=list.filter(e=>((e.note||'')+' '+(e.lot||'')+' '+evScope(e)).toLowerCase().includes(q))}
+  list=list.sort((x,y)=>x.date<y.date?1:x.date>y.date?-1:(y.at||'')<(x.at||'')?-1:1);
+  const L=UI.evLim||50;
+  return `<div class="stack"><div class="panel"><h2>Calibration and maintenance log</h2><p class="small muted" style="margin:4px 0 0;max-width:80ch">Record calibrations, reagent lot changes and maintenance. Each entry appears as a marker on the Levey-Jennings charts of the tests it applies to, and is listed beside any trend, shift or violation that follows it, which makes a shift easier to explain.</p></div>
+   ${evForm()}
+   <div class="panel"><div class="row" style="align-items:flex-end;gap:10px"><label class="f">Type<select id="evf-type" style="width:auto"><option value="">All types</option>${EVT.map(t=>`<option value="${t[0]}"${f.type===t[0]?' selected':''}>${t[1]}</option>`).join('')}</select></label>
+    ${dl.length>1?`<label class="f">Department<select id="evf-dept" style="width:auto"><option value="">All departments</option>${dl.map(d=>`<option value="${d.id}"${f.dept===d.id?' selected':''}>${esc(d.dept)}</option>`).join('')}</select></label>`:''}
+    <label class="f">From<input type="date" id="evf-from" value="${esc(f.from||'')}" style="width:auto"></label><label class="f">To<input type="date" id="evf-to" value="${esc(f.to||'')}" style="width:auto"></label>
+    <label class="f" style="flex:1 1 160px">Search<input type="text" id="evf-q" value="${esc(f.q||'')}" placeholder="Lot, test or detail"></label></div>
+    <div class="scroll" style="margin-top:10px"><table class="t"><thead><tr><th>Date</th><th>Type</th><th>Applies to</th><th>Lot / ID</th><th>Details</th><th>Logged by</th><th></th></tr></thead><tbody>
+    ${list.slice(0,L).map(ev=>{const t=evT(ev.type);return `<tr><td>${fmtDate(ev.date)}</td><td><span class="chip" style="border-color:${t[3]};color:${t[3]}">${t[1]}</span></td><td class="small">${esc(evScope(ev))}</td><td class="mono small">${esc(ev.lot||'')}</td><td class="small">${esc(ev.note||'')}</td><td class="small">${esc(ev.byName||'')}${ev.at?'<div class="muted">'+fmtTs(ev.at)+'</div>':''}</td>
+     <td style="white-space:nowrap">${can?`<button class="btn sm" data-act="evedit" data-id="${ev.id}">Edit</button> ${UI.evdel===ev.id?`<button class="btn sm danger" data-act="evdelok" data-id="${ev.id}">Yes, delete</button> <button class="btn sm" data-act="evdelno">Cancel</button>`:`<button class="btn sm" data-act="evdel" data-id="${ev.id}">Delete</button>`}`:''}</td></tr>`}).join('')||'<tr><td colspan="7" class="muted">Nothing logged yet.'+(can?' Use the form above.':'')+'</td></tr>'}</tbody></table></div>
+    ${list.length>L?`<div style="margin-top:8px"><button class="btn sm" data-act="evmore">Show more (${list.length-L} left)</button></div>`:''}</div></div>`;
+}
+function evSave(){
+  evRead();const d=evDraft();
+  if(!perm('e_log'))return;
+  if(!d.date||d.date>todayStr()){UI.evMsg='Choose the date it happened (today or earlier).';return}
+  if(!S.depts.some(x=>x.id===d.dept)){UI.evMsg='Choose a department.';return}
+  const now=nowIso(),rec={type:d.type,date:d.date,dept:d.dept,inst:d.inst||'',mod:d.mod||'',aids:(d.aids||[]).slice(),lot:(d.lot||'').trim(),note:(d.note||'').trim(),modAt:now};
+  S.events=S.events||[];
+  if(d.id){const o=S.events.find(x=>x.id===d.id);if(!o)return;Object.assign(o,rec);delete o._h;audit('Log entry edited',evT(o.type)[1]+' '+fmtDate(o.date)+' · '+evScope(o),null,[o.dept])}
+  else{const o={id:uid(),...rec,by:CU?CU.id:null,byName:CU?CU.name:'',at:now};S.events.push(o);audit('Log entry added',evT(o.type)[1]+' '+fmtDate(o.date)+' · '+evScope(o)+(o.lot?' · lot '+o.lot:''),null,[o.dept])}
+  UI.evd=null;UI.evOpen=false;UI.evNew=false;UI.evMsg='';save();toast('Added to the log.');
+}
+function evAct(act,el){
+  const id=el.dataset.id;
+  if(act==='evnew'){   /* from a chart: prefill with that test */
+    const a=anOf(id);if(!a||!perm('e_log'))return true;
+    UI.evd={id:'',type:'cal',date:todayStr(),dept:a.dept,inst:instOf(a),mod:'',aids:[a.id],lot:'',note:''};UI.evNew=true;setTab('log');return true}
+  if(act==='evcancel'){UI.evd=null;UI.evNew=false;UI.evOpen=false;UI.evMsg='';render();return true}
+  if(act==='evmore'){UI.evLim=(UI.evLim||50)+50;render();return true}
+  if(!perm('e_log'))return true;
+  if(act==='evedit'){const o=(S.events||[]).find(x=>x.id===id);if(!o)return true;UI.evd={id:o.id,type:o.type,date:o.date,dept:o.dept,inst:o.inst||'',mod:o.mod||'',aids:(o.aids||[]).slice(),lot:o.lot||'',note:o.note||''};UI.evOpen=true;render();window.scrollTo(0,0);return true}
+  if(act==='evdel'){UI.evdel=id;render();return true}
+  if(act==='evdelno'){UI.evdel=null;render();return true}
+  if(act==='evdelok'){const o=(S.events||[]).find(x=>x.id===id);UI.evdel=null;if(o){tomb(id);S.events=S.events.filter(x=>x.id!==id);audit('Log entry deleted',evT(o.type)[1]+' '+fmtDate(o.date)+' · '+evScope(o),null,[o.dept]);save();toast('Deleted from the log.')}render();return true}
+  return false;
+}
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
@@ -3086,10 +3227,10 @@ function render(){
   const un=S.setup.done?unresolved(allFlags()).length:0;
   h+=`<header class="top"><div class="brand"><h1 class="sr">QCLens</h1><img class="logo" src="${LOGO}" alt="QCLens logo"><span>${S.setup.done?esc((S.setup.lab?S.setup.lab+' · ':'')+(visDepts().length>1?visDepts().map(d=>d.dept).join(', '):visDepts().length===1?visDepts()[0].dept+' · '+analyserNameV():(S.setup.sub?S.setup.sub+' · ':'')+analyserName())):'Levey-Jennings charts and Westgard rules for the clinical laboratory'}</span></div>${userBar()}</header>`;
   if(S.setup.done&&!UI.editing){
-    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['materials','QC materials'],['limits','Establish limits'],['rules','Westgard rules'],['sigma','Sigma metrics']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
+    const T=[['today','Today'],...(perm('e_other')?[['other','Other QC']]:[]),['charts','Charts'],['alerts','Alerts'],['materials','QC materials'],['limits','Establish limits'],['rules','Westgard rules'],['sigma','Sigma metrics'],['log','Calibration log']].filter(x=>perm('v_'+x[0])||x[0]==='today'||x[0]==='other');if(canSetup())T.push(['setup','Setup']);if(isAdmin())T.push(['users','Users']);if(canAudit())T.push(['audit','Audit log']);
     if(!T.some(x=>x[0]===S.tab))S.tab='today';
     h+=`<nav class="tabs" role="tablist">${T.map(([k,n])=>`<button role="tab" aria-selected="${S.tab===k}" data-act="tab" data-t="${k}">${n}${k==='alerts'&&un?`<span class="badge">${un}</span>`:''}</button>`).join('')}</nav>`;
-    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():S.tab==='materials'?renderMaterials():S.tab==='sigma'?renderSigma():setupView();
+    h+=S.tab==='today'?renderToday():S.tab==='charts'?renderCharts():S.tab==='alerts'?renderAlerts():S.tab==='limits'?renderLimits():S.tab==='users'?renderUsers():S.tab==='audit'?renderAudit():S.tab==='rules'?renderRules():S.tab==='other'?renderOther():S.tab==='materials'?renderMaterials():S.tab==='sigma'?renderSigma():S.tab==='log'?renderLog():setupView();
   }else h+=renderSetup();
   h+=renderModal();
   app.innerHTML=h+FOOT;
@@ -3115,7 +3256,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
@@ -3325,6 +3466,8 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('change',e=>{
   if(CU&&sgChange(e))return;
+  if(CU&&evChange(e))return;
+  if(CU&&isAdmin()&&(e.target.id==='uq'||e.target.id==='urf'||e.target.id==='usort')){const k=e.target.id==='uq'?'uq':e.target.id==='urf'?'urf':'usort';UI[k]=e.target.value;render();return}
   if(estChange(e))return;
   const t=e.target,st=S.setup,d=t.dataset;
   if(!CU)return;

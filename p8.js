@@ -83,7 +83,7 @@ function mergeStates(L,R){
   const tomb=new Set([...(L.tomb||[]),...(R.tomb||[])]),out=JSON.parse(JSON.stringify(L));
   const by=(a,b,pick)=>{const m=new Map();(b||[]).forEach(x=>m.set(x.id,x));(a||[]).forEach(x=>m.set(x.id,m.has(x.id)&&pick?pick(x,m.get(x.id)):x));return [...m.values()].filter(x=>!tomb.has(x.id))};
   const newer=(a,b)=>((a.upd||a).at||'')>=((b.upd||b).at||'')?a:b;
-  const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;return x};
+  const keepPw=(a,b)=>{const w=(b.mod||'')>(a.mod||'')?b:a,o=w===a?b:a,x={...w};if(!x.pw&&o.pw)x.pw=o.pw;if(!x.rec&&o.rec)x.rec=o.rec;const ll=[a.lastLogin,b.lastLogin].filter(Boolean).sort().pop();if(ll)x.lastLogin=ll;return x};
   out.users=by(L.users,R.users,keepPw);out.requests=by(L.requests,R.requests,(a,b)=>(b.status&&b.status!=='pending'&&(!a.status||a.status==='pending'))?b:a);out.depts=by(L.depts,R.depts,(a,b)=>((b.modAt||'')>(a.modAt||'')?b:a));out.audit=by(L.audit,R.audit).sort((x,y)=>x.at<y.at?-1:x.at>y.at?1:0);
   const newerMod=(a,b)=>{const am=a.modAt||'',bm=b.modAt||'';return bm>am?b:am>bm?a:null};
   out.est=by(L.est,R.est,(a,b)=>newerMod(a,b)||(b.runs&&a.runs&&b.runs.length>a.runs.length?b:a));
@@ -98,7 +98,7 @@ function mergeStates(L,R){
   if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
   out.drules={};out.drulesAt={};{const ids=new Set([...Object.keys(L.drulesAt||{}),...Object.keys(R.drulesAt||{}),...Object.keys(L.drules||{}),...Object.keys(R.drules||{})]);
    ids.forEach(id=>{const lr=(L.drulesAt||{})[id]||'',rr=(R.drulesAt||{})[id]||'',useR=rr>lr;const src=useR?R:L;if((src.drules||{})[id]!==undefined)out.drules[id]=src.drules[id];if(useR?rr:lr)out.drulesAt[id]=useR?rr:lr})}
-  out.trash=by(L.trash,R.trash);out.tomb=[...tomb];
+  out.trash=by(L.trash,R.trash);out.events=by(L.events,R.events,(a,b)=>newerMod(a,b)||a);out.tomb=[...tomb];
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   return out;
 }

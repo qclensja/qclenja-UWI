@@ -15,6 +15,7 @@ function trashDept(id){   /* call BEFORE the department is removed */
   syncCtx();const rec=S.depts.find(d=>d.id===id);if(!rec)return;
   const ids=S.analytes.filter(a=>a.dept===id).map(a=>a.id),set=new Set(ids),pk=trashPack(ids);
   pk.est=(S.est||[]).filter(e=>set.has(e.aid));
+  const evs=(S.events||[]).filter(e=>e.dept===id);evs.forEach(e=>tomb(e.id));S.events=(S.events||[]).filter(e=>e.dept!==id);pk.events=evs;
   trashAdd('dept',rec.dept,ids.length+' tests, '+pk.results.length+' QC results',{...pk,dept:rec,drules:(S.drules||{})[id]||null,userIds:S.users.filter(u=>Array.isArray(u.depts)&&u.depts.includes(id)).map(u=>u.id)});
 }
 function trashTests(ids,kind,label,panelName){   /* call BEFORE removeAnalyte */
@@ -36,6 +37,7 @@ function trashRestore(tid,intoDept){
     d.skips.forEach(s=>{s.aid=map[s.aid];if(s.id)s.id=uid()});
     d.est.forEach(e=>{e.aid=map[e.aid];e.id=uid();fresh(e)});
     S.analytes.push(...d.analytes);S.results.push(...d.results);S.skips.push(...d.skips);S.est.push(...d.est);
+    (d.events||[]).forEach(e=>{e.id=uid();e.dept=newId;e.aids=(e.aids||[]).map(x=>map[x]).filter(Boolean);fresh(e)});S.events=(S.events||[]).concat(d.events||[]);
     if(d.drules!=null){S.drules=S.drules||{};S.drulesAt=S.drulesAt||{};S.drules[newId]=d.drules;S.drulesAt[newId]=now}
     (d.userIds||[]).forEach(uid_=>{const u=S.users.find(x=>x.id===uid_);if(u&&Array.isArray(u.depts)&&!u.depts.includes(newId)){u.depts=[...u.depts,newId];u.mod=now}});
   }else{   /* panel or test: goes back into a department (original one, or one chosen) */

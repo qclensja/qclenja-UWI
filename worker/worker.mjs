@@ -35,7 +35,7 @@ export function applyRules(R,C,caller,pwset){
   const rm=new Map((R.users||[]).map(u=>[u.id,u]));let users;
   if(caller.role==='admin'){
     users=(C.users||[]).map(cu=>{const ru=rm.get(cu.id),o={...cu};delete o.pw;delete o.rec;
-      if(ru){o.pw=ru.pw;if(ru.rec)o.rec=ru.rec}
+      if(ru){o.pw=ru.pw;if(ru.rec)o.rec=ru.rec;if(ru.lastLogin&&(!o.lastLogin||ru.lastLogin>o.lastLogin))o.lastLogin=ru.lastLogin}
       if(pw[cu.id])o.pw=pw[cu.id].pw;
       return o.pw?o:null}).filter(Boolean);
     const dead=new Set(C.tomb||[]);
@@ -48,7 +48,12 @@ export function applyRules(R,C,caller,pwset){
   let out;
   if(caller.role==='admin')out={...C,users,requests:unionReq(R.requests,C.requests)};
   else if(caller.role==='sup'||caller.role==='qm')out={...C,users,requests:R.requests||[],rules:R.rules,rulesAt:R.rulesAt,drules:R.drules,drulesAt:R.drulesAt,perms:R.perms,permsAt:R.permsAt,tomb:unionBy(R.tomb,C.tomb,x=>x)};
-  else out={...R,users,results:unionBy(R.results,C.results,x=>x.id),skips:unionBy(R.skips,C.skips,x=>x.aid+'|'+x.date),audit:unionBy(R.audit,C.audit,x=>x.id)};
+  else{
+    /* technologists and consultants may log events (calibrations, lot changes, maintenance) and delete event entries, nothing else */
+    const evIds=new Set((R.events||[]).map(e=>e.id)),evDead=new Set((C.tomb||[]).filter(id=>evIds.has(id)));
+    out={...R,users,results:unionBy(R.results,C.results,x=>x.id),skips:unionBy(R.skips,C.skips,x=>x.aid+'|'+x.date),audit:unionBy(R.audit,C.audit,x=>x.id),
+      events:unionBy(R.events,C.events,x=>x.id).filter(e=>!evDead.has(e.id)),tomb:unionBy(R.tomb,[...evDead],x=>x)};
+  }
   delete out.tab;return out;
 }
 /* ---- backups: dated copies of the data file inside the same private repository ---- */
