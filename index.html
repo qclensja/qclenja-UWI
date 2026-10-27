@@ -425,7 +425,9 @@ function migAnalysers(o){
   fixRec(o.setup);(o.depts||[]).forEach(fixRec);(o.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]});
   (o.trash||[]).forEach(t=>{const d=t.data||{};fixRec(d.dept);(d.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]})});
 }
+const APPV=1;
 function norm(o){
+  o.appv=Math.max(+o.appv||0,APPV);
   o.users=o.users||[];o.events=o.events||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migAnalysers(o);migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
@@ -436,7 +438,7 @@ function norm(o){
   o.depts=o.depts||[];
   if(!o.depts.length&&((o.analytes||[]).length||st.done)){const id=Math.random().toString(36).slice(2,9);st.cur=id;o.depts.push({id})}
   if(st.cur&&!o.depts.some(d=>d.id===st.cur))o.depts.push({id:st.cur});
-  o.depts.forEach(d=>{if(d.id===st.cur)Object.assign(d,{dept:st.dept,sub:st.sub,analysers:st.analysers.slice(),amods:st.amods,sel:st.sel,selFor:st.selFor,cpanels:st.cpanels});d.analysers=d.analysers||[];d.sel=d.sel||{};d.cpanels=d.cpanels||[]});
+  o.depts.forEach(d=>{if(d.id===st.cur&&d.dept===undefined)Object.assign(d,{dept:st.dept,sub:st.sub,analysers:st.analysers.slice(),amods:st.amods,sel:st.sel,selFor:st.selFor,cpanels:st.cpanels});d.analysers=d.analysers||[];d.sel=d.sel||{};d.cpanels=d.cpanels||[]});
   (o.analytes||[]).forEach(a=>{
     if(!a.dept)a.dept=st.cur;
     if(!a.inst)a.inst=st.analysers[0]||'';
@@ -1989,9 +1991,13 @@ function mergeStates(L,R){
   out.analytes=by(L.analytes,R.analytes,(a,b)=>newerMod(a,b)||(b.targets.length>a.targets.length?b:a));
   const ok=new Set(out.analytes.map(a=>a.id));
   const rst=r=>[r.at,(r.upd||{}).at,r.ov&&r.ov.at,r.ovAt].filter(Boolean).sort().pop()||'';
-  out.results=by(L.results,R.results,(a,b)=>{const w=rst(b)>rst(a)?b:a;return (a.notes||b.notes)?{...w,notes:mergeNotes(a.notes,b.notes),noteAt:[a.noteAt,b.noteAt].filter(Boolean).sort().pop()}:w}).filter(r=>ok.has(r.aid));
-  const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>ok.has(s.aid));
+  out.results=by(L.results,R.results,(a,b)=>{const w=rst(b)>rst(a)?b:a;return (a.notes||b.notes)?{...w,notes:mergeNotes(a.notes,b.notes),noteAt:[a.noteAt,b.noteAt].filter(Boolean).sort().pop()}:w}).filter(r=>!tomb.has(r.aid));
+  const sk=new Map();(R.skips||[]).concat(L.skips||[]).forEach(s=>sk.set(s.aid+'|'+s.date,s));out.skips=[...sk.values()].filter(s=>!tomb.has(s.aid));
   out.setup=(L.setup&&L.setup.done)||!(R.setup&&R.setup.done)?L.setup:JSON.parse(JSON.stringify(R.setup));
+  /* global setup maps are merged key by key so a change made on another device is never wiped by a stale copy */
+  if(out.setup&&R.setup){const o=out.setup,r=R.setup;o.units={...(r.units||{}),...(o.units||{})};
+    const pa={...(r.padd||{})};Object.keys(o.padd||{}).forEach(k=>{const m=new Map((pa[k]||[]).map(i=>[i.name,i]));(o.padd[k]||[]).forEach(i=>m.set(i.name,i));pa[k]=[...m.values()]});o.padd=pa}
+  out.appv=Math.max(+L.appv||0,+R.appv||0);
   if((R.rulesAt||'')>(L.rulesAt||'')){out.rules=R.rules||{};out.rulesAt=R.rulesAt}
   if((R.permsAt||'')>(L.permsAt||'')){out.perms=R.perms||{};out.permsAt=R.permsAt}
   out.drules={};out.drulesAt={};{const ids=new Set([...Object.keys(L.drulesAt||{}),...Object.keys(R.drulesAt||{}),...Object.keys(L.drules||{}),...Object.keys(R.drules||{})]);
@@ -2015,7 +2021,8 @@ async function ghSync(){
     for(let i=0;i<3;i++){
       const rem=await ghPull();let remoteH=null;
       if(rem.exists){
-        GHS.sha=rem.sha;GHS.boot=!!rem.empty;if(rem.data){const R=norm(rem.data);remoteH=rem.empty?null:ghHash(R);
+        GHS.sha=rem.sha;GHS.boot=!!rem.empty;if(rem.data&&(+rem.data.appv||0)>APPV){GHS.st='err';GHS.msg='A newer version of QCLens has been published. Reload this page (or clear the browser cache) so your changes are not lost.';GHS.blocked=true;return}
+        if(rem.data){const R=norm(rem.data);remoteH=rem.empty?null:ghHash(R);
         const M=norm(mergeStates(S,R));
         if(ghHash(M)!==ghHash(S))ghAdopt(M)}
       }else{GHS.sha=null;GHS.boot=true}
@@ -2029,7 +2036,7 @@ async function ghSync(){
   finally{GHS.busy=false;ghPaint();if(GHS.pending){GHS.pending=false;ghQueue()}}
 }
 function ghQueue(){
-  if(!ghReady())return;
+  if(!ghReady()||GHS.blocked)return;
   if(GHS.lastHash!==null&&ghHash(S)===GHS.lastHash)return;
   clearTimeout(GHS.timer);GHS.timer=setTimeout(ghSync,2500);GHS.st=GHS.st==='err'?'err':'pending';ghPaint();
 }

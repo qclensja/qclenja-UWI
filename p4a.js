@@ -112,7 +112,9 @@ function migAnalysers(o){
   fixRec(o.setup);(o.depts||[]).forEach(fixRec);(o.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]});
   (o.trash||[]).forEach(t=>{const d=t.data||{};fixRec(d.dept);(d.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]})});
 }
+const APPV=1;
 function norm(o){
+  o.appv=Math.max(+o.appv||0,APPV);
   o.users=o.users||[];o.events=o.events||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migAnalysers(o);migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
@@ -123,7 +125,7 @@ function norm(o){
   o.depts=o.depts||[];
   if(!o.depts.length&&((o.analytes||[]).length||st.done)){const id=Math.random().toString(36).slice(2,9);st.cur=id;o.depts.push({id})}
   if(st.cur&&!o.depts.some(d=>d.id===st.cur))o.depts.push({id:st.cur});
-  o.depts.forEach(d=>{if(d.id===st.cur)Object.assign(d,{dept:st.dept,sub:st.sub,analysers:st.analysers.slice(),amods:st.amods,sel:st.sel,selFor:st.selFor,cpanels:st.cpanels});d.analysers=d.analysers||[];d.sel=d.sel||{};d.cpanels=d.cpanels||[]});
+  o.depts.forEach(d=>{if(d.id===st.cur&&d.dept===undefined)Object.assign(d,{dept:st.dept,sub:st.sub,analysers:st.analysers.slice(),amods:st.amods,sel:st.sel,selFor:st.selFor,cpanels:st.cpanels});d.analysers=d.analysers||[];d.sel=d.sel||{};d.cpanels=d.cpanels||[]});
   (o.analytes||[]).forEach(a=>{
     if(!a.dept)a.dept=st.cur;
     if(!a.inst)a.inst=st.analysers[0]||'';

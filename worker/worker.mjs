@@ -121,6 +121,7 @@ async function route(req,env){
     const {data:R,sha}=await load(env),C=b.data;
     if(!C||typeof C!=='object'||!Array.isArray(C.users))return J({error:'Bad data'},400);
     if(sha&&b.sha!==sha)return J({conflict:true},409);
+    if(hasUsers(R)&&(+C.appv||0)<(+R.appv||0))return J({error:'This copy of QCLens is out of date and was not allowed to overwrite newer data. Reload the page (clear the browser cache if needed) and try again.',outdated:true},426);
     let out;
     if(!hasUsers(R)){
       if(!b.boot||!C.users.some(u=>u.role==='admin'&&u.pw))return J({error:'The first upload must come from the administrator.'},403);
@@ -128,6 +129,7 @@ async function route(req,env){
     }else{
       const me=authUser(R,b.u,b.hash);if(!me)return J({error:'Username or password is incorrect.'},401);
       out=applyRules(R,C,me,b.pwset);
+      Object.keys(R).forEach(k=>{if(!(k in out))out[k]=R[k]});out.appv=Math.max(+R.appv||0,+C.appv||0);
     }
     const r=await store(env,out,sha);if(r.conflict)return J({conflict:true},409);
     return J({ok:true,sha:r.sha});

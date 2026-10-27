@@ -60,4 +60,10 @@ r=await post('/pull',{u:'jaba',hash:'H1'});ok('tech event saved, tomb for analyt
 const shE=r.j.sha;
 r=await post('/push',{u:'zed',hash:'H9',sha:shE,data:{users:[],events:[{id:'ev1',type:'reg',date:'2026-10-02',dept:'d'}],tomb:['ev0']}});
 r=await post('/pull',{u:'jaba',hash:'H1'});ok('tech can delete an event entry',r.j.data.events.length===1&&r.j.data.events[0].id==='ev1'&&r.j.data.tomb.includes('ev0'));
+// ---- version skew: an out-of-date client may not overwrite newer data; fields it does not know are kept ----
+r=await post('/pull',{u:'jaba',hash:'H1'});const us=r.j.data.users;
+r=await post('/push',{u:'jaba',hash:'H1',sha:r.j.sha,data:{users:us,analytes:[],events:[{id:'evx',type:'cal',date:'2026-10-03',dept:'d'}],appv:2}});ok('new client push ok',r.s===200);
+r=await post('/pull',{u:'jaba',hash:'H1'});
+const old=await post('/push',{u:'jaba',hash:'H1',sha:r.j.sha,data:{users:us,analytes:[]}});ok('old client rejected',old.s===426&&old.j.outdated);
+r=await post('/push',{u:'jaba',hash:'H1',sha:r.j.sha,data:{users:us,analytes:[],appv:2}});r=await post('/pull',{u:'jaba',hash:'H1'});ok('unknown field kept',(r.j.data.events||[]).some(e=>e.id==='evx')&&r.j.data.appv===2);
 srv.close();
