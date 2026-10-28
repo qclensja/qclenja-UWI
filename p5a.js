@@ -107,18 +107,22 @@ function resolvedCard(r,flags){
    <div class="row" style="margin-top:6px">${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button>`:''}</div></div>`;
 }
 function renderAlerts(){
-  const flags=allFlags(),un=unresolved(flags),L=UI.resLimit||15;
-  const warn=VR().filter(r=>!r.ov&&(flags[r.id]||[]).length&&!(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1).slice(0,15);
+  const flags=allFlags();
+  return `<div class="stack"><h2>QC alerts</h2>${alertBar(flags)}<div id="alres" class="stack">${alertsBody(flags)}</div></div>`;
+}
+function alertsBody(flags){
+  const un0=unresolved(flags),L=UI.resLimit||15,fl=alActive(),F=l=>alF(l,flags),un=F(un0);
+  const warn=F(VR().filter(r=>!r.ov&&(flags[r.id]||[]).length&&!(flags[r.id]||[]).some(x=>x.sev==='reject'))).sort((x,y)=>x.date<y.date?1:-1).slice(0,fl?200:15);
   const byNew=(x,y)=>(y.ov.at||y.date)>(x.ov.at||x.date)?1:-1;
-  const resRej=VR().filter(r=>r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort(byNew);
-  const resOther=VR().filter(r=>r.ov&&!(flags[r.id]||[]).some(x=>x.sev==='reject')).sort(byNew);
-  return `<div class="stack"><h2>QC alerts</h2>
-   <h3>Unresolved violations (${un.length})</h3>
-   ${un.length?un.map(r=>alertCard(r,flags,true)).join(''):'<div class="panel empty">No unresolved violations. All results are in control or resolved with a comment.</div>'}
-   ${warn.length?`<h3>Recent warnings</h3>${warn.map(r=>alertCard(r,flags,false)).join('')}`:''}
+  const resRej=F(VR().filter(r=>r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject'))).sort(byNew);
+  const resOther=F(VR().filter(r=>r.ov&&!(flags[r.id]||[]).some(x=>x.sev==='reject'))).sort(byNew);
+  const cnt=(n,t)=>fl&&n!==t?n+' of '+t:''+n;
+  return `<h3>Unresolved violations (${cnt(un.length,un0.length)})</h3>
+   ${un.length?un.map(r=>alertCard(r,flags,true)).join(''):`<div class="panel empty">${fl&&un0.length?'No unresolved violations match these filters.':'No unresolved violations. All results are in control or resolved with a comment.'}</div>`}
+   ${warn.length?`<h3>${fl?'Warnings':'Recent warnings'}</h3>${warn.map(r=>alertCard(r,flags,false)).join('')}`:''}
    <h3>Resolved violations (${resRej.length})</h3>
-   ${resRej.length?`<p class="small muted" style="margin:0">Rejections that were accepted with a comment explaining what was done. Newest first.</p>${resRej.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resRej.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resRej.length-L} left)</button></div>`:''}`:'<div class="panel empty">No resolved violations yet.</div>'}
-   ${resOther.length?`<h3>Reviewed warnings and notes (${resOther.length})</h3>${resOther.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resOther.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resOther.length-L} left)</button></div>`:''}`:''}</div>`;
+   ${resRej.length?`<p class="small muted" style="margin:0">Rejections that were accepted with a comment explaining what was done. Newest first.</p>${resRej.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resRej.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resRej.length-L} left)</button></div>`:''}`:`<div class="panel empty">${fl?'No resolved violations match these filters.':'No resolved violations yet.'}</div>`}
+   ${resOther.length?`<h3>Reviewed warnings and notes (${resOther.length})</h3>${resOther.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resOther.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resOther.length-L} left)</button></div>`:''}`:''}`;
 }
 const LATE_MS=3600000;
 function saveQC(scope){

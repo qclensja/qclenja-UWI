@@ -786,18 +786,22 @@ function resolvedCard(r,flags){
    <div class="row" style="margin-top:6px">${perm('e_override')?`<button class="btn sm" data-act="unoverride" data-id="${r.id}">Reopen violation</button>`:''}</div></div>`;
 }
 function renderAlerts(){
-  const flags=allFlags(),un=unresolved(flags),L=UI.resLimit||15;
-  const warn=VR().filter(r=>!r.ov&&(flags[r.id]||[]).length&&!(flags[r.id]||[]).some(x=>x.sev==='reject')).sort((x,y)=>x.date<y.date?1:-1).slice(0,15);
+  const flags=allFlags();
+  return `<div class="stack"><h2>QC alerts</h2>${alertBar(flags)}<div id="alres" class="stack">${alertsBody(flags)}</div></div>`;
+}
+function alertsBody(flags){
+  const un0=unresolved(flags),L=UI.resLimit||15,fl=alActive(),F=l=>alF(l,flags),un=F(un0);
+  const warn=F(VR().filter(r=>!r.ov&&(flags[r.id]||[]).length&&!(flags[r.id]||[]).some(x=>x.sev==='reject'))).sort((x,y)=>x.date<y.date?1:-1).slice(0,fl?200:15);
   const byNew=(x,y)=>(y.ov.at||y.date)>(x.ov.at||x.date)?1:-1;
-  const resRej=VR().filter(r=>r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject')).sort(byNew);
-  const resOther=VR().filter(r=>r.ov&&!(flags[r.id]||[]).some(x=>x.sev==='reject')).sort(byNew);
-  return `<div class="stack"><h2>QC alerts</h2>
-   <h3>Unresolved violations (${un.length})</h3>
-   ${un.length?un.map(r=>alertCard(r,flags,true)).join(''):'<div class="panel empty">No unresolved violations. All results are in control or resolved with a comment.</div>'}
-   ${warn.length?`<h3>Recent warnings</h3>${warn.map(r=>alertCard(r,flags,false)).join('')}`:''}
+  const resRej=F(VR().filter(r=>r.ov&&(flags[r.id]||[]).some(x=>x.sev==='reject'))).sort(byNew);
+  const resOther=F(VR().filter(r=>r.ov&&!(flags[r.id]||[]).some(x=>x.sev==='reject'))).sort(byNew);
+  const cnt=(n,t)=>fl&&n!==t?n+' of '+t:''+n;
+  return `<h3>Unresolved violations (${cnt(un.length,un0.length)})</h3>
+   ${un.length?un.map(r=>alertCard(r,flags,true)).join(''):`<div class="panel empty">${fl&&un0.length?'No unresolved violations match these filters.':'No unresolved violations. All results are in control or resolved with a comment.'}</div>`}
+   ${warn.length?`<h3>${fl?'Warnings':'Recent warnings'}</h3>${warn.map(r=>alertCard(r,flags,false)).join('')}`:''}
    <h3>Resolved violations (${resRej.length})</h3>
-   ${resRej.length?`<p class="small muted" style="margin:0">Rejections that were accepted with a comment explaining what was done. Newest first.</p>${resRej.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resRej.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resRej.length-L} left)</button></div>`:''}`:'<div class="panel empty">No resolved violations yet.</div>'}
-   ${resOther.length?`<h3>Reviewed warnings and notes (${resOther.length})</h3>${resOther.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resOther.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resOther.length-L} left)</button></div>`:''}`:''}</div>`;
+   ${resRej.length?`<p class="small muted" style="margin:0">Rejections that were accepted with a comment explaining what was done. Newest first.</p>${resRej.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resRej.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resRej.length-L} left)</button></div>`:''}`:`<div class="panel empty">${fl?'No resolved violations match these filters.':'No resolved violations yet.'}</div>`}
+   ${resOther.length?`<h3>Reviewed warnings and notes (${resOther.length})</h3>${resOther.slice(0,L).map(r=>resolvedCard(r,flags)).join('')}${resOther.length>L?`<div><button class="btn sm" data-act="resmore">Show more (${resOther.length-L} left)</button></div>`:''}`:''}`;
 }
 const LATE_MS=3600000;
 function saveQC(scope){
@@ -923,6 +927,7 @@ function renderModal(){
   if(m.exp)return renderExpModal();
   if(m.sgrep)return renderSgModal();
   if(m.ptn)return renderPtModal();
+  if(m.srch)return renderSrchModal();
   if(m.add)return renderAddModal();
   if(m.edit)return renderEditModal();
   if(m.late)return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:640px" role="dialog" aria-modal="true" aria-label="Reason for changing QC" data-stop>
@@ -1445,7 +1450,7 @@ function authGate(){
 }
 function userBar(){
   return `<div class="userbar"><span class="who"><b>${esc(CU.name)}</b> <span class="chip${CU.role==='admin'?' acc':''}">${roleName(CU.role)}</span></span>
-   <button class="btn sm" data-act="acct">Account</button><button class="btn sm" data-act="signout">Sign out</button></div>`;
+   <button class="btn sm" data-act="srchopen" title="Search analytes, lots and dates ( / )">Search</button><button class="btn sm" data-act="acct">Account</button><button class="btn sm" data-act="signout">Sign out</button></div>`;
 }
 function renderAcctModal(){
   return `<div class="modalbg" data-act="mclose"><div class="modal" role="dialog" aria-modal="true" aria-label="Account" data-stop>
@@ -3271,6 +3276,82 @@ function ptAct(act,el){
     audit('Point comment deleted',(a?a.name:'')+' '+levelName(r.lv)+' '+fmtDate(r.date),null,a?[a.dept]:[]);save();render();return true}
   return false;
 }
+/* p18: search (analyte, lot, date) and filters on the Alerts tab */
+const dOnly=s=>{const m=String(s||'').trim().match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);if(m)return m[3]+'-'+pad(+m[2])+'-'+pad(+m[1]);const n=String(s||'').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);return n?n[1]+'-'+pad(+n[2])+'-'+pad(+n[3]):''};
+const lvOf=(a,r)=>((targetFor(a,r.date)||{}).levels||[])[r.lv]||{};
+function alActive(){const f=UI.alf||{};return !!(f.q||f.inst||f.rule||f.who||f.from||f.to)}
+function alMatch(r,flags){
+  const f=UI.alf||{},a=anOf(r.aid);if(!a)return false;const fl=flags[r.id]||[],t=lvOf(a,r);
+  if(f.inst&&instOf(a)!==f.inst)return false;
+  if(f.rule&&!fl.some(x=>x.rule===f.rule))return false;
+  if(f.who&&r.byName!==f.who&&!(r.ov&&r.ov.byName===f.who))return false;
+  if(f.from&&r.date<f.from)return false;if(f.to&&r.date>f.to)return false;
+  const q=(f.q||'').trim().toLowerCase();
+  if(q){const iso=dOnly(q);
+    const hay=[a.name,a.panel,instOf(a),a.mod,t.lot,t.material,r.date,fmtDate(r.date),r.byName,r.ov&&r.ov.comment,r.ov&&r.ov.byName,...ptNotes(r).map(n=>n.text)].filter(Boolean).join(' | ').toLowerCase();
+    if(!(hay.includes(q)||(iso&&r.date===iso)))return false}
+  return true;
+}
+const alF=(list,flags)=>alActive()?list.filter(r=>alMatch(r,flags)):list;
+function alertBar(flags){
+  const f=UI.alf||{},rs=VR(),insts=[...new Set(VA().map(a=>instOf(a)).filter(Boolean))].sort(),
+   who=[...new Set(rs.flatMap(r=>[r.byName,r.ov&&r.ov.byName]).filter(Boolean))].sort((x,y)=>x.localeCompare(y)),
+   used=new Set(Object.values(flags).flat().map(x=>x.rule)),rules=Object.keys(RULES).filter(k=>used.has(k)||k===f.rule);
+  const sel=(id,lab,opts,v)=>`<label class="f">${lab}<select id="${id}" style="width:auto"><option value="">All</option>${opts.map(o=>`<option value="${esc(o[0])}"${o[0]===v?' selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`;
+  return `<div class="panel stack" style="gap:10px"><div class="row" style="align-items:flex-end;gap:10px;flex-wrap:wrap">
+   <label class="f" style="flex:1 1 220px">Find in alerts<input type="search" id="alq" value="${esc(f.q||'')}" placeholder="Analyte, lot, date, comment or person" autocomplete="off"></label>
+   ${insts.length>1?sel('alinst','Analyser',insts.map(x=>[x,x]),f.inst):''}
+   ${sel('alrule','Rule',rules.map(k=>[k,RULES[k].name]),f.rule)}
+   ${sel('alwho','Person',who.map(x=>[x,x]),f.who)}
+   <label class="f">From<input type="date" id="alfrom" value="${esc(f.from||'')}"></label><label class="f">To<input type="date" id="alto" value="${esc(f.to||'')}"></label>
+   ${alActive()?'<button class="btn sm" data-act="alclear">Clear filters</button>':''}</div>
+   <p class="small muted" style="margin:0">Person matches who entered the result or who resolved it. Filters apply to every list below.</p></div>`;
+}
+/* ---- global search ---- */
+function srchData(q){
+  q=(q||'').trim().toLowerCase();if(!q)return null;
+  const iso=dOnly(q),A=VA(),flags=allFlags();
+  const an=A.filter(a=>(a.name+' '+(a.panel||'')+' '+instOf(a)).toLowerCase().includes(q)).sort((x,y)=>x.name.localeCompare(y.name)).slice(0,25);
+  const lots=new Map();
+  A.forEach(a=>(a.targets||[]).forEach((tg,ti)=>tg.levels.forEach((l,li)=>{
+    if(l.lot&&(l.lot+' '+(l.material||'')).toLowerCase().includes(q)){const k=(l.material||'')+'|'+l.lot;if(!lots.has(k))lots.set(k,{lot:l.lot,material:l.material||'',rows:[]});
+      lots.get(k).rows.push({a,li,from:tg.from,exp:l.exp,cur:ti===a.targets.length-1})}})));
+  const days=iso?VR().filter(r=>r.date===iso).sort((x,y)=>(anOf(x.aid).name+x.lv).localeCompare(anOf(y.aid).name+y.lv)):[];
+  return {q,iso,an,lots:[...lots.values()].slice(0,12),days,flags};
+}
+function srchHtml(q){
+  const d=srchData(q);if(!d)return '<p class="muted small" style="margin:8px 0 0">Type an analyte name, a QC lot number or a date (for example 22/10/2026).</p>';
+  let h='';
+  if(d.iso)h+=`<h3 style="margin:12px 0 6px">${fmtDate(d.iso)}</h3><div class="row" style="margin-bottom:6px"><button class="btn sm" data-act="srchday" data-d="${d.iso}">Open this day on Today</button></div>`+(d.days.length?`<div class="stack" style="gap:4px">${d.days.map(r=>{const a=anOf(r.aid),f=d.flags[r.id]||[],rej=f.some(x=>x.sev==='reject');return `<button class="btn" style="text-align:left" data-act="ptnote" data-id="${r.id}"><b>${esc(a.name)}</b> · ${levelName(r.lv)} · <span class="mono">${fmt(r.value,decs(a))} ${esc(a.unit)}</span> ${f.length?f.map(x=>`<span class="chip ${x.sev==='reject'?'bad':'warn'}">${RULES[x.rule].name}</span>`).join(' '):'<span class="chip good">In control</span>'}</button>`}).join('')}</div>`:'<p class="muted small">No QC results on this date.</p>');
+  if(d.an.length)h+=`<h3 style="margin:12px 0 6px">Analytes (${d.an.length})</h3><div class="stack" style="gap:4px">${d.an.map(a=>`<button class="btn" style="text-align:left" data-act="srchan" data-id="${a.id}"><b>${esc(a.name)}</b> <span class="muted small">${esc(a.panel||'')}${multiInst()?' · '+esc(instLabel(a)):''}${a.off?' · disabled':''}</span></button>`).join('')}</div>`;
+  if(d.lots.length)h+=`<h3 style="margin:12px 0 6px">QC lots</h3>`+d.lots.map(l=>`<div class="panelcard small" style="margin-bottom:6px"><b>${esc(l.lot)}</b> <span class="muted">${esc(l.material)}</span><div class="muted" style="margin-top:4px">${l.rows.slice(0,40).map(x=>`<button class="btn sm" data-act="srchan" data-id="${x.a.id}" style="margin:0 6px 6px 0">${esc(x.a.name)} L${x.li+1}</button>`).join('')}${l.rows.length>40?'…':''}</div><div class="muted" style="margin-top:4px">Used from ${fmtDate(l.rows.map(x=>x.from).sort()[0])}${l.rows.some(x=>x.exp)?' · expires '+fmtDate(l.rows.map(x=>x.exp).filter(Boolean).sort().pop()):''}${l.rows.some(x=>x.cur)?' · current lot':' · past lot'}</div></div>`).join('');
+  if(!d.an.length&&!d.lots.length&&!(d.iso))h+='<p class="muted small" style="margin:8px 0 0">Nothing found.</p>';
+  return h;
+}
+function renderSrchModal(){
+  return `<div class="modalbg" data-act="mclose"><div class="modal" style="max-width:680px" role="dialog" aria-modal="true" aria-label="Search" data-stop>
+   <h2>Search</h2><label class="f" style="margin-top:6px">Analyte, lot or date<input type="search" id="srch-q" value="${esc(UI.srchQ||'')}" autocomplete="off" placeholder="e.g. Sodium, A1042 or 22/10/2026"></label>
+   <div id="srch-res">${srchHtml(UI.srchQ)}</div><div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-act="mclose">Close</button></div></div></div>`;
+}
+function srchAct(act,el){
+  if(act==='alclear'){UI.alf={};render();return true}
+  if(act==='srchopen'){UI.srchQ='';UI.modal={srch:true};render();setTimeout(()=>{const i=document.getElementById('srch-q');if(i)i.focus()},30);return true}
+  if(act==='srchan'){const a=anOf(el.dataset.id);UI.modal=null;if(a){if(!perm('v_charts'))return true;UI.cid=a.id;if(a.dept&&S.setup.cur!==a.dept&&canSeeD(a.dept))try{loadCtx(a.dept)}catch(e){}UI.cid=a.id;setTab('charts')}else render();return true}
+  if(act==='srchday'){UI.modal=null;UI.date=el.dataset.d;UI.report=[];setTab('today');return true}
+  return false;
+}
+document.addEventListener('input',e=>{
+  const t=e.target;if(!t||!t.id||typeof CU==='undefined'||!CU)return;
+  if(t.id==='srch-q'){UI.srchQ=t.value;const r=document.getElementById('srch-res');if(r)r.innerHTML=srchHtml(t.value)}
+  else if(t.id==='alq'){(UI.alf=UI.alf||{}).q=t.value;const r=document.getElementById('alres');if(r)r.innerHTML=alertsBody(allFlags())}
+});
+document.addEventListener('change',e=>{
+  const t=e.target;if(!t||!CU)return;const m={alinst:'inst',alrule:'rule',alwho:'who',alfrom:'from',alto:'to'}[t.id];
+  if(m){(UI.alf=UI.alf||{})[m]=t.value;render()}
+});
+document.addEventListener('keydown',e=>{
+  if(!CU||UI.modal)return;if((e.key==='/'&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName))||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();srchAct('srchopen')}
+});
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
@@ -3336,7 +3417,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if((act.startsWith('srch')||act==='alclear')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);

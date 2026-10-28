@@ -110,7 +110,7 @@ function authGate(){
 }
 function userBar(){
   return `<div class="userbar"><span class="who"><b>${esc(CU.name)}</b> <span class="chip${CU.role==='admin'?' acc':''}">${roleName(CU.role)}</span></span>
-   <button class="btn sm" data-act="acct">Account</button><button class="btn sm" data-act="signout">Sign out</button></div>`;
+   <button class="btn sm" data-act="srchopen" title="Search analytes, lots and dates ( / )">Search</button><button class="btn sm" data-act="acct">Account</button><button class="btn sm" data-act="signout">Sign out</button></div>`;
 }
 function renderAcctModal(){
   return `<div class="modalbg" data-act="mclose"><div class="modal" role="dialog" aria-modal="true" aria-label="Account" data-stop>
