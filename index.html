@@ -1156,13 +1156,14 @@ function renderManager(){
      <div class="row" style="gap:6px"><button class="btn sm" data-act="addopen" data-p="${esc(pn)}">Add or move analytes</button>${allP.length?`<button class="btn sm" data-act="ptoggle" data-p="${esc(pn)}" title="Turn every test in this panel off or on">${allP.every(a=>a.off)?'Enable panel':'Disable panel'}</button>`:''}
      ${pc?`<span class="small">Delete the panel "${esc(pn)}", its ${allP.length} analyte${allP.length===1?'':'s'} and ${nr} QC result${nr===1?'':'s'}? An administrator can restore it for 30 days from Setup, Recently deleted.</span><button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Yes, delete panel</button><button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm danger" data-act="pdel" data-p="${esc(pn)}">Delete panel</button>`}</div></div>
      ${list.length?`<div class="scroll"><table class="t" style="margin-top:6px"><thead><tr><th>Analyte</th><th>Unit</th>${ctxMulti()?'<th>Analyser · module</th>':''}<th>Schedule</th><th>QC materials · lots</th><th></th></tr></thead><tbody>${list.map(a=>{const t=curTarget(a),c=UI.confirmDel===a.id,n=nRes(a.id);
-       return `<tr${a.off?' style="opacity:.62"':''}><td><b>${esc(a.name)}</b>${a.off?' <span class="chip">Disabled</span>':''}</td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
+       return `<tr data-arow="${a.id}"${a.off?' style="opacity:.62"':''}><td><b>${esc(a.name)}</b>${a.off?' <span class="chip">Disabled</span>':''}</td><td>${uIn(a)}</td>${ctxMulti()?`<td><select data-inst="${a.id}" aria-label="Analyser for ${esc(a.name)}">${instOpts(instOf(a),a.mod||'')}</select></td>`:''}<td class="small">${esc(scheduleText(a))}</td><td class="small">${t.levels.slice(0,a.nlev).map((l,i)=>levelName(i)+': '+esc(l.material||'–')+(l.lot?' · '+esc(l.lot):'')).join('<br>')}</td>
        <td style="text-align:right;white-space:nowrap">${c?`<span class="small">Delete ${n} result${n===1?'':'s'}?</span> <button class="btn sm danger" data-act="arem" data-id="${a.id}">Confirm</button> <button class="btn sm" data-act="arcancel">Cancel</button>`:`<button class="btn sm" data-act="aedit" data-id="${a.id}" aria-label="Edit ${esc(a.name)}">Edit</button> <button class="btn sm" data-act="atoggle" data-id="${a.id}" aria-label="${a.off?'Enable':'Disable'} ${esc(a.name)}" title="${a.off?'Start asking for QC on this test again':'Stop asking for QC on this test. Its results are kept.'}">${a.off?'Enable':'Disable'}</button> <button class="btn sm" data-act="arem" data-id="${a.id}" aria-label="Remove ${esc(a.name)}">Remove</button>`}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted" style="margin:8px 0 0">No analytes in this panel yet.</p>'}
      ${sugg.length&&!seenP.has(pn)?`<div class="row" style="margin-top:8px;gap:6px;align-items:center"><span class="small muted">Routine tests not in use:</span>${sugg.map(i=>`<button class="btn sm" data-act="sugg" data-p="${esc(pn)}" data-n="${esc(i.name)}">+ ${esc(i.name)}</button>`).join('')}</div>`:''}</div>`};
   seenP.clear();
   const cards=byAnalyser(DA(),(pn,list)=>{const h=card(pn,list);seenP.add(pn);return h})+(()=>{const empty=names.filter(pn=>!DA().some(a=>a.panel===pn));return empty.length?`<div class="angrp"><div class="angh"><span>Panels with no analytes yet</span></div>${empty.map(pn=>card(pn,[])).join('')}</div>`:''})();
   const more=routine.filter(p=>!names.includes(p.name));
   return `<div class="panel stack"><div><h3>Panels and analytes</h3><p class="small muted" style="margin:4px 0 0">Add new analytes to a panel, move analytes in from other panels, change a unit, rename or delete a custom panel, or start a new panel. New analytes start QC from today and existing results are not changed.</p></div>
+   <div style="position:relative;max-width:460px"><label class="f">Find an analyte<input type="search" id="mfind" autocomplete="off" placeholder="Type a test name to jump to it" value=""></label><div id="mfind-res" class="panelcard" style="display:none;position:absolute;left:0;right:0;z-index:5;margin-top:2px;padding:4px"></div></div>
    <datalist id="unitlist">${UNITS.map(u=>`<option value="${esc(u)}">`).join('')}</datalist>
    <div class="stack">${cards}</div>
    ${more.length?`<details data-more${UI.moreOpen?' open':''}><summary style="cursor:pointer"><b>More routine panels for ${esc(st.sub||st.dept)} (${more.length})</b></summary><div class="stack" style="margin-top:10px">${more.map(p=>`<div class="panelcard"><h3>${esc(p.name)}</h3><div class="row" style="margin-top:8px;gap:6px">${p.items.map(i=>`<button class="btn sm" data-act="sugg" data-p="${esc(p.name)}" data-n="${esc(i.name)}">+ ${esc(i.name)}</button>`).join('')}</div></div>`).join('')}</div></details>`:''}
@@ -3334,6 +3335,7 @@ function renderSrchModal(){
    <div id="srch-res">${srchHtml(UI.srchQ)}</div><div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-act="mclose">Close</button></div></div></div>`;
 }
 function srchAct(act,el){
+  if(act==='mfgo'){mfGo(el.dataset.id);return true}
   if(act==='alclear'){UI.alf={};render();return true}
   if(act==='srchopen'){UI.srchQ='';UI.modal={srch:true};render();setTimeout(()=>{const i=document.getElementById('srch-q');if(i)i.focus()},30);return true}
   if(act==='srchan'){const a=anOf(el.dataset.id);UI.modal=null;if(a){if(!perm('v_charts'))return true;UI.cid=a.id;if(a.dept&&S.setup.cur!==a.dept&&canSeeD(a.dept))try{loadCtx(a.dept)}catch(e){}UI.cid=a.id;setTab('charts')}else render();return true}
@@ -3352,6 +3354,24 @@ document.addEventListener('change',e=>{
 document.addEventListener('keydown',e=>{
   if(!CU||UI.modal)return;if((e.key==='/'&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName))||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();srchAct('srchopen')}
 });
+
+/* ---- Setup: find an analyte and jump to its row ---- */
+function mfMatches(q){q=(q||'').trim().toLowerCase();if(!q)return [];
+  return DA().filter(a=>(a.name+' '+(a.panel||'')+' '+instOf(a)).toLowerCase().includes(q)).sort((x,y)=>(x.name.toLowerCase().startsWith(q)?0:1)-(y.name.toLowerCase().startsWith(q)?0:1)||x.name.localeCompare(y.name)).slice(0,8)}
+function mfRes(q){const box=document.getElementById('mfind-res');if(!box)return;const l=mfMatches(q);
+  if(!(q||'').trim()){box.style.display='none';box.innerHTML='';return}
+  box.style.display='block';box.innerHTML=l.length?l.map(a=>`<button class="btn" style="display:block;width:100%;text-align:left;border:0" data-act="mfgo" data-id="${a.id}"><b>${esc(a.name)}</b> <span class="muted small">${esc(a.panel||'')}${ctxMulti()?' · '+esc(instOf(a)):''}${a.off?' · disabled':''}</span></button>`).join(''):'<div class="small muted" style="padding:8px">No analyte in this department matches.</div>'}
+function mfGo(id){
+  const row=document.querySelector('[data-arow="'+id+'"]');const box=document.getElementById('mfind-res');
+  if(box){box.style.display='none'}
+  if(!row){toast('That analyte is not on this screen.');return}
+  const d=row.closest('details');if(d)d.open=true;
+  row.scrollIntoView({behavior:'smooth',block:'center'});
+  row.style.transition='background .4s';const old=row.style.background;row.style.background='var(--bg-warning,#fff3c4)';
+  setTimeout(()=>{row.style.background=old||''},2600);
+}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='mfind')mfRes(e.target.value)});
+document.addEventListener('keydown',e=>{const t=e.target;if(t&&t.id==='mfind'){if(e.key==='Enter'){e.preventDefault();const l=mfMatches(t.value);if(l[0])mfGo(l[0].id)}else if(e.key==='Escape'){t.value='';mfRes('')}}});
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
@@ -3417,7 +3437,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if((act.startsWith('srch')||act==='alclear')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if((act.startsWith('srch')||act==='alclear'||act==='mfgo')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);

@@ -56,6 +56,7 @@ function renderSrchModal(){
    <div id="srch-res">${srchHtml(UI.srchQ)}</div><div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" data-act="mclose">Close</button></div></div></div>`;
 }
 function srchAct(act,el){
+  if(act==='mfgo'){mfGo(el.dataset.id);return true}
   if(act==='alclear'){UI.alf={};render();return true}
   if(act==='srchopen'){UI.srchQ='';UI.modal={srch:true};render();setTimeout(()=>{const i=document.getElementById('srch-q');if(i)i.focus()},30);return true}
   if(act==='srchan'){const a=anOf(el.dataset.id);UI.modal=null;if(a){if(!perm('v_charts'))return true;UI.cid=a.id;if(a.dept&&S.setup.cur!==a.dept&&canSeeD(a.dept))try{loadCtx(a.dept)}catch(e){}UI.cid=a.id;setTab('charts')}else render();return true}
@@ -74,3 +75,21 @@ document.addEventListener('change',e=>{
 document.addEventListener('keydown',e=>{
   if(!CU||UI.modal)return;if((e.key==='/'&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target||{}).tagName))||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();srchAct('srchopen')}
 });
+
+/* ---- Setup: find an analyte and jump to its row ---- */
+function mfMatches(q){q=(q||'').trim().toLowerCase();if(!q)return [];
+  return DA().filter(a=>(a.name+' '+(a.panel||'')+' '+instOf(a)).toLowerCase().includes(q)).sort((x,y)=>(x.name.toLowerCase().startsWith(q)?0:1)-(y.name.toLowerCase().startsWith(q)?0:1)||x.name.localeCompare(y.name)).slice(0,8)}
+function mfRes(q){const box=document.getElementById('mfind-res');if(!box)return;const l=mfMatches(q);
+  if(!(q||'').trim()){box.style.display='none';box.innerHTML='';return}
+  box.style.display='block';box.innerHTML=l.length?l.map(a=>`<button class="btn" style="display:block;width:100%;text-align:left;border:0" data-act="mfgo" data-id="${a.id}"><b>${esc(a.name)}</b> <span class="muted small">${esc(a.panel||'')}${ctxMulti()?' · '+esc(instOf(a)):''}${a.off?' · disabled':''}</span></button>`).join(''):'<div class="small muted" style="padding:8px">No analyte in this department matches.</div>'}
+function mfGo(id){
+  const row=document.querySelector('[data-arow="'+id+'"]');const box=document.getElementById('mfind-res');
+  if(box){box.style.display='none'}
+  if(!row){toast('That analyte is not on this screen.');return}
+  const d=row.closest('details');if(d)d.open=true;
+  row.scrollIntoView({behavior:'smooth',block:'center'});
+  row.style.transition='background .4s';const old=row.style.background;row.style.background='var(--bg-warning,#fff3c4)';
+  setTimeout(()=>{row.style.background=old||''},2600);
+}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='mfind')mfRes(e.target.value)});
+document.addEventListener('keydown',e=>{const t=e.target;if(t&&t.id==='mfind'){if(e.key==='Enter'){e.preventDefault();const l=mfMatches(t.value);if(l[0])mfGo(l[0].id)}else if(e.key==='Escape'){t.value='';mfRes('')}}});
