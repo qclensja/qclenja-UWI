@@ -27,6 +27,12 @@ function renderPtModal(){
    ${notes.length?notes.map(n=>`<div class="panelcard" style="margin-bottom:6px"><div style="white-space:pre-wrap">${esc(n.text)}</div><div class="small muted" style="margin-top:4px">${esc(n.byName||'')} · ${fmtTs(n.at)}${n.by&&CU&&(n.by===CU.id||isAdmin())?` · <button class="btn sm" type="button" data-act="ptnotedel" data-id="${r.id}" data-n="${n.id}">Delete</button>`:''}</div></div>`).join(''):'<p class="small muted" style="margin:0 0 6px">No comments on this point yet.</p>'}
    ${can?`<label class="f">Add a comment<textarea id="pt-text" rows="3" maxlength="500" placeholder="e.g. New vial opened before this run. Repeat is in control."></textarea></label>
    <p id="pt-err" class="small" style="color:var(--bad);margin:6px 0 0" hidden></p>`:'<p class="small muted">Your access level can read comments but not add them.</p>'}
+   ${perm('e_log')?`<h3 style="margin:16px 0 6px">Log calibration or maintenance on ${fmtDate(r.date)}</h3>
+   <div class="row" style="gap:10px;align-items:flex-end;flex-wrap:wrap"><label class="f">What happened<select id="pt-evt" style="width:auto">${EVT.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join('')}</select></label>
+   <label class="f">Applies to<select id="pt-evs" style="width:auto"><option value="one">${esc(a.name)} only</option><option value="all">All tests on ${esc(instOf(a)||'this analyser')}${a.mod?' · '+esc(a.mod):''}</option></select></label>
+   <label class="f" style="flex:1 1 160px">Note (optional)<input type="text" id="pt-evn" maxlength="200" placeholder="e.g. Probe cleaned, lot 2231"></label>
+   <button class="btn" type="button" data-act="ptnoteev" data-id="${r.id}">Log event</button></div>
+   <p class="small muted" style="margin:6px 0 0">It appears on the chart as a marker at this point and in the Calibration log.</p>`:''}
    <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-act="mclose">Close</button>${can?`<button class="btn primary" data-act="ptnoteadd" data-id="${r.id}">Add comment</button>`:''}</div>
   </div></div>`;
 }
@@ -34,6 +40,15 @@ function ptAct(act,el){
   const id=el.dataset.id;
   if(act==='ptnote'){const r=S.results.find(x=>x.id===id);if(r){UI.modal={ptn:id};render()}return true}
   const r=S.results.find(x=>x.id===id);if(!r)return true;
+  if(act==='ptnoteev'){
+    if(!perm('e_log'))return true;
+    const a=anOf(r.aid);if(!a)return true;
+    const g=i=>(document.getElementById(i)||{}).value||'',type=g('pt-evt')||'cal',whole=g('pt-evs')==='all',note=g('pt-evn').trim().slice(0,200),now=nowIso();
+    S.events=S.events||[];
+    const o={id:uid(),type,date:r.date,dept:a.dept,inst:whole?instOf(a):instOf(a),mod:whole?(a.mod||''):'',aids:whole?[]:[a.id],lot:'',note,modAt:now,by:CU?CU.id:null,byName:CU?CU.name:'',at:now};
+    S.events.push(o);
+    audit('Log entry added',evT(type)[1]+' '+fmtDate(o.date)+' · '+evScope(o)+' (from a chart point)',null,[o.dept]);
+    save();toast(evT(type)[1]+' logged for '+fmtDate(r.date)+'. It now shows on the chart.');render();return true}
   if(act==='ptnoteadd'){
     if(!perm('e_override'))return true;
     const box=document.getElementById('pt-text'),txt=(box&&box.value||'').trim();
