@@ -54,6 +54,8 @@ export function applyRules(R,C,caller,pwset){
     out={...R,users,results:unionBy(R.results,C.results,x=>x.id),skips:unionBy(R.skips,C.skips,x=>x.aid+'|'+x.date),audit:unionBy(R.audit,C.audit,x=>x.id),
       events:unionBy(R.events,C.events,x=>x.id).filter(e=>!evDead.has(e.id)),tomb:unionBy(R.tomb,[...evDead],x=>x)};
   }
+  /* a point deleted by an administrator or supervisor must never come back from a stale device */
+  {const T=new Set(out.tomb||[]);if(T.size&&Array.isArray(out.results))out.results=out.results.filter(r=>!T.has(r.id))}
   delete out.tab;return out;
 }
 /* ---- backups: dated copies of the data file inside the same private repository ---- */

@@ -1,4 +1,5 @@
 import {start} from './devserver.mjs';
+import {applyRules} from './worker.mjs';
 const srv=await start(8788);const U='http://localhost:8788';
 const post=async(p,b)=>{const r=await fetch(U+p,{method:'POST',body:JSON.stringify(b)});return {s:r.status,j:await r.json()}};
 const ok=(n,c)=>console.log((c?'PASS':'FAIL'),n);
@@ -66,4 +67,7 @@ r=await post('/push',{u:'jaba',hash:'H1',sha:r.j.sha,data:{users:us,analytes:[],
 r=await post('/pull',{u:'jaba',hash:'H1'});
 const old=await post('/push',{u:'jaba',hash:'H1',sha:r.j.sha,data:{users:us,analytes:[]}});ok('old client rejected',old.s===426&&old.j.outdated);
 r=await post('/push',{u:'jaba',hash:'H1',sha:r.j.sha,data:{users:us,analytes:[],appv:2}});r=await post('/pull',{u:'jaba',hash:'H1'});ok('unknown field kept',(r.j.data.events||[]).some(e=>e.id==='evx')&&r.j.data.appv===2);
+// ---- a deleted QC point must not be resurrected by a technologist's stale device ----
+{const R0={users:[],results:[{id:'keep',aid:'a'}],tomb:['gone']},Cs={users:[],results:[{id:'keep',aid:'a'},{id:'gone',aid:'a'}],tomb:[]};
+ const o=applyRules(R0,Cs,{id:'t1',role:'tech'},[]);ok('stale tech push does not resurrect a deleted point',o.results.length===1&&o.results[0].id==='keep'&&o.tomb.includes('gone'))}
 srv.close();

@@ -426,6 +426,7 @@ function migAnalysers(o){
 const APPV=1;
 function norm(o){
   o.appv=Math.max(+o.appv||0,APPV);
+  if(Array.isArray(o.tomb)&&o.tomb.length&&Array.isArray(o.results)){const T=new Set(o.tomb);o.results=o.results.filter(r=>!T.has(r.id))}
   o.users=o.users||[];o.events=o.events||[];o.trash=o.trash||[];trashPurge(o);o.audit=o.audit||[];o.est=o.est||[];o.tomb=o.tomb||[];o.requests=o.requests||[];o.perms=o.perms||{};o.materials=o.materials||[];o.drules=o.drules||{};o.drulesAt=o.drulesAt||{};o.permsAt=o.permsAt||'';o.rules=o.rules||{};o.rulesAt=o.rulesAt||'';o.skips=o.skips||[];o.results=o.results||[];
   const st=o.setup||(o.setup={});
   st.amods=st.amods||{};migAnalysers(o);migDept(st);(o.depts||[]).forEach(d=>{migDept(d);d.amods=d.amods||{}});
