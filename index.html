@@ -3520,7 +3520,8 @@ function renderSetupHome(){
 }
 const app=document.getElementById('app');
 function stashDrafts(){UI.draft=UI.draft||{};document.querySelectorAll('[data-in]').forEach(i=>{const k=UI.date+':'+i.dataset.in;if(i.value!=='')UI.draft[k]=i.value;else delete UI.draft[k]})}
-const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved.</footer>';
+const BUILD='81c';
+const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved. <span class="muted" title="Build number: quote it when reporting a problem">Build '+BUILD+'</span></footer>';
 function render(){
   const y=window.scrollY;stashDrafts();
   const gate=authGate();if(gate){app.innerHTML=gate+FOOT;window.scrollTo(0,0);return}
