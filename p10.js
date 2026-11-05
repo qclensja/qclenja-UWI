@@ -12,6 +12,7 @@ function renderOther(){
   const o=obState(),yest=dstr(new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()-1,12));
   if(o.to>yest)o.to=yest;if(o.from>o.to)o.from=o.to;
   const all=VAL();if(!all.length)return '<div class="panel empty">No active analytes available.</div>';
+  if(o.mode==='all')return renderOtherAll(o);
   if(o.mode==='day')return renderOtherDay(o,all,yest);
   const cf=x=>(!o.inst||instOf(x)===o.inst)&&(!o.mod||(x.mod||'')===o.mod);let L=all.filter(cf);if(!L.length){o.inst='';o.mod='';L=all}
   if(!L.some(x=>x.id===o.aid))o.aid=L[0].id;
@@ -57,7 +58,7 @@ function saveOther(only){
   toast(ids.length+' value'+(ids.length>1?'s':'')+' saved and plotted.'+(n?' '+n+' violation'+(n>1?'s':'')+' found. See QC alerts.':''));
 }
 
-function obModeSw(o){return `<div class="row" style="margin:8px 0 0"><button class="btn sm${o.mode==='day'?'':' primary'}" data-act="obmode" data-m="an">One analyte, many days</button><button class="btn sm${o.mode==='day'?' primary':''}" data-act="obmode" data-m="day">All analytes, one day</button></div>`}
+function obModeSw(o){return `<div class="row" style="margin:8px 0 0"><button class="btn sm${o.mode==='day'||o.mode==='all'?'':' primary'}" data-act="obmode" data-m="an">One analyte, many days</button><button class="btn sm${o.mode==='day'?' primary':''}" data-act="obmode" data-m="day">All analytes, one day</button><button class="btn sm${o.mode==='all'?' primary':''}" data-act="obmode" data-m="all">All plotted QC</button></div>`}
 function renderOtherDay(o,all,yest){
   if(!o.day||o.day>yest)o.day=yest;
   const insts=[...new Set(all.map(instOf).filter(Boolean))],mods=[...new Set(all.filter(x=>!o.inst||instOf(x)===o.inst).map(x=>x.mod).filter(Boolean))].sort();
