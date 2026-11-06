@@ -112,7 +112,8 @@ function migAnalysers(o){
   fixRec(o.setup);(o.depts||[]).forEach(fixRec);(o.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]});
   (o.trash||[]).forEach(t=>{const d=t.data||{};fixRec(d.dept);(d.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]})});
 }
-const APPV=1;
+const APPV=2;
+const BUILD='__BUILD__';
 function norm(o){
   o.appv=Math.max(+o.appv||0,APPV);
   if(Array.isArray(o.tomb)&&o.tomb.length&&Array.isArray(o.results)){const T=new Set(o.tomb);o.results=o.results.filter(r=>!T.has(r.id))}

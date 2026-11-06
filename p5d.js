@@ -23,8 +23,7 @@ function renderSetupHome(){
 }
 const app=document.getElementById('app');
 function stashDrafts(){UI.draft=UI.draft||{};document.querySelectorAll('[data-in]').forEach(i=>{const k=UI.date+':'+i.dataset.in;if(i.value!=='')UI.draft[k]=i.value;else delete UI.draft[k]})}
-const BUILD='81c';
-const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved. <span class="muted" title="Build number: quote it when reporting a problem">Build '+BUILD+'</span></footer>';
+const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved. <span class="muted" title="Build number: quote it when reporting a problem">Build '+BUILD+'</span> <button class="btn sm" type="button" data-act="updcheck" style="margin-left:6px">Check for updates</button></footer>';
 function render(){
   const y=window.scrollY;stashDrafts();
   const gate=authGate();if(gate){app.innerHTML=gate+FOOT;window.scrollTo(0,0);return}
@@ -64,7 +63,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if((act==='oamore'||act==='oaclear'||/^oa(b?)(edit|del|editok|delok)$/.test(act))&&oaAct(act,el))return;if((act.startsWith('srch')||act==='alclear'||act==='mfgo')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if(act==='updcheck'||act==='updnow'){updAct(act);return}if((act==='oamore'||act==='oaclear'||/^oa(b?)(edit|del|editok|delok)$/.test(act))&&oaAct(act,el))return;if((act.startsWith('srch')||act==='alclear'||act==='mfgo')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);

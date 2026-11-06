@@ -425,7 +425,8 @@ function migAnalysers(o){
   fixRec(o.setup);(o.depts||[]).forEach(fixRec);(o.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]});
   (o.trash||[]).forEach(t=>{const d=t.data||{};fixRec(d.dept);(d.analytes||[]).forEach(a=>{if(a&&ANMIG[a.inst])a.inst=ANMIG[a.inst]})});
 }
-const APPV=1;
+const APPV=2;
+const BUILD='20261106-0500';
 function norm(o){
   o.appv=Math.max(+o.appv||0,APPV);
   if(Array.isArray(o.tomb)&&o.tomb.length&&Array.isArray(o.results)){const T=new Set(o.tomb);o.results=o.results.filter(r=>!T.has(r.id))}
@@ -3495,6 +3496,46 @@ document.addEventListener('input',e=>{const t=e.target;if(!t||!CU||t.id!=='oa-q'
 function oaBPrev(){const m=UI.modal&&UI.modal.oab;if(!m)return;const o=oaState(),ids=Object.keys(o.sel).filter(id=>S.results.some(r=>r.id===id)).slice(0,5),box=document.getElementById('oa-bprev');if(!box)return;
   box.innerHTML=ids.map(id=>{const r=S.results.find(x=>x.id===id),a=anOf(r.aid);return `<div class="small">${esc(a.name)} ${levelName(r.lv)} · ${fmtDate(r.date)} · <span class="mono">${fmt(r.value,decs(a))} → ${fmt(oaNew(r.value,m.mode||'set',m.amt),decs(a))}</span></div>`}).join('')}
 document.addEventListener('input',e=>{const t=e.target;if(t&&t.id==='oa-bamt'&&UI.modal&&UI.modal.oab){UI.modal.oab.amt=t.value;oaBPrev()}});
+/* p20: keep every browser on the newest version. The page checks version.json (never cached) and reloads itself when it is safe. */
+let UPD={build:null,timer:null,busy:false};
+function updBar(show){
+  let b=document.getElementById('updbar');
+  if(!show){if(b)b.remove();return}
+  if(!b){b=document.createElement('div');b.id='updbar';b.setAttribute('role','status');
+    b.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;background:#0B7A6F;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:14px';
+    b.innerHTML='<span>A new version of QCLens is ready. It will install by itself as soon as you are not in the middle of something.</span><button type="button" data-act="updnow" style="background:#fff;color:#0B7A6F;border:0;border-radius:6px;padding:6px 14px;font-weight:600;cursor:pointer">Update now</button>';
+    document.body.appendChild(b)}
+}
+function updSafe(){
+  if(UI.modal||UI.updBusy)return false;const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return false;
+  const full=o=>o&&Object.values(o).some(v=>String(v==null?'':v).trim()!=='');
+  if(full(UI.draft)||full(UI.obd))return false;
+  if(typeof ghOn==='function'&&ghOn()&&(GHS.timer||GHS.busy||GHS.st==='pending'))return false;
+  return true;
+}
+async function updReload(){
+  if(UPD.busy)return;UPD.busy=true;
+  try{if(typeof ghOn==='function'&&ghOn()&&ghReady()&&ghHash(S)!==GHS.lastHash){await Promise.race([ghSync(),new Promise(r=>setTimeout(r,6000))])}}catch(e){}
+  try{if('caches' in window){const k=await caches.keys();await Promise.all(k.map(x=>caches.delete(x)))}}catch(e){}
+  try{if(navigator.serviceWorker){const r=await navigator.serviceWorker.getRegistrations();await Promise.all(r.map(x=>x.unregister()))}}catch(e){}
+  const u=new URL(location.href);u.searchParams.set('b',UPD.build||Date.now());location.replace(u.toString());
+}
+async function updCheck(manual){
+  if(!/^https?:$/.test(location.protocol))return manual&&toast('Update checks only work on the published site.');
+  try{
+    const r=await fetch('version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;const j=await r.json();
+    if(!j||!j.build)throw 0;
+    if(j.build!==BUILD){UPD.build=j.build;updBar(true);updTick()}
+    else{updBar(false);if(manual)toast('QCLens is up to date (build '+BUILD+').')}
+  }catch(e){if(manual)toast('Could not check for updates. Check your connection.')}
+}
+function updTried(){try{return new URL(location.href).searchParams.get('b')===String(UPD.build)}catch(e){return false}}
+function updTick(){clearInterval(UPD.timer);if(updTried())return;UPD.timer=setInterval(()=>{if(updSafe()&&!updTried())updReload()},8000);if(updSafe())setTimeout(()=>{if(updSafe()&&!updTried())updReload()},1500)}
+function updAct(act){if(act==='updcheck')return updCheck(true);if(act==='updnow')return updReload()}
+(function(){if(!/^https?:$/.test(location.protocol))return;
+  setTimeout(()=>updCheck(false),4000);setInterval(()=>updCheck(false),180000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')updCheck(false)});
+})();
 /* ===== Setup summary, main render, events ===== */
 function setupView(){return (isAdmin()||perm('e_setup'))?renderSetupHome():'<div class="alert warn" style="margin:0"><b>View only.</b> Your access level can see Setup but not change it.</div><div inert>'+renderSetupHome()+'</div>'}
 function renderSetupHome(){
@@ -3520,8 +3561,7 @@ function renderSetupHome(){
 }
 const app=document.getElementById('app');
 function stashDrafts(){UI.draft=UI.draft||{};document.querySelectorAll('[data-in]').forEach(i=>{const k=UI.date+':'+i.dataset.in;if(i.value!=='')UI.draft[k]=i.value;else delete UI.draft[k]})}
-const BUILD='81c';
-const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved. <span class="muted" title="Build number: quote it when reporting a problem">Build '+BUILD+'</span></footer>';
+const FOOT='<footer class="sitefoot">&copy; 2026 QCLens. All rights reserved. <span class="muted" title="Build number: quote it when reporting a problem">Build '+BUILD+'</span> <button class="btn sm" type="button" data-act="updcheck" style="margin-left:6px">Check for updates</button></footer>';
 function render(){
   const y=window.scrollY;stashDrafts();
   const gate=authGate();if(gate){app.innerHTML=gate+FOOT;window.scrollTo(0,0);return}
@@ -3561,7 +3601,7 @@ document.addEventListener('click',e=>{
   if(NEED[act]&&!perm(NEED[act])){toast('Your access level does not include this. Ask an administrator.');return}
   if(act==='permreset'){if(!isAdmin())return;S.perms={};S.permsAt=nowIso();audit('Permissions restored to defaults','',null,[]);save();render();return}
   if(act.startsWith('est')&&estAct(act,el))return;
-  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if((act==='oamore'||act==='oaclear'||/^oa(b?)(edit|del|editok|delok)$/.test(act))&&oaAct(act,el))return;if((act.startsWith('srch')||act==='alclear'||act==='mfgo')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
+  if(act.startsWith('sg')&&sgAct(act,el))return;if(act.startsWith('bkp')&&bkpAct(act,el))return;if(act.startsWith('tr')&&trashAct(act,el))return;if(act.startsWith('ev')&&evAct(act,el))return;if(act.startsWith('ptnote')&&ptAct(act,el))return;if(act==='updcheck'||act==='updnow'){updAct(act);return}if((act==='oamore'||act==='oaclear'||/^oa(b?)(edit|del|editok|delok)$/.test(act))&&oaAct(act,el))return;if((act.startsWith('srch')||act==='alclear'||act==='mfgo')&&srchAct(act,el))return;if(act==='admsec'){UI.admSec=el.dataset.s;return render()}if(act==='udeptedit'&&isAdmin()){UI.udeptOpen=el.dataset.id;return render()}if(act==='udeptdone'){UI.udeptOpen=null;return render()}if(act==='crange'){UI.cto=todayStr();UI.cfrom=dstr(new Date(Date.now()-(+el.dataset.d-1)*864e5));return render()}
   switch(act){
    case 'tab':if(el.dataset.aid)UI.cid=el.dataset.aid;return setTab(el.dataset.t);
    case 'signout':return signOut(false);
